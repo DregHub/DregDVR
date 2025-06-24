@@ -1,7 +1,7 @@
 # DregDVR
 Dreg's DVR... Am i 4k wecording? Yes im 4k wecording!
 
-#WOT IT DO ?
+# WOT IT DO ?
 
 Automatically downloads all their....
 	livestreams
@@ -14,7 +14,7 @@ Automatically uploads....
 
 Using fuck all resources, no video transcoding.
 
-#I WANT DIS! HOW I GET....
+# I WANT DIS! HOW I GET....
 
 If your on windows run the command here and reboot
 
