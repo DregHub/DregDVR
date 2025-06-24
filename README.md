@@ -4,11 +4,14 @@ Dreg's DVR... Am i 4k wecording? Yes im 4k wecording!
 # WOT IT DO ?
 
 Automatically downloads all their....
-	livestreams
-	comments on livestreams (even hidden or removed ones) to a .txt file
-	shorts & videos
+
+	Livestreams
+	Livestream Comments (even hidden or removed ones) to a .txt file
+	Videos
+	Shorts
 
 Automatically uploads....
+
 	To internet archive which is practically unbannable
 	To youtube (to seed google search results with links to the internet archive page we dont care if this gets taken down)
 
@@ -29,18 +32,19 @@ then look at this command and modify it for your system
 docker run -v V:\Dregs\pj:/dvr python:alpine python /dvr/main.py
 
 command brakedown...
-V:\Dregs\PJ = The folder on the disk for this instance of the dvr
-:/dvr = Leave this alone can be the same for multiple dregs
-python:alpine = the os the container will run leave this alone its already slimmed down enough
-python /dvr/main.py = the command the container will use to start the dregs dvr script
+
+	V:\Dregs\PJ = The folder on the disk for this instance of the dvr
+	:/dvr = Leave this alone can be the same for multiple dregs
+	python:alpine = the os the container will run leave this alone its already slimmed down enough
+	python /dvr/main.py = the command the container will use to start the dregs dvr script
 
 You need a different folder and container for each dreg you want to record
 
-eg
-docker run -v V:\Dregs\PJ:/dvr python:alpine python /dvr/main.py
-docker run -v V:\Dregs\Gert:/dvr python:alpine python /dvr/main.py
-docker run -v V:\Dregs\Timmy:/dvr python:alpine python /dvr/main.py
-etc
+	eg
+	docker run -v V:\Dregs\PJ:/dvr python:alpine python /dvr/main.py
+	docker run -v V:\Dregs\Gert:/dvr python:alpine python /dvr/main.py
+	docker run -v V:\Dregs\Timmy:/dvr python:alpine python /dvr/main.py
+	etc
 
 You need to customise each ini for each Dreg...
 	Each DVR needs...
