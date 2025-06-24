@@ -27,15 +27,18 @@ download this and install
  
 https://www.docker.com/products/docker-desktop/
 
+
+Clone the repo into a folder structure like V:\Dregs\SOMEDREG first and fill in your config.cfg with real details
+
 then look at this command and modify it for your system
 
-docker run -v V:\Dregs\pj:/dvr python:alpine python /dvr/main.py
+docker run -v V:\Dregs\SOMEDREG:/dvr python:alpine python /dvr/main.py
 
 command brakedown...
 
-	V:\Dregs\PJ = The folder on the disk for this instance of the dvr
+	V:\Dregs\SOMEDREG = The folder on the disk for this instance of the dvr, the repo files should already be in here
 	:/dvr = Leave this alone can be the same for multiple dregs
-	python:alpine = the os the container will run leave this alone its already slimmed down enough
+	python:alpine = the os the container will run only alpine is supported
 	python /dvr/main.py = the command the container will use to start the dregs dvr script
 
 You need a different folder and container for each dreg you want to record
