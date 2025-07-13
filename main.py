@@ -11,7 +11,6 @@ async def main():
         if os.name == "nt":
             # Windows
             LogManager.log_core("Skipping Dependence Package Update as os = Windows")
-            pass
         else:
             LogManager.log_core("Updating Dependency Packages... This may take some time...")
 

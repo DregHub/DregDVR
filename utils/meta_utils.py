@@ -15,8 +15,7 @@ class MetaDataManager:
         try:
             MetaData_Dir_Name = Config.get_value("Directories", "MetaData_Dir")
             MetaData_Dir = os.path.join(Config.ProjRoot_Dir, MetaData_Dir_Name)
-            Meta = os.path.join(MetaData_Dir, "Default.xml")
-            return Meta
+            return os.path.join(MetaData_Dir, "Default.xml")
         except Exception as e:
             LogManager.log_core(f"Failed to read value from meta:  {e}\n{traceback.format_exc()}")
             return None

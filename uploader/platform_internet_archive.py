@@ -10,10 +10,8 @@ IA_LastSessionTime = None
 
 def write_netrc(email, password):
     """Write credentials to the .netrc/_netrc file for IA CLI authentication."""
-    if os.name == "nt":  # Windows
-        netrc_filename = "_netrc"
-    else:
-        netrc_filename = ".netrc"
+    # Windows uses '_netrc', others use '.netrc'
+    netrc_filename = "_netrc" if os.name == "nt" else ".netrc"
     netrc_path = os.path.join(os.path.expanduser("~"), netrc_filename)
     machine = "archive.org"
     content = f"machine {machine}\n  login {email}\n  password {password}\n"

@@ -66,11 +66,9 @@ async def upload_to_youtube(filepath, filename):
         if response:
             LogManager.log_upload_yt(f"Successfully uploaded {Title} to YouTube: {response['id']}")
             if media_upload and hasattr(media_upload, '_fd') and media_upload._fd:
-                try:
+                from contextlib import suppress
+                with suppress(Exception):
                     media_upload._fd.close()
-                except Exception:
-                    pass
-
             return True
         else:
             LogManager.log_upload_yt(f"Upload failed for {Title}")
@@ -81,7 +79,6 @@ async def upload_to_youtube(filepath, filename):
     finally:
         # Ensure file handle is closed if present
         if media_upload and hasattr(media_upload, '_fd') and media_upload._fd:
-            try:
+            from contextlib import suppress
+            with suppress(Exception):
                 media_upload._fd.close()
-            except Exception:
-                pass

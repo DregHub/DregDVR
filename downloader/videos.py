@@ -34,8 +34,8 @@ class VideoDownloader:
                     writer = csv.writer(f)
                     writer.writerow(["UniqueID", "Title", "URL", "Downloaded"])
 
-            with open(cls.persistent_playlist, "r", encoding="utf-8") as infile:
-                reader = csv.reader(infile)
+            with open(cls.persistent_playlist, "r", encoding="utf-8") as in_file:
+                reader = csv.reader(in_file)
                 headers = next(reader, None)
                 for row in reader:
                     if len(row) < 4:
@@ -46,15 +46,14 @@ class VideoDownloader:
                     rows.append(row)
 
             if urls_to_download:
-                with open(cls.posted_download_list, "w", encoding="utf-8") as outfile:
+                with open(cls.posted_download_list, "w", encoding="utf-8") as out_file:
                     for url in urls_to_download:
-                        outfile.write(url + "\n")
-            else:
-                if os.path.exists(cls.posted_download_list):
-                    delete_file(cls.posted_download_list, LogManager.DOWNLOAD_POSTED_LOG_FILE)
+                        out_file.write(url + "\n")
+            elif os.path.exists(cls.posted_download_list):
+                delete_file(cls.posted_download_list, LogManager.DOWNLOAD_POSTED_LOG_FILE)
 
-            with open(cls.persistent_playlist, "w", newline="", encoding="utf-8") as outfile:
-                writer = csv.writer(outfile)
+            with open(cls.persistent_playlist, "w", newline="", encoding="utf-8") as out_file:
+                writer = csv.writer(out_file)
                 if headers:
                     writer.writerow(headers)
                 writer.writerows(rows)
@@ -73,8 +72,8 @@ class VideoDownloader:
                 await cls.generate_download_List()
 
                 if os.path.exists(cls.posted_download_list):
-                    with open(cls.posted_download_list, "r", encoding="utf-8") as infile:
-                        urls = [line.strip() for line in infile if line.strip()]
+                    with open(cls.posted_download_list, "r", encoding="utf-8") as in_file:
+                        urls = [line.strip() for line in in_file if line.strip()]
                         for url in urls:
                             CurrentIndex = IndexManager.get_index("posted_index", LogManager.DOWNLOAD_POSTED_LOG_FILE)
                             CurrentDownloadFile = f"999999{CurrentIndex} %(title)s {cls.DownloadTimeStampFormat}.%(ext)s"

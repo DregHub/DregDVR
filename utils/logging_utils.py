@@ -81,19 +81,19 @@ class LogManager:
                 agg_match = agg_pattern.fullmatch(last_line)
                 normal_match = normal_pattern.fullmatch(last_line)
 
-                if agg_match and agg_match.group(3) == message:
+                if agg_match and agg_match[3] == message:
                     # Update the aggregated line
-                    first_ts = agg_match.group(1)
-                    repeat_count = int(agg_match.group(4)) + 1
+                    first_ts = agg_match[1]
+                    repeat_count = int(agg_match[4]) + 1
                     new_line = f"[{first_ts} > {timestamp}] {message} [Repeat X {repeat_count}]"
                     lines[-1] = new_line + "\n"
                     with open(log_file_name, "w", encoding="utf-8") as log_file:
                         log_file.writelines(lines)
                     print(f"{log_file_name}   :   {new_line}")
                     return
-                elif normal_match and normal_match.group(2) == message:
+                elif normal_match and normal_match[2] == message:
                     # Convert to aggregated line
-                    first_ts = normal_match.group(1)
+                    first_ts = normal_match[1]
                     new_line = f"[{first_ts} > {timestamp}] {message} [Repeat X 2]"
                     lines[-1] = new_line + "\n"
                     with open(log_file_name, "w", encoding="utf-8") as log_file:

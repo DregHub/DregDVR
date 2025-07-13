@@ -35,9 +35,8 @@ class IndexManager:
                 for fname in os.listdir(dir_path):
                     if fname.lower().endswith(".mp4"):
                         previous_videos = True
-                        match = pattern.match(fname)
-                        if match:
-                            idx = int(match.group(1))
+                        if match := pattern.match(fname):
+                            idx = int(match[1])
                             if idx > max_index:
                                 max_index = idx
 
@@ -45,9 +44,7 @@ class IndexManager:
                 LogManager.log_message("No previous videos found, returning first index", log_file)
                 return "1"
 
-            string_index = str(max_index)
-            return string_index
-
+            return str(max_index)
         except Exception as e:
             LogManager.log_message(f"Failed to get index: {e}\n{traceback.format_exc()}", log_file)
             return None
@@ -61,10 +58,7 @@ class IndexManager:
                 LogManager.log_message("Current index is None, cannot increment.", log_file)
                 return None
             current_index_num = int(current_index) + 1
-            current_index_str = str(current_index_num)
-            #LogManager.log_message(f"Returning {current_index_str} as the next available free index for new downloads", log_file)
-            return current_index_str
-
+            return str(current_index_num)
         except Exception as e:
             LogManager.log_message(f"Failed to get next free index: {e}\n{traceback.format_exc()}", log_file)
             return None
@@ -74,9 +68,7 @@ class IndexManager:
         """Read the current value of specified Index from the config."""
         try:
             index = int(Config.get_value("Upload_Index", specified_index))
-            string_index = str(index)
-            return string_index
-
+            return str(index)
         except Exception as e:
             LogManager.log_message(f"Failed to get {specified_index}: {e}\n{traceback.format_exc()}", log_file)
             return None
@@ -85,8 +77,9 @@ class IndexManager:
     def increment_index(specified_index, log_file):
         """Increment the value of specified DownloadFileIndex by one and save it to the config."""
         try:
-            download_file_index = int(Config.get_value("Upload_Index", specified_index))
-            download_file_index += 1
+            download_file_index = (
+                int(Config.get_value("Upload_Index", specified_index)) + 1
+            )
             new_index = str(download_file_index)
             Config.set_value("Upload_Index", specified_index, new_index)
             LogManager.log_message(f"Incremented {specified_index} to : {new_index}", log_file)

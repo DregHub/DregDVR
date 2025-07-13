@@ -38,7 +38,6 @@ class DependencyManager:
         repo_file = "/etc/apk/repositories"
 
         try:
-            
             import aiofiles
             # Log the contents before modification
             async with aiofiles.open(repo_file, "r") as file:

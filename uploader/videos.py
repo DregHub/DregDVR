@@ -29,7 +29,7 @@ class VideoUploader:
                         if not os.path.isfile(filepath):
                             continue  # Skip directories or non-files
 
-                        if file.lower().endswith((".mp4", ".webm")):
+                        if file.lower().endswith((".mp4", ".webm", ".mkv", ".flv", ".3gp")):
                             filename = os.path.splitext(file)[0]  # Extract file name without extension
 
                             if (filename.lower().endswith("am") or filename.lower().endswith("pm")):
