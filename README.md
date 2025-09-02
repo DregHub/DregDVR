@@ -55,13 +55,9 @@ You need to customise each ini for each Dreg...
 
 Additionally
 	1 google account with API access see: https://developers.google.com/youtube/v3/quickstart/python#step_1_set_up_your_project_and_credentials
-<<<<<<< HEAD
 
 	Save the oath json as YT-oauth2.json in \_Auth you can duplicate this file across all your Dreg dvr containers.\
 
-=======
-	Save the oath json as YT-oauth2.json in \_Auth you can duplicate this file across all your Dreg dvr containers.
->>>>>>> dd708771f8fb7f77dbceec60e538aaeaec36d4a6
 	run ia configure within the containers shell to save your archive.org shared secret.
 
 
