@@ -15,6 +15,8 @@ class LivestreamDownloader:
     Live_CompletedUploads_Dir = Config.get_live_completeduploads_dir()
     DownloadFilePrefix = Config.get_live_downloadprefix()
     DownloadTimeStampFormat = Config.get_download_timestamp_format()
+    dlp_verbose = Config.get_verbose_dlp_mode()
+    dlp_keep_fragments = Config.get_dlp_keep_fragments()
 
 
     @classmethod
@@ -34,7 +36,6 @@ class LivestreamDownloader:
                 YT_Handle = cls.extract_username(cls.youtube_source)
                 CurrentDownloadFile = f"{CurrentIndex} {cls.DownloadFilePrefix} {cls.DownloadTimeStampFormat}.%(ext)s"
 
-                verbose = Config.get_verbose_dlp_mode()
                 command = [
                     "yt-dlp",
                     f"--paths temp:{cls.Live_DownloadQueue_Dir}",
@@ -47,8 +48,11 @@ class LivestreamDownloader:
                     cls.youtube_source,
                 ]
 
-                if (verbose == "true"):
+                if (cls.dlp_verbose == "true"):
                     command.append("--verbose")
+
+                if (cls.dlp_keep_fragments == "true"):
+                    command.append("--keep-fragments")
 
                 mini_log = await run_subprocess(
                     command,

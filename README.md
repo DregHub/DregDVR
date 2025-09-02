@@ -57,3 +57,61 @@ You need to customise each ini for each Dreg...
 Additionally
 1 google account with API access see: https://developers.google.com/youtube/v3/quickstart/python#step_1_set_up_your_project_and_credentials
 Save the oath json as YT-oauth2.json in \_Auth you can duplicate this file across all your Dreg dvr containers.
+run ia configure within the containers shell to save your archive.org shared secret.
+
+
+# OPTIONS , WHAT THEY DO!
+
+Here is a quick breakdown of the config file
+
+[YT_Sources]
+source = "https://www.youtube.com/@somebody/live"     = The channel you want to clone
+
+[YT_DownloadSettings]
+live_downloadprefix = timmylivestream-                                     = This is what the flenames of downloaded livestreams will start with    
+posted_downloadprefix = timmypostedvideo-                                  = This is what the flenames of downloaded videos will start with     
+downloadtimestampformat = %(timestamp>%d-%m-%Y %I-%M%p)s                   = The timestamp rever to yt-dlp documentation for more info this is attached to the end of all video file names
+download_file_extentions = [".mp4", ".webm", ".mkv", ".flv", ".3gp"]       = File extentions for the uploaders to watch the uploadqueue folders for
+verbose_dlp_downloads = false                                              = Run yt-dlp in verbose mode useful for troubleshooting
+dlp_keep_fragments = false                                                 = Keep the fragments after downloading useful if anything fcuks up the uploader is smart enough to ignore these
+
+[IA_Settings]
+itemid = somename                                                          = Your itemid on archive.org
+
+[IA_Credentials]
+email = 'someuser'                                                         = Your archive.org credentials. You will still need to run ia configure on each container before uploading anything
+password = '123'                                                           = Your archive.org credentials. You will still need to run ia configure on each container before uploading anything
+
+[Log_Filters]
+core_log_filter = []                                                       = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
+download_live_log_filter = []                                              = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
+download_posted_log_filter = []                                            = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
+upload_posted_log_filter = []                                              = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
+upload_live_log_filter = []                                                = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
+upload_ia_log_filter = []                                                  = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
+upload_yt_log_filter = []                                                  = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
+
+[Directories]
+live_uploadqueue_dir = _Live_UploadQueue                                   = The name of the directory is customizable for reasons
+live_downloadqueue_dir = _Live_DownloadQueue                               = The name of the directory is customizable for reasons
+live_completeduploads_dir = _Live_CompletedUploads                         = The name of the directory is customizable for reasons
+live_comments_dir = _Live_Comments                                         = The name of the directory is customizable for reasons
+posted_uploadqueue_dir = _Posted_UploadQueue                               = The name of the directory is customizable for reasons
+posted_downloadqueue_dir = _Posted_DownloadQueue                           = The name of the directory is customizable for reasons
+posted_completeduploads_dir = _Posted_CompletedUploads                     = The name of the directory is customizable for reasons
+posted_playlists_dir = _Posted_Playlists                                   = The name of the directory is customizable for reasons
+metadata_dir = _Meta                                                       = The name of the directory is customizable for reasons
+log_dir = _Logs                                                            = The name of the directory is customizable for reasons
+auth_dir = _Auth                                                           = The name of the directory is customizable for reasons
+bin_dir = /usr/local/bin                                                   = the ia binary goes in here, we download it for you how handy
+dirs_to_create =                                                           = ["make", "this", "dir"]
+
+[Maintenance]
+container_maintenance_inf_loop = false                                     = boots the contianer and does nothing if true, so you can run commands
+required_dependencies = ["are","installed","automatically"]                = dependencies for us to automatically install using pip
+disable_live_download = false                                              = If true we dont download livestreams
+disable_comment_download = false                                           = If true we dont download comments from livestreams
+disable_posted_download = false                                            = if true we dont download shorts or posted videos
+disable_live_upload = true                                                 = if true we dont upload livestreams
+disable_posted_upload = true                                               = if true we dont upload shorts or posted videos
+disable_log_archiving = true                                               = if true we dont archive logs into folders based on the video filename (useful for troubleshooting)

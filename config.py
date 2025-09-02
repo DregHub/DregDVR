@@ -211,6 +211,10 @@ class Config:
         return cls.get_value("YT_Sources", "source")
 
     @classmethod
+    def get_disable_log_archiving(cls):
+        return cls.get_value("Maintenance", "disable_log_archiving")
+    
+    @classmethod
     def get_download_timestamp_format(cls):
         return cls.get_value("YT_DownloadSettings", "DownloadTimeStampFormat")
     
@@ -225,6 +229,10 @@ class Config:
     @classmethod
     def get_verbose_dlp_mode(cls):
         return cls.get_value("YT_DownloadSettings", "verbose_dlp_downloads")
+    
+    @classmethod
+    def get_dlp_keep_fragments(cls):
+        return cls.get_value("YT_DownloadSettings", "dlp_keep_fragments")
 
     @classmethod
     def get_ia_itemid(cls):

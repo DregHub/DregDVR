@@ -33,29 +33,32 @@ class LiveCommentsDownloader:
                     # Run the blocking chat download in a thread
                     def collect_comments():
                         try:
-                            chat = ChatDownloader().get_chat(yturl)
-                            if chat is not None:
-                                for message in chat:
+                            try:
+                                chat = ChatDownloader().get_chat(yturl)
+                                if chat is not None:
                                     try:
-                                        formatted_message = chat.format(message)
-                                        if formatted_message:  # Only write non-empty messages
-                                            with open(LiveChat_File, "a", encoding="utf-8") as f:
-                                                f.write(formatted_message + "\n")
-                                    except Exception as msg_exc:
-                                        LogManager.log_download_comments(
-                                            f"Exception formatting/writing message: {msg_exc}\n{traceback.format_exc()}"
-                                        )
-                            else:
-                                LogManager.log_download_comments(
-                                    f"ChatDownloader.get_chat returned None for url: {yturl}"
-                                )
+                                        for message in chat:
+                                            try:
+                                                formatted_message = chat.format(message)
+                                                if formatted_message:  # Only write non-empty messages
+                                                    with open(LiveChat_File, "a", encoding="utf-8") as f:
+                                                        f.write(formatted_message + "\n")
+                                            except Exception as msg_exc:
+                                                LogManager.log_download_comments(f"Exception formatting/writing message: {msg_exc}\n{traceback.format_exc()}")
+                                    except PermissionError as perm_exc:
+                                        LogManager.log_download_comments(f"Ignored PermissionError during chat iteration: {perm_exc}\n{traceback.format_exc()}")
+                                    except Exception as iter_exc:
+                                        LogManager.log_download_comments(f"Unexpected error during chat iteration: {iter_exc}\n{traceback.format_exc()}")
+                                else:
+                                    LogManager.log_download_comments(f"ChatDownloader.get_chat returned None for url: {yturl}")
+                            except Exception as chat_exc:
+                                LogManager.log_download_comments(f"Exception initializing chat: {chat_exc}\n{traceback.format_exc()}")
+
                         except Exception as chat_exc:
                             # Silently ignore "this channel has no videos of the requested type"
                             if "this channel has no videos of the requested type" in str(chat_exc).lower():
                                 return
-                            LogManager.log_download_comments(
-                                f"Exception in collect_comments: {chat_exc}\n{traceback.format_exc()}"
-                            )
+                            LogManager.log_download_comments(f"Exception in collect_comments: {chat_exc}\n{traceback.format_exc()}")
 
                     loop = asyncio.get_running_loop()
                     await loop.run_in_executor(None, collect_comments)
@@ -66,6 +69,5 @@ class LiveCommentsDownloader:
                         await asyncio.sleep(30)
                         continue
                     else:
-                        LogManager.log_download_comments(
-                            f"Exception in download_comments:  {e}\n{traceback.format_exc()}")
+                        LogManager.log_download_comments(f"Exception in download_comments:  {e}\n{traceback.format_exc()}")
                         await asyncio.sleep(30)

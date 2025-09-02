@@ -26,6 +26,7 @@ class LogManager:
     UPLOAD_LIVE_LOG_FILTER = Config.upload_live_log_filter()
     UPLOAD_IA_LOG_FILTER = Config.upload_ia_log_filter()
     UPLOAD_YT_LOG_FILTER = Config.upload_yt_log_filter()
+    disable_log_archiving = Config.get_disable_log_archiving().lower() 
 
 
     LOG_FILTERS = [CORE_LOG_FILTER, DOWNLOAD_LIVE_LOG_FILTER, DOWNLOAD_POSTED_LOG_FILTER,
@@ -145,15 +146,16 @@ class LogManager:
     def archive_logs_for_stream(cls, filename, parent_folder, log_files):
         """Archive all log files to a folder named after the uploaded file inside the specified parent_folder."""
         try:
-            log_archive_path = os.path.join(cls.Log_Dir, parent_folder)
-            # Ensure log_archive_path exists
-            if not os.path.exists(log_archive_path):
-                os.makedirs(log_archive_path)
-            archive_folder = os.path.join(log_archive_path, filename)
-            if not os.path.exists(archive_folder):
-                os.makedirs(archive_folder)
-            for log_file in log_files:
-                if os.path.exists(log_file):
-                    shutil.move(log_file, os.path.join(archive_folder, os.path.basename(log_file)))
+            if cls.disable_log_archiving != "true":
+                log_archive_path = os.path.join(cls.Log_Dir, parent_folder)
+                # Ensure log_archive_path exists
+                if not os.path.exists(log_archive_path):
+                    os.makedirs(log_archive_path)
+                archive_folder = os.path.join(log_archive_path, filename)
+                if not os.path.exists(archive_folder):
+                    os.makedirs(archive_folder)
+                for log_file in log_files:
+                    if os.path.exists(log_file):
+                        shutil.move(log_file, os.path.join(archive_folder, os.path.basename(log_file)))
         except Exception as e:
             cls.log_core(f"Failed to archive logs for {filename}: {e}\n{traceback.format_exc()}")

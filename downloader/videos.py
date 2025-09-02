@@ -20,6 +20,8 @@ class VideoDownloader:
     posted_download_list = Config.get_posted_download_list()
     delta_playlist = Config.get_posted_delta_playlist()
     persistent_playlist = Config.get_posted_persistent_playlist()
+    dlp_verbose = Config.get_verbose_dlp_mode()
+    dlp_keep_fragments = Config.get_dlp_keep_fragments()
 
     @classmethod
     async def generate_download_List(cls):
@@ -87,7 +89,7 @@ class VideoDownloader:
                                 url
                             ]
 
-                            if (verbose == "true"):
+                            if (cls.dlp_verbose == "true"):
                                 command.append("--verbose")
 
                             MiniLog = await run_subprocess(
