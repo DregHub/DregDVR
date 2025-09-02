@@ -13,8 +13,7 @@ class MetaDataManager:
     @classmethod
     def init_reader(cls):
         try:
-            MetaData_Dir_Name = Config.get_value("Directories", "MetaData_Dir")
-            MetaData_Dir = os.path.join(Config.ProjRoot_Dir, MetaData_Dir_Name)
+            MetaData_Dir =  Config.get_meta_data_dir()
             return os.path.join(MetaData_Dir, "Default.xml")
         except Exception as e:
             LogManager.log_core(f"Failed to read value from meta:  {e}\n{traceback.format_exc()}")

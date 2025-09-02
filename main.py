@@ -1,31 +1,29 @@
 import os
 import traceback
 import asyncio
+import json
 from utils.logging_utils import LogManager
 from config import Config
 from utils.dependency_utils import DependencyManager
 
-
 async def main():
     try:
+        dirs_to_create = json.loads(Config.get_value("Directories", "dirs_to_create"))
+        for dir in dirs_to_create:
+            os.makedirs(dir, exist_ok=True)
+        
         if os.name == "nt":
             # Windows
-            LogManager.log_core("Skipping Dependence Package Update as os = Windows")
+                LogManager.log_core("Skipping Dependency Package Update as os = Windows")
         else:
-            LogManager.log_core("Updating Dependency Packages... This may take some time...")
-
-            await DependencyManager.ensure_python_and_pip()
-            await DependencyManager.install_pip_dependency("aiohttp")
-            await DependencyManager.install_pip_dependency("aiofiles")
-            await DependencyManager.install_pip_dependency("asyncio")
-            await DependencyManager.install_pip_dependency("configparser")
-            await DependencyManager.install_pip_dependency("oauth2client")
-            await DependencyManager.install_pip_dependency("google-api-python-client")
-            await DependencyManager.install_pip_dependency("chat-downloader")
+            await DependencyManager.instal_apk_packages()
             await DependencyManager.update_apk_repositories()
             await DependencyManager.update_ia()
             await DependencyManager.update_ytdlp()
-
+            pip_dependencies =  json.loads(Config.get_value("Maintenance", "required_dependencies"))
+            for dependency in pip_dependencies:
+                await DependencyManager.install_pip_dependency(dependency)
+            LogManager.log_core("All required dependencies installed/updated successfully.")
         ContainerMaintenance = Config.get_value("Maintenance", "container_maintenance_inf_loop")
         if ContainerMaintenance.lower() == "true":
             LogManager.log_core("Container Maintenance Mode is ON")

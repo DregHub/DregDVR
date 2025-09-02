@@ -19,11 +19,8 @@ async def upload_to_youtube(filepath, filename):
     media_upload = None
     try:
         LogManager.log_upload_yt(f"Attempting upload of file: {filepath} to YouTube")
-        AuthDirName = Config.get_value("Directories", "Auth_Dir")
-        AuthDir = os.path.join(Config.ProjRoot_Dir, AuthDirName)
-
-        YT_ClientSecretFile = os.path.join(AuthDir, "YT-client_secret.json")
-        YT_CredentialsFile = os.path.join(AuthDir, "YT-oauth2.json")
+        YT_ClientSecretFile = Config.get_yt_client_secret_file()
+        YT_CredentialsFile = Config.get_yt_credentials_file()
 
         storage = Storage(YT_CredentialsFile)
         credentials = storage.get()
@@ -44,7 +41,7 @@ async def upload_to_youtube(filepath, filename):
 
         Short_Meta_Description = MetaDataManager.read_value("ShortDescription", LogManager.UPLOAD_YT_LOG_FILE)
         CSV_Keywords = MetaDataManager.read_value("CSVTags", LogManager.UPLOAD_YT_LOG_FILE)
-        Title = filename.replace(".mp4", "")
+        Title = os.path.splitext(filename)[0]
         LogManager.log_upload_yt(f"Uploading {Title} to YouTube...")
 
         media_upload = MediaFileUpload(filepath, chunksize=-1, resumable=True)

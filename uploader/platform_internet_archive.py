@@ -45,9 +45,9 @@ async def login_ia_session(email, password):
 async def upload_to_ia(filepath, filename):
     """Upload a video file to Internet Archive."""
     try:
-        IA_ItemID = Config.get_value("IA_Settings", "itemid")
-        IA_Email = Config.get_value("IA_Credentials", "email")
-        IA_Password = Config.get_value("IA_Credentials", "password")
+        IA_ItemID = Config.get_ia_itemid()
+        IA_Email = Config.get_ia_email()
+        IA_Password = Config.get_ia_password()
         await login_ia_session(IA_Email, IA_Password)
         LogManager.log_upload_ia(f"Attempting archive of file: {filepath} to InternetArchive")
 

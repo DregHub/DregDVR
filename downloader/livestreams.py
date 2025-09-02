@@ -9,14 +9,13 @@ from config import Config
 
 
 class LivestreamDownloader:
-    youtube_source = Config.get_value("YT_Sources", "source")
-    Live_DownloadQueue_Dir = os.path.join(
-        Config.ProjRoot_Dir, Config.get_value("Directories", "Live_DownloadQueue_Dir"))
-    Live_UploadQueue_Dir = os.path.join(Config.ProjRoot_Dir, Config.get_value("Directories", "Live_UploadQueue_Dir"))
-    DownloadFilePrefix = Config.get_value("YT_DownloadSettings", "DownloadFilePrefix")
-    DownloadTimeStampFormat = Config.get_value("YT_DownloadSettings", "DownloadTimeStampFormat")
-    Live_CompletedUploads_Dir = os.path.join(
-        Config.ProjRoot_Dir, Config.get_value("Directories", "live_completeduploads_dir"))
+    youtube_source = Config.get_youtube_source()
+    Live_DownloadQueue_Dir = Config.get_live_downloadqueue_dir()
+    Live_UploadQueue_Dir = Config.get_live_uploadqueue_dir()
+    Live_CompletedUploads_Dir = Config.get_live_completeduploads_dir()
+    DownloadFilePrefix = Config.get_live_downloadprefix()
+    DownloadTimeStampFormat = Config.get_download_timestamp_format()
+
 
     @classmethod
     def extract_username(cls, url):
@@ -31,9 +30,11 @@ class LivestreamDownloader:
         LogManager.log_download_live(f"Starting YT-DLP Monitor for {cls.youtube_source}")
         while True:
             try:
-                CurrentIndex = IndexManager.find_new_index(LogManager.DOWNLOAD_LIVE_LOG_FILE)
+                CurrentIndex = IndexManager.find_new_live_index(LogManager.DOWNLOAD_LIVE_LOG_FILE)
                 YT_Handle = cls.extract_username(cls.youtube_source)
                 CurrentDownloadFile = f"{CurrentIndex} {cls.DownloadFilePrefix} {cls.DownloadTimeStampFormat}.%(ext)s"
+
+                verbose = Config.get_verbose_dlp_mode()
                 command = [
                     "yt-dlp",
                     f"--paths temp:{cls.Live_DownloadQueue_Dir}",
@@ -42,8 +43,12 @@ class LivestreamDownloader:
                     "--live-from-start",
                     "--match-filter live_status=is_live",
                     "--ignore-no-formats-error",
+                    "--retries 30",
                     cls.youtube_source,
                 ]
+
+                if (verbose == "true"):
+                    command.append("--verbose")
 
                 mini_log = await run_subprocess(
                     command,

@@ -9,8 +9,8 @@ from uploader.platform_youtube import upload_to_youtube
 
 
 class VideoUploader:
-    Posted_UploadQueue_Dir = os.path.join(
-        Config.ProjRoot_Dir, Config.get_value("Directories", "Posted_UploadQueue_Dir"))
+    Posted_UploadQueue_Dir = Config.get_posted_uploadqueue_dir()
+    Posted_CompletedUploads_Dir = Config.get_posted_completeduploads_dir()
     _upload_videos_lock = asyncio.Lock()
 
     @classmethod
@@ -29,7 +29,7 @@ class VideoUploader:
                         if not os.path.isfile(filepath):
                             continue  # Skip directories or non-files
 
-                        if file.lower().endswith((".mp4", ".webm", ".mkv", ".flv", ".3gp")):
+                        if file.lower().endswith(Config.get_video_file_extensions()):
                             filename = os.path.splitext(file)[0]  # Extract file name without extension
 
                             if (filename.lower().endswith("am") or filename.lower().endswith("pm")):
@@ -40,9 +40,7 @@ class VideoUploader:
                                 )
 
                                 LogManager.log_upload_posted(f"Completed upload of file: {file} to video hosts")
-                                Posted_CompletedUploads_Dir = os.path.join(
-                                    Config.ProjRoot_Dir, Config.get_value("Directories", "Posted_CompletedUploads_Dir"))
-                                uploaded_filepath = os.path.join(Posted_CompletedUploads_Dir, file)
+                                uploaded_filepath = os.path.join(cls.Posted_CompletedUploads_Dir, file)
                                 shutil.move(filepath, uploaded_filepath)
 
                                 # Archive logs after upload

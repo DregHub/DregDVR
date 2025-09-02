@@ -10,10 +10,10 @@ from downloader.livestreams import LivestreamDownloader
 
 
 class LiveCommentsDownloader:
-    youtube_source = Config.get_value("YT_Sources", "source")
-    DownloadFilePrefix = Config.get_value("YT_DownloadSettings", "DownloadFilePrefix")
-    Live_Comments_Dir = os.path.join(Config.ProjRoot_Dir, Config.get_value("Directories", "Live_Comments_Dir"))
-    DownloadTimeStampFormat = Config.get_value("YT_DownloadSettings", "DownloadTimeStampFormat")
+    youtube_source = Config.get_youtube_source()
+    DownloadFilePrefix = Config.get_live_downloadprefix()
+    DownloadTimeStampFormat = Config.get_download_timestamp_format()
+    Live_Comments_Dir = Config.get_live_comments_dir()
     _download_lock = asyncio.Lock()
 
     @classmethod
@@ -21,7 +21,7 @@ class LiveCommentsDownloader:
         async with cls._download_lock:
             while True:
                 try:
-                    CurrentIndex = IndexManager.find_new_index(LogManager.DOWNLOAD_LIVE_LOG_FILE)
+                    CurrentIndex = IndexManager.find_new_live_index(LogManager.DOWNLOAD_LIVE_LOG_FILE)
                     YT_Handle = LivestreamDownloader.extract_username(cls.youtube_source)
                     LogManager.log_download_comments(f"Starting Live Comment Monitor for {YT_Handle}")
                     CurrentTime = datetime.now().strftime("%d-%m-%Y %I-%M%p")

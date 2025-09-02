@@ -9,11 +9,9 @@ from uploader.platform_youtube import upload_to_youtube
 
 
 class LiveStreamUploader:
-    Live_DownloadQueue_Dir = os.path.join(
-        Config.ProjRoot_Dir, Config.get_value("Directories", "Live_DownloadQueue_Dir"))
-    Live_UploadQueue_Dir = os.path.join(Config.ProjRoot_Dir, Config.get_value("Directories", "Live_UploadQueue_Dir"))
-    Live_CompletedUploads_Dir = os.path.join(
-        Config.ProjRoot_Dir, Config.get_value("Directories", "live_completeduploads_dir"))
+    Live_DownloadQueue_Dir = Config.get_live_downloadqueue_dir()
+    Live_UploadQueue_Dir = Config.get_live_uploadqueue_dir()
+    Live_CompletedUploads_Dir = Config.get_live_completeduploads_dir()
     upload_live_videos_lock = asyncio.Lock()
 
     @classmethod
@@ -28,7 +26,7 @@ class LiveStreamUploader:
                 try:
                     files = [
                         file for file in os.listdir(cls.Live_UploadQueue_Dir)
-                        if file.lower().endswith((".mp4", ".webm"))
+                        if file.lower().endswith(Config.get_video_file_extensions())
                     ]
                     for file in files:
                         filepath = os.path.join(cls.Live_UploadQueue_Dir, file)
@@ -59,7 +57,7 @@ class LiveStreamUploader:
                     # Log files with wrong extension
                     other_files = [
                         file for file in os.listdir(cls.Live_UploadQueue_Dir)
-                        if not file.lower().endswith((".mp4", ".webm"))
+                        if not file.lower().endswith(Config.get_video_file_extensions())
                     ]
                     for file in other_files:
                         LogManager.log_upload_live(f"file: {file} has the wrong file extension")

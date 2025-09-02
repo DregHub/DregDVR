@@ -2,17 +2,23 @@ import asyncio
 import sys
 import os
 import traceback
+import aiohttp
+import aiofiles
+import tarfile
+import tempfile
+import shutil
 from utils.logging_utils import LogManager
 from config import Config
 
 
 class DependencyManager:
+    bin_dir = Config.get_bin_dir()
 
     @classmethod
     async def install_pip_dependency(cls, package_name):
         try:
             process = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", "pip", "install", package_name,
+                sys.executable, "-m", "pip", "install", "--root-user-action=ignore", package_name,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT
             )
@@ -20,11 +26,11 @@ class DependencyManager:
             output = output.decode()
             LogManager.log_core(output)
             if process.returncode == 0:
-                LogManager.log_core("yt-dlp installed/updated successfully.")
+                LogManager.log_core(f"{package_name} installed/updated successfully.")
             else:
-                LogManager.log_core(f"Failed to install yt-dlp. Return code: {process.returncode}")
+                LogManager.log_core(f"Failed to install {package_name}. Return code: {process.returncode}")
         except Exception as e:
-            LogManager.log_core(f"Failed to install yt-dlp:  {e}\n{traceback.format_exc()}")
+            LogManager.log_core(f"Failed to install {package_name}:  {e}\n{traceback.format_exc()}")
 
     @classmethod
     async def update_apk_repositories(cls):
@@ -38,7 +44,6 @@ class DependencyManager:
         repo_file = "/etc/apk/repositories"
 
         try:
-            import aiofiles
             # Log the contents before modification
             async with aiofiles.open(repo_file, "r") as file:
                 before_lines = await file.readlines()
@@ -74,14 +79,14 @@ class DependencyManager:
             LogManager.log_core(f"An error occurred: {e}")
 
     @classmethod
-    async def ensure_python_and_pip(cls):
+    async def instal_apk_packages(cls):
         """
         Ensure build dependencies, python3 and py3-pip are installed via apk, and wheel is installed via pip.
         """
         try:
             # Install build dependencies first
             process_build = await asyncio.create_subprocess_exec(
-                "apk", "add", "--no-cache", "gcc", "musl-dev", "python3-dev", "libffi-dev",
+                "apk", "add", "--no-cache", "gcc", "musl-dev", "python3-dev", "libffi-dev", "ffmpeg",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT
             )
@@ -107,7 +112,7 @@ class DependencyManager:
 
             # Install wheel using pip
             process_pip = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", "pip", "install", "--upgrade", "wheel",
+                sys.executable, "-m", "pip", "install", "--root-user-action=ignore", "--upgrade", "wheel",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT
             )
@@ -124,15 +129,12 @@ class DependencyManager:
         """Install and update the latest ia tool from archive.org."""
         try:
             ia_url = "https://archive.org/download/ia-pex/ia"
-            ia_path = os.path.join(Config.ProjRoot_Dir, "ia")
-            import aiohttp
+            ia_path = os.path.join(cls.bin_dir, "ia")
             async with aiohttp.ClientSession() as session:
                 async with session.get(ia_url) as resp:
                     if resp.status == 200:
-                        import aiofiles
-                        f = await aiofiles.open(ia_path, mode='wb')
-                        await f.write(await resp.read())
-                        await f.close()
+                        async with aiofiles.open(ia_path, mode='wb') as f:
+                            await f.write(await resp.read())
                         os.chmod(ia_path, 0o755)  # Make the file executable
                         LogManager.log_core("Downloaded and updated the ia tool.")
                     else:
@@ -145,7 +147,7 @@ class DependencyManager:
         """Install or update yt-dlp using pip."""
         try:
             process = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", "pip", "install", "-U", "--pre", 'yt-dlp[default]',
+                sys.executable, "-m", "pip", "install", "--root-user-action=ignore", "-U", "--pre", 'yt-dlp[default]',
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT
             )

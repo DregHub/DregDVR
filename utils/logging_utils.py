@@ -8,33 +8,25 @@ from config import Config
 
 
 class LogManager:
-    Log_Dir = os.path.join(Config.ProjRoot_Dir, Config.get_value("Directories", "Log_Dir"))
-    CORE_LOG_FILE = os.path.join(Log_Dir, "_Core_ContentGrabber.log")
-    DOWNLOAD_COMMENTS_LOG_FILE = os.path.join(Log_Dir, "Download_YouTube_Comments.log")
-    DOWNLOAD_LIVE_LOG_FILE = os.path.join(Log_Dir, "Download_YouTube_Live.log")
-    DOWNLOAD_POSTED_LOG_FILE = os.path.join(Log_Dir, "Download_YouTube_Posted.log")
-    UPLOAD_POSTED_LOG_FILE = os.path.join(Log_Dir, "Upload_Manager_Posted.log")
-    UPLOAD_LIVE_LOG_FILE = os.path.join(Log_Dir, "Upload_Manager_Live.log")
-    UPLOAD_IA_LOG_FILE = os.path.join(Log_Dir, "Upload_Platform_InternetArchive.log")
-    UPLOAD_YT_LOG_FILE = os.path.join(Log_Dir, "Upload_Platform_YouTube.log")
-    ArchivedLogs_Dir = os.path.join(Log_Dir, "_ArchivedLogs")
 
-    @staticmethod
-    def parse_string_list(str_list):
-        """Convert a string representation of a Python list to an actual list."""
-        try:
-            return json.loads(str_list)
-        except Exception as e:
-            LogManager.log_core(f"Failed to parse string list:  {e}\n{traceback.format_exc()}")
-            return []
+    Log_Dir = Config.get_log_dir()
+    CORE_LOG_FILE = Config.get_core_log_file()
+    DOWNLOAD_COMMENTS_LOG_FILE = Config.get_download_comments_log_file()
+    DOWNLOAD_LIVE_LOG_FILE = Config.get_download_live_log_file()
+    DOWNLOAD_POSTED_LOG_FILE = Config.get_download_posted_log_file()
+    UPLOAD_POSTED_LOG_FILE = Config.get_upload_posted_log_file()
+    UPLOAD_LIVE_LOG_FILE = Config.get_upload_live_log_file()
+    UPLOAD_IA_LOG_FILE = Config.get_upload_ia_log_file()
+    UPLOAD_YT_LOG_FILE = Config.get_upload_yt_log_file()
+    ArchivedLogs_Dir = Config.get_archived_logs_dir()
+    CORE_LOG_FILTER = Config.core_log_filter()
+    DOWNLOAD_LIVE_LOG_FILTER = Config.download_live_log_filter()
+    DOWNLOAD_POSTED_LOG_FILTER = Config.download_posted_log_filter()
+    UPLOAD_POSTED_LOG_FILTER = Config.upload_posted_log_filter()
+    UPLOAD_LIVE_LOG_FILTER = Config.upload_live_log_filter()
+    UPLOAD_IA_LOG_FILTER = Config.upload_ia_log_filter()
+    UPLOAD_YT_LOG_FILTER = Config.upload_yt_log_filter()
 
-    CORE_LOG_FILTER = parse_string_list(Config.get_value("Log_Filters", "CORE_LOG_FILTER"))
-    DOWNLOAD_LIVE_LOG_FILTER = parse_string_list(Config.get_value("Log_Filters", "DOWNLOAD_LIVE_LOG_FILTER"))
-    DOWNLOAD_POSTED_LOG_FILTER = parse_string_list(Config.get_value("Log_Filters", "DOWNLOAD_POSTED_LOG_FILTER"))
-    UPLOAD_POSTED_LOG_FILTER = parse_string_list(Config.get_value("Log_Filters", "UPLOAD_POSTED_LOG_FILTER"))
-    UPLOAD_LIVE_LOG_FILTER = parse_string_list(Config.get_value("Log_Filters", "UPLOAD_LIVE_LOG_FILTER"))
-    UPLOAD_IA_LOG_FILTER = parse_string_list(Config.get_value("Log_Filters", "UPLOAD_IA_LOG_FILTER"))
-    UPLOAD_YT_LOG_FILTER = parse_string_list(Config.get_value("Log_Filters", "UPLOAD_YT_LOG_FILTER"))
 
     LOG_FILTERS = [CORE_LOG_FILTER, DOWNLOAD_LIVE_LOG_FILTER, DOWNLOAD_POSTED_LOG_FILTER,
                    UPLOAD_LIVE_LOG_FILTER, UPLOAD_IA_LOG_FILTER, UPLOAD_YT_LOG_FILTER]

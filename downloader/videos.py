@@ -2,25 +2,24 @@ import asyncio
 import os
 import csv
 import traceback
+import shlex
 from utils.logging_utils import LogManager
 from utils.subprocess_utils import run_subprocess
-from config import Config
 from utils.file_utils import delete_file
 from downloader.playlist import PlaylistManager
 from utils.index_utils import IndexManager
-
+from  config import Config
 
 class VideoDownloader:
     playlist = PlaylistManager()
-    DownloadTimeStampFormat = Config.get_value("YT_DownloadSettings", "DownloadTimeStampFormat")
-    playlist_dir = os.path.join(Config.ProjRoot_Dir, Config.get_value("Directories", "posted_playlists_dir"))
-    Posted_DownloadQueue_Dir = os.path.join(
-        Config.ProjRoot_Dir, Config.get_value("Directories", "posted_downloadqueue_dir"))
-    Posted_UploadQueue_Dir = os.path.join(
-        Config.ProjRoot_Dir, Config.get_value("Directories", "posted_uploadqueue_dir"))
-    posted_download_list = os.path.join(playlist_dir, "_Download_Playlist.txt")
-    delta_playlist = os.path.join(playlist_dir, "_Delta_Playlist.csv")
-    persistent_playlist = os.path.join(playlist_dir, "_Persistent_Playlist.csv")
+    DownloadTimeStampFormat = Config.get_download_timestamp_format()
+    posted_downloadprefix = Config.get_posted_downloadprefix()
+    playlist_dir = Config.get_posted_playlists_dir()
+    Posted_DownloadQueue_Dir = Config.get_posted_downloadqueue_dir()
+    Posted_UploadQueue_Dir = Config.get_posted_uploadqueue_dir()
+    posted_download_list = Config.get_posted_download_list()
+    delta_playlist = Config.get_posted_delta_playlist()
+    persistent_playlist = Config.get_posted_persistent_playlist()
 
     @classmethod
     async def generate_download_List(cls):
@@ -75,17 +74,21 @@ class VideoDownloader:
                     with open(cls.posted_download_list, "r", encoding="utf-8") as in_file:
                         urls = [line.strip() for line in in_file if line.strip()]
                         for url in urls:
-                            CurrentIndex = IndexManager.get_index("posted_index", LogManager.DOWNLOAD_POSTED_LOG_FILE)
-                            CurrentDownloadFile = f"999999{CurrentIndex} %(title)s {cls.DownloadTimeStampFormat}.%(ext)s"
+                            CurrentIndex = IndexManager.find_new_posted_index(LogManager.DOWNLOAD_POSTED_LOG_FILE)
+                            CurrentDownloadFile = f"{cls.posted_downloadprefix}{CurrentIndex} %(title)s {cls.DownloadTimeStampFormat}.%(ext)s"
+                            verbose = Config.get_verbose_dlp_mode()
+                            
                             command = [
                                 "yt-dlp",
                                 f"--paths temp:{cls.Posted_DownloadQueue_Dir}",
                                 "--match-filter live_status=not_live",
                                 "--output",
                                 f'"{CurrentDownloadFile}"',
-                                str(url)
-                                # ,"-v"
+                                url
                             ]
+
+                            if (verbose == "true"):
+                                command.append("--verbose")
 
                             MiniLog = await run_subprocess(
                                 command,
@@ -100,7 +103,6 @@ class VideoDownloader:
                                     "No output from yt-dlp, possibly no new videos or shorts available.")
                             else:
                                 LogManager.log_download_posted(f"Published video {url} Downloaded Successfully.")
-                                IndexManager.increment_index("posted_index", LogManager.DOWNLOAD_POSTED_LOG_FILE)
 
                 if os.path.exists(cls.posted_download_list):
                     delete_file(cls.posted_download_list, LogManager.DOWNLOAD_POSTED_LOG_FILE)

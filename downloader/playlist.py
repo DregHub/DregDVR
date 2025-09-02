@@ -8,18 +8,17 @@ from config import Config
 
 
 class PlaylistManager:
-    youtube_source = Config.get_value("YT_Sources", "source").strip('"')
+    youtube_source = Config.get_youtube_source().strip('"')
     if youtube_source.lower().endswith("/live"):
         youtube_channel = youtube_source[: -len("/live")]
     else:
         youtube_channel = youtube_source
 
     LogManager.log_download_posted(f"Generated channel url from {youtube_channel}")
-    playlist_dir = os.path.join(Config.ProjRoot_Dir, Config.get_value("Directories", "posted_playlists_dir"))
-    Posted_DownloadQueue_Dir = os.path.join(
-        Config.ProjRoot_Dir, Config.get_value("Directories", "posted_downloadqueue_dir"))
-    delta_playlist = os.path.join(playlist_dir, "_Delta_Playlist.csv")
-    persistent_playlist = os.path.join(playlist_dir, "_Persistent_Playlist.csv")
+    playlist_dir = Config.get_posted_playlists_dir()
+    Posted_DownloadQueue_Dir =  Config.get_posted_downloadqueue_dir()
+    delta_playlist = Config.get_posted_delta_playlist()
+    persistent_playlist = Config.get_posted_persistent_playlist()
 
     @classmethod
     async def download_channel_playlist(cls):
