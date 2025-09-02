@@ -48,7 +48,11 @@ class LiveCommentsDownloader:
                                     except PermissionError as perm_exc:
                                         LogManager.log_download_comments(f"Ignored PermissionError during chat iteration: {perm_exc}\n{traceback.format_exc()}")
                                     except Exception as iter_exc:
-                                        LogManager.log_download_comments(f"Unexpected error during chat iteration: {iter_exc}\n{traceback.format_exc()}")
+                                        # Silently ignore "this channel has no videos of the requested type"
+                                        if "this channel has no videos of the requested type" in str(iter_exc).lower():
+                                            return
+                                        else:
+                                            LogManager.log_download_comments(f"Unexpected error during chat iteration: {iter_exc}\n{traceback.format_exc()}")
                                 else:
                                     LogManager.log_download_comments(f"ChatDownloader.get_chat returned None for url: {yturl}")
                             except Exception as chat_exc:
@@ -58,7 +62,8 @@ class LiveCommentsDownloader:
                             # Silently ignore "this channel has no videos of the requested type"
                             if "this channel has no videos of the requested type" in str(chat_exc).lower():
                                 return
-                            LogManager.log_download_comments(f"Exception in collect_comments: {chat_exc}\n{traceback.format_exc()}")
+                            else:
+                                LogManager.log_download_comments(f"Exception in collect_comments: {chat_exc}\n{traceback.format_exc()}")
 
                     loop = asyncio.get_running_loop()
                     await loop.run_in_executor(None, collect_comments)
