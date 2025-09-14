@@ -8,7 +8,8 @@ from utils.subprocess_utils import run_subprocess
 from utils.file_utils import delete_file
 from downloader.playlist import PlaylistManager
 from utils.index_utils import IndexManager
-from  config import Config
+from config import Config
+
 
 class VideoDownloader:
     playlist = PlaylistManager()
@@ -21,7 +22,8 @@ class VideoDownloader:
     delta_playlist = Config.get_posted_delta_playlist()
     persistent_playlist = Config.get_posted_persistent_playlist()
     dlp_verbose = Config.get_verbose_dlp_mode()
-    dlp_keep_fragments = Config.get_dlp_keep_fragments()
+    dlp_no_progress = Config.no_progress_dlp_downloads()
+    dlp_keep_fragments = Config.get_keep_fragments_dlp_downloads()
 
     @classmethod
     async def generate_download_List(cls):
@@ -78,19 +80,28 @@ class VideoDownloader:
                         for url in urls:
                             CurrentIndex = IndexManager.find_new_posted_index(LogManager.DOWNLOAD_POSTED_LOG_FILE)
                             CurrentDownloadFile = f"{cls.posted_downloadprefix}{CurrentIndex} %(title)s {cls.DownloadTimeStampFormat}.%(ext)s"
+                            # The `verbose` variable in the `download_videos` method is used to
+                            # determine whether the verbose mode is enabled for the video downloading
+                            # process.
                             verbose = Config.get_verbose_dlp_mode()
-                            
+
                             command = [
                                 "yt-dlp",
                                 f"--paths temp:{cls.Posted_DownloadQueue_Dir}",
                                 "--match-filter live_status=not_live",
                                 "--output",
                                 f'"{CurrentDownloadFile}"',
-                                url
+                                "--downloader-args", f'"ffmpeg_i:-loglevel quiet"',
+                                f'"{url}"',
                             ]
 
                             if (cls.dlp_verbose == "true"):
                                 command.append("--verbose")
+
+                            if cls.dlp_no_progress == "true":
+                                for filt in Config.get_no_progress_dlp_filters():
+                                    if filt not in LogManager.DOWNLOAD_POSTED_LOG_FILTER:
+                                        LogManager.DOWNLOAD_POSTED_LOG_FILTER.append(filt)
 
                             MiniLog = await run_subprocess(
                                 command,

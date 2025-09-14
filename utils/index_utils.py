@@ -42,7 +42,7 @@ class IndexManager:
                                 max_index = idx
 
             if not previous_videos:
-                LogManager.log_message("No previous videos found, returning 0", log_file)
+                LogManager.log_message("No previous videos found, Index will be returned as 0", log_file)
                 return "0"
 
             return str(max_index)
@@ -94,7 +94,7 @@ class IndexManager:
                                 max_index = idx
 
             if not previous_videos:
-                LogManager.log_message("No previous videos found, returning 0", log_file)
+                LogManager.log_message("No previous videos found, Index will be returned as 0", log_file)
                 return "0"
 
             return str(max_index)

@@ -63,6 +63,11 @@ class Config:
     def get_live_downloadqueue_dir(cls):
         return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Live_DownloadQueue_Dir"))
 
+
+    @classmethod
+    def get_live_downloadrecovery_dir(cls):
+        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "live_downloadrecovery_dir"))
+
     @classmethod
     def get_live_completeduploads_dir(cls):
         return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "live_completeduploads_dir"))
@@ -155,6 +160,11 @@ class Config:
     @classmethod
     def get_download_live_log_file(cls):
         return os.path.join(cls.get_log_dir(), "Download_YouTube_Live.log")
+    
+    
+    @classmethod
+    def get_download_live_recovery_log_file(cls):
+        return os.path.join(cls.get_log_dir(), "Download_YouTube_Recovery.log")
 
     @classmethod
     def get_download_posted_log_file(cls):
@@ -184,6 +194,10 @@ class Config:
     @classmethod
     def download_live_log_filter(cls):
         return cls.parse_string_list(cls.get_value("Log_Filters", "DOWNLOAD_LIVE_LOG_FILTER"))
+    
+    @classmethod
+    def download_live_recovery_log_filter(cls):
+        return cls.parse_string_list(cls.get_value("Log_Filters", "download_live_recovery_log_filter"))
 
     @classmethod
     def download_posted_log_filter(cls):
@@ -212,8 +226,12 @@ class Config:
 
     @classmethod
     def get_disable_log_archiving(cls):
-        return cls.get_value("Maintenance", "disable_log_archiving")
-    
+        return cls.get_value("Maintenance", "disable_log_archiving").lower()
+
+    @classmethod
+    def get_disable_comment_download(cls):
+        return cls.get_value("Maintenance", "disable_comment_download").lower()
+
     @classmethod
     def get_download_timestamp_format(cls):
         return cls.get_value("YT_DownloadSettings", "DownloadTimeStampFormat")
@@ -231,8 +249,12 @@ class Config:
         return cls.get_value("YT_DownloadSettings", "verbose_dlp_downloads")
     
     @classmethod
-    def get_dlp_keep_fragments(cls):
-        return cls.get_value("YT_DownloadSettings", "dlp_keep_fragments")
+    def no_progress_dlp_downloads(cls):
+        return cls.get_value("YT_DownloadSettings", "no_progress_dlp_downloads")
+    
+    @classmethod
+    def get_keep_fragments_dlp_downloads(cls):
+        return cls.get_value("YT_DownloadSettings", "keep_fragments_dlp_downloads")
 
     @classmethod
     def get_ia_itemid(cls):
@@ -247,8 +269,12 @@ class Config:
         return cls.get_value("IA_Credentials", "password")
 
     @classmethod
+    def get_no_progress_dlp_filters(cls):
+        file_extensions = json.loads(cls.get_value("YT_DownloadSettings", "no_progress_dlp_filters"))
+        return  tuple(file_extensions)
+
+    @classmethod
     def get_video_file_extensions(cls):
         file_extensions = json.loads(cls.get_value("YT_DownloadSettings", "download_file_extentions"))
         return  tuple(file_extensions)
-    
 

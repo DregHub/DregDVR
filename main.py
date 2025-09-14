@@ -6,21 +6,22 @@ from utils.logging_utils import LogManager
 from config import Config
 from utils.dependency_utils import DependencyManager
 
+
 async def main():
     try:
         dirs_to_create = json.loads(Config.get_value("Directories", "dirs_to_create"))
         for dir in dirs_to_create:
             os.makedirs(dir, exist_ok=True)
-        
+
         if os.name == "nt":
             # Windows
-                LogManager.log_core("Skipping Dependency Package Update as os = Windows")
+            LogManager.log_core("Skipping Dependency Package Update as os = Windows")
         else:
             await DependencyManager.instal_apk_packages()
             await DependencyManager.update_apk_repositories()
             await DependencyManager.update_ia()
             await DependencyManager.update_ytdlp()
-            pip_dependencies =  json.loads(Config.get_value("Maintenance", "required_dependencies"))
+            pip_dependencies = json.loads(Config.get_value("Maintenance", "required_dependencies"))
             for dependency in pip_dependencies:
                 await DependencyManager.install_pip_dependency(dependency)
             LogManager.log_core("All required dependencies installed/updated successfully.")
@@ -36,10 +37,10 @@ async def main():
             LogManager.log_core("Starting Dregg's DVR... Am i 4k wecording? Yes im 4k wecording!")
 
             disable_live_download = Config.get_value("Maintenance", "disable_live_download").lower()
-            disable_comment_download = Config.get_value("Maintenance", "disable_comment_download").lower()
             disable_posted_download = Config.get_value("Maintenance", "disable_posted_download").lower()
             disable_live_upload = Config.get_value("Maintenance", "disable_live_upload").lower()
             disable_posted_upload = Config.get_value("Maintenance", "disable_posted_upload").lower()
+            disable_live_recovery_download = Config.get_value("Maintenance", "disable_live_recovery_download").lower()
 
             tasks = []
             if disable_live_download != "true":
@@ -47,26 +48,31 @@ async def main():
                 tasks.append(LivestreamDownloader.download_livestreams())
             else:
                 LogManager.log_core("Live Download is disabled in INI Maintenance Section. Skipping...")
+
+            if disable_live_recovery_download != "true":
+                from downloader.recovery import RecoveryDownloader
+                tasks.append(RecoveryDownloader.monitor_recoveryqueue())
+            else:
+                LogManager.log_core("Live Recovery Download is disabled in INI Maintenance Section. Skipping...")
+
             if disable_posted_download != "true":
                 from downloader.videos import VideoDownloader
                 tasks.append(VideoDownloader.download_videos())
             else:
                 LogManager.log_core("Posted Download is disabled in INI Maintenance Section. Skipping...")
-            if disable_comment_download != "true":
-                from downloader.comments import LiveCommentsDownloader
-                tasks.append(LiveCommentsDownloader.download_comments())
-            else:
-                LogManager.log_core("Comment Download is disabled in INI Maintenance Section. Skipping...")
+
             if disable_live_upload != "true":
                 from uploader.livestreams import LiveStreamUploader
                 tasks.append(LiveStreamUploader.upload_live_videos())
             else:
                 LogManager.log_core("Live Upload is disabled in INI Maintenance Section. Skipping...")
+
             if disable_posted_upload != "true":
                 from uploader.videos import VideoUploader
                 tasks.append(VideoUploader.upload_videos())
             else:
                 LogManager.log_core("Posted Upload is disabled in INI Maintenance Section. Skipping...")
+
             if not tasks:
                 LogManager.log_core("All Tasks are disabled in INI Maintenance Section. Exiting...")
             else:

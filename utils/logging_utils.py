@@ -8,11 +8,11 @@ from config import Config
 
 
 class LogManager:
-
     Log_Dir = Config.get_log_dir()
     CORE_LOG_FILE = Config.get_core_log_file()
     DOWNLOAD_COMMENTS_LOG_FILE = Config.get_download_comments_log_file()
     DOWNLOAD_LIVE_LOG_FILE = Config.get_download_live_log_file()
+    DOWNLOAD_LIVE_RECOVERY_LOG_FILE = Config.get_download_live_recovery_log_file()
     DOWNLOAD_POSTED_LOG_FILE = Config.get_download_posted_log_file()
     UPLOAD_POSTED_LOG_FILE = Config.get_upload_posted_log_file()
     UPLOAD_LIVE_LOG_FILE = Config.get_upload_live_log_file()
@@ -21,6 +21,7 @@ class LogManager:
     ArchivedLogs_Dir = Config.get_archived_logs_dir()
     CORE_LOG_FILTER = Config.core_log_filter()
     DOWNLOAD_LIVE_LOG_FILTER = Config.download_live_log_filter()
+    DOWNLOAD_LIVE_RECOVERY_LOG_FILTER = Config.download_live_recovery_log_filter()
     DOWNLOAD_POSTED_LOG_FILTER = Config.download_posted_log_filter()
     UPLOAD_POSTED_LOG_FILTER = Config.upload_posted_log_filter()
     UPLOAD_LIVE_LOG_FILTER = Config.upload_live_log_filter()
@@ -29,14 +30,14 @@ class LogManager:
     disable_log_archiving = Config.get_disable_log_archiving().lower() 
 
 
-    LOG_FILTERS = [CORE_LOG_FILTER, DOWNLOAD_LIVE_LOG_FILTER, DOWNLOAD_POSTED_LOG_FILTER,
-                   UPLOAD_LIVE_LOG_FILTER, UPLOAD_IA_LOG_FILTER, UPLOAD_YT_LOG_FILTER]
-    LOG_FILES = [CORE_LOG_FILE, DOWNLOAD_LIVE_LOG_FILE, DOWNLOAD_POSTED_LOG_FILE,
-                 UPLOAD_LIVE_LOG_FILE, UPLOAD_IA_LOG_FILE, UPLOAD_YT_LOG_FILE]
+    LOG_FILTERS = [CORE_LOG_FILTER, DOWNLOAD_LIVE_LOG_FILTER,DOWNLOAD_LIVE_RECOVERY_LOG_FILTER, DOWNLOAD_POSTED_LOG_FILTER,UPLOAD_LIVE_LOG_FILTER, UPLOAD_IA_LOG_FILTER, UPLOAD_YT_LOG_FILTER]
+    LOG_FILES = [CORE_LOG_FILE, DOWNLOAD_LIVE_LOG_FILE,DOWNLOAD_LIVE_RECOVERY_LOG_FILE, DOWNLOAD_POSTED_LOG_FILE,UPLOAD_LIVE_LOG_FILE, UPLOAD_IA_LOG_FILE, UPLOAD_YT_LOG_FILE]
 
     @classmethod
     def log_message(cls, message, log_file_name):
         """Log a message with a timestamp to the specified log file, aggregating consecutive duplicates, and filter messages."""
+        if not log_file_name:
+            return
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:
             # Find the index of the log file and get the corresponding filter
@@ -111,6 +112,11 @@ class LogManager:
     def log_download_live(cls, message):
         """Log a message to the Download YouTube Live log."""
         cls.log_message(message, cls.DOWNLOAD_LIVE_LOG_FILE)
+
+    @classmethod
+    def log_download_live_recovery(cls, message):
+        """Log a message to the Download YouTube Live Recovery log."""
+        cls.log_message(message, cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILE)
 
     @classmethod
     def log_download_comments(cls, message):
