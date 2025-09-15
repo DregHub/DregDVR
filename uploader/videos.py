@@ -15,6 +15,7 @@ class VideoUploader:
 
     @classmethod
     async def upload_videos(cls):
+        LogManager.log_upload_posted(f"Monitoring {cls.Posted_UploadQueue_Dir} For Published Videos & Shorts")
         # Try to acquire the lock without waiting
         if cls._upload_videos_lock.locked():
             LogManager.log_upload_posted("upload_videos is already running, skipping this call.")
@@ -22,7 +23,6 @@ class VideoUploader:
 
         async with cls._upload_videos_lock:
             while True:
-                LogManager.log_upload_posted(f"Monitoring {cls.Posted_UploadQueue_Dir} For Published Videos")
                 try:
                     for file in os.listdir(cls.Posted_UploadQueue_Dir):
                         filepath = os.path.join(cls.Posted_UploadQueue_Dir, file)

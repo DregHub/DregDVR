@@ -16,13 +16,13 @@ class LiveStreamUploader:
 
     @classmethod
     async def upload_live_videos(cls):
+        LogManager.log_upload_live(f"Monitoring {cls.Live_UploadQueue_Dir} For Published Live Streams")
         if cls.upload_live_videos_lock.locked():
             LogManager.log_upload_live("upload_live_videos is already running. Skipping this invocation.")
             return
 
         async with cls.upload_live_videos_lock:
             while True:
-                LogManager.log_upload_live(f"Monitoring {cls.Live_UploadQueue_Dir} For Published Videos")
                 try:
                     files = [
                         file for file in os.listdir(cls.Live_UploadQueue_Dir)

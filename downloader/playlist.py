@@ -14,7 +14,6 @@ class PlaylistManager:
     else:
         youtube_channel = youtube_source
 
-    LogManager.log_download_posted(f"Generated channel url from {youtube_channel}")
     playlist_dir = Config.get_posted_playlists_dir()
     Posted_DownloadQueue_Dir =  Config.get_posted_downloadqueue_dir()
     delta_playlist = Config.get_posted_delta_playlist()
@@ -28,6 +27,8 @@ class PlaylistManager:
             "yt-dlp",
             "-i",
             "--flat-playlist",
+            "--quiet",
+            "--no-warnings"
             "--match-filter live_status=not_live",
             "--print-to-file",
             "'%(id)s,%(title)s,%(url)s,0'",
@@ -37,7 +38,7 @@ class PlaylistManager:
 
         MiniLog = await run_subprocess(
             command,
-            LogManager.DOWNLOAD_POSTED_LOG_FILE,
+            None, #disable logging to file as this function is called frequently
             "yt-dlp video/shorts playlist extraction failed",
             "Exception in download_videos_and_shorts",
             cls.Posted_DownloadQueue_Dir
@@ -60,7 +61,6 @@ class PlaylistManager:
                 delta_lines = [line.strip() for line in source_file if line.strip()]
 
             if not delta_lines:
-                LogManager.log_download_posted(f"Delta playlist file {cls.delta_playlist} is empty. Skipping merge.")
                 return
 
             existing_ids = set()
@@ -89,8 +89,8 @@ class PlaylistManager:
                     if not existing_ids or (unique_id and unique_id not in existing_ids):
                         writer.writerow(row)
                         existing_ids.add(unique_id)
-                    else:
-                        LogManager.log_download_posted(f"Skipping existing primary key {unique_id}")
-            LogManager.log_download_posted(f"Merged delta playlist written to {cls.persistent_playlist}")
+                    #else:
+                        #LogManager.log_download_posted(f"Skipping existing primary key {unique_id}")
+                        #LogManager.log_download_posted(f"Merged delta playlist written to {cls.persistent_playlist}")
         except Exception as e:
             LogManager.log_download_posted(f"Failed to merge delta playlist:  {e}\n{traceback.format_exc()}")

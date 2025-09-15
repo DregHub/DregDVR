@@ -24,6 +24,7 @@ class VideoDownloader:
     dlp_verbose = Config.get_verbose_dlp_mode()
     dlp_no_progress = Config.no_progress_dlp_downloads()
     dlp_keep_fragments = Config.get_keep_fragments_dlp_downloads()
+    youtube_source = Config.get_youtube_source()
 
     @classmethod
     async def generate_download_List(cls):
@@ -61,13 +62,14 @@ class VideoDownloader:
                     writer.writerow(headers)
                 writer.writerows(rows)
 
-            LogManager.log_download_posted(
-                f"Exported {len(urls_to_download)} URLs to Download.txt and updated Uploaded status.")
+            if (len(urls_to_download) > 0):
+                LogManager.log_download_posted(f"Generated download list with {len(urls_to_download)} new items.")
         except Exception as e:
             LogManager.log_download_posted(f"Failed in generate_download_List:  {e}\n{traceback.format_exc()}")
 
     @classmethod
     async def download_videos(cls):
+        LogManager.log_download_posted(f"Starting Video & Shorts Downloader for {cls.youtube_source}")
         while True:
             try:
                 await cls.playlist.download_channel_playlist()
@@ -80,10 +82,6 @@ class VideoDownloader:
                         for url in urls:
                             CurrentIndex = IndexManager.find_new_posted_index(LogManager.DOWNLOAD_POSTED_LOG_FILE)
                             CurrentDownloadFile = f"{cls.posted_downloadprefix}{CurrentIndex} %(title)s {cls.DownloadTimeStampFormat}.%(ext)s"
-                            # The `verbose` variable in the `download_videos` method is used to
-                            # determine whether the verbose mode is enabled for the video downloading
-                            # process.
-                            verbose = Config.get_verbose_dlp_mode()
 
                             command = [
                                 "yt-dlp",
