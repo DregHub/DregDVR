@@ -126,5 +126,7 @@ Here is a quick breakdown of the config file
 
 # CREDITS , WHO TO THANK
 https://github.com/yt-dlp/yt-dlp
+
 https://github.com/xenova/chat-downloader
+
 https://github.com/Pyreko/yt-community-post-archiver
