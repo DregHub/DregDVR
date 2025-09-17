@@ -16,6 +16,7 @@ class RecoveryDownloader:
     dlp_keep_fragments = Config.get_keep_fragments_dlp_downloads()
     dlp_no_progress = Config.no_progress_dlp_downloads()
     dlp_max_fragment_retry = Config.get_max_dlp_fragment_retries()
+    dlp_max_dlp_download_retries = Config.get_max_dlp_download_retries()
     dlp_max_title_chars = Config.get_max_title_filename_chars()
 
     # Recovery queue: list of dicts with url, filename, download_complete, and recovery_attempts
@@ -54,6 +55,7 @@ class RecoveryDownloader:
                 "--output", f'"{item['filename']}"',
                 "--downloader-args", f'"ffmpeg_i:-loglevel quiet"',
                 "--restrict-filenames",
+                f"--retries {cls.dlp_max_dlp_download_retries}",
                 f'"{currenturl}"',
             ]
 

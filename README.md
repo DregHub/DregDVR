@@ -71,10 +71,15 @@ Here is a quick breakdown of the config file
 	[YT_DownloadSettings]
 	live_downloadprefix = timmylivestream-                        = This is what the flenames of downloaded livestreams will start with    
 	posted_downloadprefix = timmypostedvideo-                     = This is what the flenames of downloaded videos will start with     
-	downloadtimestampformat = %(timestamp>%d-%m-%Y %I-%M%p)s      = The timestamp rever to yt-dlp documentation for more info this is attached to the end of all video file names
+	download_timestamp_format = %(timestamp>%d-%m-%Y %I-%M%p)s    = The timestamp refer to yt-dlp documentation for more info this is attached to the end of all video file names
 	download_file_extentions = [".mp4", ".webm", ".mkv", ".etc"]  = File extentions for the uploaders to watch the uploadqueue folders for
-	verbose_dlp_downloads = false                                 = Run yt-dlp in verbose mode useful for troubleshooting
-	dlp_keep_fragments = false                                    = Keep the fragments after downloading useful if anything fcuks up the uploader is smart enough to ignore these
+	dlp_no_progress_filters = [": [download]", "of ~", "iB/s"]    = filters to use when dlp_no_progress_downloads is true greatly reduces log file size (recommended)
+	dlp_no_progress_downloads = true                              = dont output 1000s of lines of useless progress messages (recommended)
+	dlp_verbose_downloads = true                                  = Run yt-dlp in verbose mode useful for troubleshooting (recommended)
+	dlp_keep_fragments_downloads = false                          = Keep the fragments after downloading useful if anything fcuks up the uploader is smart enough to ignore these
+	dlp_max_fragment_retries = 10                                 = Mapped to the --retries option for yt-dlp default is 10
+	dlp_max_fragment_retries = 10                                 = Mapped to the --fragment-retries option for yt-dlp default is 10
+	dlp_truncate_title_after_x_chars = 60                         = Trim the title of the source video when its too large (not the title of the prefixed filename we make)
 
 	[IA_Settings]
 	itemid = somename                                             = Your itemid on archive.org
@@ -110,9 +115,16 @@ Here is a quick breakdown of the config file
 	[Maintenance]
 	container_maintenance_inf_loop = false                        = boots the contianer and does nothing if true, so you can run commands
 	required_dependencies = ["are","installed","automatically"]   = dependencies for us to automatically install using pip
-	disable_live_download = false                                 = If true we dont download livestreams
+	disable_live_download = false                                 = If true we dont download livestreams as they are streaming
+	disable_live_recovery_download = false                        = If true we dont download livestreams again for recovery after they have finished
 	disable_comment_download = false                              = If true we dont download comments from livestreams
 	disable_posted_download = false                               = if true we dont download shorts or posted videos
 	disable_live_upload = true                                    = if true we dont upload livestreams
 	disable_posted_upload = true                                  = if true we dont upload shorts or posted videos
 	disable_log_archiving = true                                  = if true we dont archive logs into folders based on the video filename (useful for troubleshooting)
+
+
+# CREDITS , WHO TO THANK
+https://github.com/yt-dlp/yt-dlp
+https://github.com/xenova/chat-downloader
+https://github.com/Pyreko/yt-community-post-archiver

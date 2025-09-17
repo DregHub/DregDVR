@@ -20,7 +20,8 @@ class LivestreamDownloader:
     dlp_verbose = Config.get_verbose_dlp_mode()
     dlp_keep_fragments = Config.get_keep_fragments_dlp_downloads()
     dlp_no_progress = Config.no_progress_dlp_downloads()
-    dlp_max_fragment_retry = Config.get_max_dlp_fragment_retries()
+    dlp_max_fragment_retries = Config.get_max_dlp_fragment_retries()
+    dlp_max_dlp_download_retries = Config.get_max_dlp_download_retries()
     dlp_max_title_chars = Config.get_max_title_filename_chars()
     disable_comment_download = Config.get_disable_comment_download()
 
@@ -104,7 +105,8 @@ class LivestreamDownloader:
                     "--live-from-start",
                     "--match-filter live_status=is_live",
                     "--ignore-no-formats-error",
-                    f"--retries {cls.dlp_max_fragment_retry}",
+                    f"--fragment-retries {cls.dlp_max_fragment_retries}",
+                    f"--retries {cls.dlp_max_dlp_download_retries}",
                     "--skip-unavailable-fragments",
                     "--no-abort-on-error",
                     "--restrict-filenames",

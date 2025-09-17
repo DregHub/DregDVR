@@ -240,12 +240,16 @@ class Config:
 
     @classmethod
     def get_download_timestamp_format(cls):
-        return cls.get_value("YT_DownloadSettings", "DownloadTimeStampFormat")
+        return cls.get_value("YT_DownloadSettings", "download_timestamp_format")
     
     @classmethod
     def get_max_title_filename_chars(cls):
-        return cls.get_value("YT_DownloadSettings", "truncate_title_filename_after_x_chars")
+        return cls.get_value("YT_DownloadSettings", "dlp_truncate_title_after_x_chars")
     
+    @classmethod
+    def get_max_dlp_download_retries(cls):
+        return cls.get_value("YT_DownloadSettings", "dlp_max_download_retries")
+
     @classmethod
     def get_max_dlp_fragment_retries(cls):
         return cls.get_value("YT_DownloadSettings", "dlp_max_fragment_retries")
@@ -260,15 +264,15 @@ class Config:
     
     @classmethod
     def get_verbose_dlp_mode(cls):
-        return cls.get_value("YT_DownloadSettings", "verbose_dlp_downloads")
+        return cls.get_value("YT_DownloadSettings", "dlp_verbose_downloads")
     
     @classmethod
     def no_progress_dlp_downloads(cls):
-        return cls.get_value("YT_DownloadSettings", "no_progress_dlp_downloads")
+        return cls.get_value("YT_DownloadSettings", "dlp_no_progress_downloads")
     
     @classmethod
     def get_keep_fragments_dlp_downloads(cls):
-        return cls.get_value("YT_DownloadSettings", "keep_fragments_dlp_downloads")
+        return cls.get_value("YT_DownloadSettings", "dlp_keep_fragments_downloads")
 
     @classmethod
     def get_ia_itemid(cls):
@@ -284,7 +288,7 @@ class Config:
 
     @classmethod
     def get_no_progress_dlp_filters(cls):
-        file_extensions = json.loads(cls.get_value("YT_DownloadSettings", "no_progress_dlp_filters"))
+        file_extensions = json.loads(cls.get_value("YT_DownloadSettings", "dlp_no_progress_filters"))
         return  tuple(file_extensions)
 
     @classmethod
