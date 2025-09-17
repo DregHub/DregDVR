@@ -2,7 +2,7 @@ import asyncio
 import re
 import traceback
 from utils.logging_utils import LogManager
-from utils.subprocess_utils import run_subprocess, run_subprocess_realtime
+from utils.subprocess_utils import run_subprocess_realtime
 from config import Config
 
 
@@ -15,15 +15,17 @@ class RecoveryDownloader:
     dlp_verbose = Config.get_verbose_dlp_mode()
     dlp_keep_fragments = Config.get_keep_fragments_dlp_downloads()
     dlp_no_progress = Config.no_progress_dlp_downloads()
+    dlp_max_fragment_retry = Config.get_max_dlp_fragment_retries()
+    dlp_max_title_chars = Config.get_max_title_filename_chars()
 
-    # Recovery queue: list of dicts with url, index, download_complete, and recovery_attempts
+    # Recovery queue: list of dicts with url, filename, download_complete, and recovery_attempts
     recoveryqueue = []
 
     @classmethod
-    async def add_to_recoveryqueue(cls, url, index):
+    async def add_to_recoveryqueue(cls, url, filename):
         cls.recoveryqueue.append({
             "url": url,
-            "index": index,
+            "filename": filename,
             "download_complete": False,
             "recovery_attempts": 0
         })
@@ -45,14 +47,13 @@ class RecoveryDownloader:
     async def download_recovery_livestream(cls, item):
         async with cls._recovery_lock:
             LogManager.log_download_live_recovery(f"Starting Recovery Download For {item['url']}")
-            
-            CurrentRecoveryFile = f"{item['index']} {cls.DownloadFilePrefix} %(title)s {cls.DownloadTimeStampFormat}.%(ext)s"
             currenturl = f'https://www.youtube.com/watch?v={item["url"]}'
             recovery_command = [
                 "yt-dlp",
                 "--paths", f"temp:{cls.Live_DownloadRecovery_dir}",
-                "--output", f'"{CurrentRecoveryFile}"',
+                "--output", f'"{item['filename']}"',
                 "--downloader-args", f'"ffmpeg_i:-loglevel quiet"',
+                "--restrict-filenames",
                 f'"{currenturl}"',
             ]
 

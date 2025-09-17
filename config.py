@@ -223,6 +223,12 @@ class Config:
     @classmethod
     def get_youtube_source(cls):
         return cls.get_value("YT_Sources", "source")
+    
+    @classmethod
+    def get_youtube_handle(cls):
+        youtube_source = cls.get_youtube_source().strip('"')
+        youtube_channel = youtube_source[:-5] if youtube_source.lower().endswith("/live") else youtube_source
+        return youtube_channel
 
     @classmethod
     def get_disable_log_archiving(cls):
@@ -235,6 +241,14 @@ class Config:
     @classmethod
     def get_download_timestamp_format(cls):
         return cls.get_value("YT_DownloadSettings", "DownloadTimeStampFormat")
+    
+    @classmethod
+    def get_max_title_filename_chars(cls):
+        return cls.get_value("YT_DownloadSettings", "truncate_title_filename_after_x_chars")
+    
+    @classmethod
+    def get_max_dlp_fragment_retries(cls):
+        return cls.get_value("YT_DownloadSettings", "dlp_max_fragment_retries")
     
     @classmethod
     def get_live_downloadprefix(cls):

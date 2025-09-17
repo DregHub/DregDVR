@@ -49,7 +49,7 @@ class LiveStreamUploader:
                                 LogManager.UPLOAD_IA_LOG_FILE,
                                 LogManager.UPLOAD_YT_LOG_FILE
                             ]
-                            LogManager.archive_logs_for_stream(
+                            LogManager.archive_logs(
                                 filename, "_Archived_LiveStream_Logs", archive_log_files)
                         else:
                             LogManager.log_upload_live(

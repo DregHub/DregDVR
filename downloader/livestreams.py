@@ -20,6 +20,8 @@ class LivestreamDownloader:
     dlp_verbose = Config.get_verbose_dlp_mode()
     dlp_keep_fragments = Config.get_keep_fragments_dlp_downloads()
     dlp_no_progress = Config.no_progress_dlp_downloads()
+    dlp_max_fragment_retry = Config.get_max_dlp_fragment_retries()
+    dlp_max_title_chars = Config.get_max_title_filename_chars()
     disable_comment_download = Config.get_disable_comment_download()
 
     @classmethod
@@ -102,9 +104,10 @@ class LivestreamDownloader:
                     "--live-from-start",
                     "--match-filter live_status=is_live",
                     "--ignore-no-formats-error",
-                    "--retries 15",
+                    f"--retries {cls.dlp_max_fragment_retry}",
                     "--skip-unavailable-fragments",
                     "--no-abort-on-error",
+                    "--restrict-filenames",
                     f'"{item['url']}"',
 
                 ]
@@ -188,8 +191,8 @@ class LivestreamDownloader:
                 item['download_attempts'] += 1
                 LogManager.log_download_live(
                     "Detected the end of a live stream, Adding to the recovery download queue.")
-                if CurrentIndex is not None and current_videoid is not None:
-                    await RecoveryDownloader.add_to_recoveryqueue(current_videoid, CurrentIndex)
+                if CurrentDownloadFile is not None and current_videoid is not None:
+                    await RecoveryDownloader.add_to_recoveryqueue(current_videoid, CurrentDownloadFile)
 
     @classmethod
     async def add_to_downloadqueue(cls, url, index):

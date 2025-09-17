@@ -149,7 +149,7 @@ class LogManager:
         cls.log_message(message, cls.UPLOAD_YT_LOG_FILE)
 
     @classmethod
-    def archive_logs_for_stream(cls, filename, parent_folder, log_files):
+    def archive_logs(cls, filename, parent_folder, log_files):
         """Archive all log files to a folder named after the uploaded file inside the specified parent_folder."""
         try:
             if cls.disable_log_archiving != "true":

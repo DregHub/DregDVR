@@ -1,4 +1,3 @@
-
 import os
 import csv
 import traceback
@@ -8,11 +7,7 @@ from config import Config
 
 
 class PlaylistManager:
-    youtube_source = Config.get_youtube_source().strip('"')
-    if youtube_source.lower().endswith("/live"):
-        youtube_channel = youtube_source[: -len("/live")]
-    else:
-        youtube_channel = youtube_source
+
 
     playlist_dir = Config.get_posted_playlists_dir()
     Posted_DownloadQueue_Dir =  Config.get_posted_downloadqueue_dir()
@@ -22,30 +17,30 @@ class PlaylistManager:
     @classmethod
     async def download_channel_playlist(cls):
         open(cls.delta_playlist, "w").close()
-
         command = [
             "yt-dlp",
             "-i",
             "--flat-playlist",
             "--quiet",
-            "--no-warnings"
+            "--no-warnings",
             "--match-filter live_status=not_live",
             "--print-to-file",
             "'%(id)s,%(title)s,%(url)s,0'",
             cls.delta_playlist,
-            cls.youtube_channel
+            Config.get_youtube_handle()
         ]
-
-        MiniLog = await run_subprocess(
+        
+        MiniLog, exit_code = await run_subprocess(
             command,
-            None, #disable logging to file as this function is called frequently
+            #LogManager.DOWNLOAD_POSTED_LOG_FILE
+            None,  # disable logging to file as this function is called frequently
             "yt-dlp video/shorts playlist extraction failed",
             "Exception in download_videos_and_shorts",
             cls.Posted_DownloadQueue_Dir
         )
 
-        if not MiniLog:
-            LogManager.log_download_posted("No output from yt-dlp, possibly no new videos or shorts available.")
+        if exit_code != 0:
+            LogManager.log_download_posted(f"yt-dlp exited with code {exit_code}")
 
     @classmethod
     async def merge_delta_playlist(cls):
@@ -53,7 +48,7 @@ class PlaylistManager:
 
         # Skip if delta_playlist is missing or empty
         if not os.path.exists(cls.delta_playlist):
-            LogManager.log_download_posted(f"Delta playlist file {cls.delta_playlist} does not exist. Skipping merge.")
+            #LogManager.log_download_posted(f"Delta playlist file {cls.delta_playlist} does not exist. Skipping merge.")
             return
 
         try:
@@ -77,7 +72,7 @@ class PlaylistManager:
                         if row and row[0]:
                             existing_ids.add(row[0])
 
-            # Read existing rows (after header) if file exists, else start with header
+            # Open persistent_playlist in append mode to write new rows
             with open(cls.persistent_playlist, "a", newline="", encoding="utf-8") as outfile:
                 writer = csv.writer(outfile)
                 for line in delta_lines:
@@ -89,8 +84,6 @@ class PlaylistManager:
                     if not existing_ids or (unique_id and unique_id not in existing_ids):
                         writer.writerow(row)
                         existing_ids.add(unique_id)
-                    #else:
-                        #LogManager.log_download_posted(f"Skipping existing primary key {unique_id}")
-                        #LogManager.log_download_posted(f"Merged delta playlist written to {cls.persistent_playlist}")
+            #LogManager.log_download_posted(f"Merged delta playlist written to {cls.persistent_playlist}")
         except Exception as e:
             LogManager.log_download_posted(f"Failed to merge delta playlist:  {e}\n{traceback.format_exc()}")
