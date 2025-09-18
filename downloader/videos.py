@@ -5,7 +5,7 @@ import traceback
 import shlex
 from utils.logging_utils import LogManager
 from utils.subprocess_utils import run_subprocess
-from utils.file_utils import delete_file
+from utils.file_utils import FileManager
 from downloader.playlist import PlaylistManager
 from utils.index_utils import IndexManager
 from config import Config
@@ -25,6 +25,7 @@ class VideoDownloader:
     dlp_no_progress = Config.no_progress_dlp_downloads()
     dlp_keep_fragments = Config.get_keep_fragments_dlp_downloads()
     dlp_max_fragment_retry = Config.get_max_dlp_fragment_retries()
+    dlp_max_dlp_download_retries = Config.get_max_dlp_download_retries()
     dlp_max_title_chars = Config.get_max_title_filename_chars()
     youtube_source = Config.get_youtube_source()
     youtube_handle = Config.get_youtube_handle()
@@ -61,7 +62,7 @@ class VideoDownloader:
                         out_file.write(url + "\n")
             elif os.path.exists(cls.posted_download_list):
                 #LogManager.log_download_posted(f"No URLs to download. Deleting {cls.posted_download_list}.")
-                delete_file(cls.posted_download_list, LogManager.DOWNLOAD_POSTED_LOG_FILE)
+                FileManager.delete_file(cls.posted_download_list, LogManager.DOWNLOAD_POSTED_LOG_FILE)
 
             #LogManager.log_download_posted(f"Writing updated rows back to {cls.persistent_playlist}.")
             with open(cls.persistent_playlist, "w", newline="", encoding="utf-8") as out_file:
@@ -104,7 +105,7 @@ class VideoDownloader:
             try:
                 # Clean up the download old file if it exists
                 if os.path.exists(cls.posted_download_list):
-                    delete_file(cls.posted_download_list, LogManager.DOWNLOAD_POSTED_LOG_FILE)
+                    FileManager.delete_file(cls.posted_download_list, LogManager.DOWNLOAD_POSTED_LOG_FILE)
 
                 await cls.playlist.download_channel_playlist()
                 await cls.playlist.merge_delta_playlist()
@@ -132,6 +133,7 @@ class VideoDownloader:
                                 f'"{CurrentDownloadFile}"',
                                 "--downloader-args", f'"ffmpeg_i:-loglevel quiet"',
                                 "--restrict-filenames",
+                                f"--retries {cls.dlp_max_dlp_download_retries}",
                                 f'"{url}"',
                             ]
 

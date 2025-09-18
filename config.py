@@ -1,4 +1,5 @@
 import os
+import re
 import traceback
 import json
 from configparser import ConfigParser, NoSectionError, NoOptionError
@@ -56,13 +57,12 @@ class Config:
         except Exception as e:
             raise RuntimeError(f"Failed to parse string list:  {e}\n{traceback.format_exc()}")
 
-    #Directory References
+    # Directory References
 
-    #Live Directories
+    # Live Directories
     @classmethod
     def get_live_downloadqueue_dir(cls):
         return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Live_DownloadQueue_Dir"))
-
 
     @classmethod
     def get_live_downloadrecovery_dir(cls):
@@ -80,7 +80,7 @@ class Config:
     def get_live_comments_dir(cls):
         return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Live_Comments_Dir"))
 
-    #Posted Directories
+    # Posted Directories
     @classmethod
     def get_posted_downloadqueue_dir(cls):
         return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "posted_downloadqueue_dir"))
@@ -88,7 +88,7 @@ class Config:
     @classmethod
     def get_posted_completeduploads_dir(cls):
         return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "posted_completeduploads_dir"))
-    
+
     @classmethod
     def get_posted_playlists_dir(cls):
         return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "posted_playlists_dir"))
@@ -97,7 +97,11 @@ class Config:
     def get_posted_uploadqueue_dir(cls):
         return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "posted_uploadqueue_dir"))
 
-    #Misc Directories
+    @classmethod
+    def get_posted_notices_dir(cls):
+        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "posted_notices_dir"))
+
+    # Misc Directories
     @classmethod
     def get_auth_dir(cls):
         return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Auth_Dir"))
@@ -119,9 +123,9 @@ class Config:
         MetaData_Dir_Name = cls.get_value("Directories", "MetaData_Dir")
         return os.path.join(cls.ProjRoot_Dir, MetaData_Dir_Name)
 
-    #File References
+    # File References
 
-    #Posted Files
+    # Posted Files
     @classmethod
     def get_posted_delta_playlist(cls):
         playlist_dir = cls.get_posted_playlists_dir()
@@ -131,13 +135,13 @@ class Config:
     def get_posted_persistent_playlist(cls):
         playlist_dir = cls.get_posted_playlists_dir()
         return os.path.join(playlist_dir, "_Persistent_Playlist.csv")
-    
+
     @classmethod
     def get_posted_download_list(cls):
         playlist_dir = cls.get_posted_playlists_dir()
         return os.path.join(playlist_dir, "_Download_Playlist.txt")
 
-    #Upload Files
+    # Upload Files
     @classmethod
     def get_yt_client_secret_file(cls):
         auth_dir = cls.get_auth_dir()
@@ -147,8 +151,8 @@ class Config:
     def get_yt_credentials_file(cls):
         auth_dir = cls.get_auth_dir()
         return os.path.join(cls.ProjRoot_Dir, auth_dir, "YT-oauth2.json")
-    
-    #Log File References
+
+    # Log File References
     @classmethod
     def get_core_log_file(cls):
         return os.path.join(cls.get_log_dir(), "_Core_ContentGrabber.log")
@@ -160,8 +164,7 @@ class Config:
     @classmethod
     def get_download_live_log_file(cls):
         return os.path.join(cls.get_log_dir(), "Download_YouTube_Live.log")
-    
-    
+
     @classmethod
     def get_download_live_recovery_log_file(cls):
         return os.path.join(cls.get_log_dir(), "Download_YouTube_Recovery.log")
@@ -169,6 +172,10 @@ class Config:
     @classmethod
     def get_download_posted_log_file(cls):
         return os.path.join(cls.get_log_dir(), "Download_YouTube_Posted.log")
+
+    @classmethod
+    def get_download_posted_notices_log_file(cls):
+        return os.path.join(cls.get_log_dir(), "Download_YouTube_Posted_Notices.log")
 
     @classmethod
     def get_upload_posted_log_file(cls):
@@ -186,7 +193,7 @@ class Config:
     def get_upload_yt_log_file(cls):
         return os.path.join(cls.get_log_dir(), "Upload_Platform_YouTube.log")
 
-    #Log Filters
+    # Log Filters
     @classmethod
     def core_log_filter(cls):
         return cls.parse_string_list(cls.get_value("Log_Filters", "CORE_LOG_FILTER"))
@@ -194,7 +201,7 @@ class Config:
     @classmethod
     def download_live_log_filter(cls):
         return cls.parse_string_list(cls.get_value("Log_Filters", "DOWNLOAD_LIVE_LOG_FILTER"))
-    
+
     @classmethod
     def download_live_recovery_log_filter(cls):
         return cls.parse_string_list(cls.get_value("Log_Filters", "download_live_recovery_log_filter"))
@@ -202,6 +209,10 @@ class Config:
     @classmethod
     def download_posted_log_filter(cls):
         return cls.parse_string_list(cls.get_value("Log_Filters", "DOWNLOAD_POSTED_LOG_FILTER"))
+
+    @classmethod
+    def download_posted_notices_log_filter(cls):
+        return cls.parse_string_list(cls.get_value("Log_Filters", "DOWNLOAD_POSTED_NOTICES_LOG_FILTER"))
 
     @classmethod
     def upload_posted_log_filter(cls):
@@ -218,17 +229,26 @@ class Config:
     @classmethod
     def upload_yt_log_filter(cls):
         return cls.parse_string_list(cls.get_value("Log_Filters", "UPLOAD_YT_LOG_FILTER"))
-    
-    #Strings
+
+    # Strings
     @classmethod
     def get_youtube_source(cls):
         return cls.get_value("YT_Sources", "source")
-    
+
     @classmethod
     def get_youtube_handle(cls):
         youtube_source = cls.get_youtube_source().strip('"')
         youtube_channel = youtube_source[:-5] if youtube_source.lower().endswith("/live") else youtube_source
         return youtube_channel
+
+    @classmethod
+    def get_youtube_handle_name(cls):
+        youtube_source = cls.get_youtube_source().strip('"')
+        match = re.search(r"/@([^/]+)", youtube_source)
+        if match:
+            handle = match.group(1).strip("/")
+            return f'@{handle}'
+        return 'Unknown_Handle'
 
     @classmethod
     def get_disable_log_archiving(cls):
@@ -241,11 +261,11 @@ class Config:
     @classmethod
     def get_download_timestamp_format(cls):
         return cls.get_value("YT_DownloadSettings", "download_timestamp_format")
-    
+
     @classmethod
     def get_max_title_filename_chars(cls):
         return cls.get_value("YT_DownloadSettings", "dlp_truncate_title_after_x_chars")
-    
+
     @classmethod
     def get_max_dlp_download_retries(cls):
         return cls.get_value("YT_DownloadSettings", "dlp_max_download_retries")
@@ -253,7 +273,7 @@ class Config:
     @classmethod
     def get_max_dlp_fragment_retries(cls):
         return cls.get_value("YT_DownloadSettings", "dlp_max_fragment_retries")
-    
+
     @classmethod
     def get_live_downloadprefix(cls):
         return cls.get_value("YT_DownloadSettings", "live_downloadprefix")
@@ -261,15 +281,15 @@ class Config:
     @classmethod
     def get_posted_downloadprefix(cls):
         return cls.get_value("YT_DownloadSettings", "posted_downloadprefix")
-    
+
     @classmethod
     def get_verbose_dlp_mode(cls):
         return cls.get_value("YT_DownloadSettings", "dlp_verbose_downloads")
-    
+
     @classmethod
     def no_progress_dlp_downloads(cls):
         return cls.get_value("YT_DownloadSettings", "dlp_no_progress_downloads")
-    
+
     @classmethod
     def get_keep_fragments_dlp_downloads(cls):
         return cls.get_value("YT_DownloadSettings", "dlp_keep_fragments_downloads")
@@ -289,10 +309,9 @@ class Config:
     @classmethod
     def get_no_progress_dlp_filters(cls):
         file_extensions = json.loads(cls.get_value("YT_DownloadSettings", "dlp_no_progress_filters"))
-        return  tuple(file_extensions)
+        return tuple(file_extensions)
 
     @classmethod
     def get_video_file_extensions(cls):
         file_extensions = json.loads(cls.get_value("YT_DownloadSettings", "download_file_extentions"))
-        return  tuple(file_extensions)
-
+        return tuple(file_extensions)

@@ -34,10 +34,9 @@ class VideoUploader:
 
                             if (filename.lower().endswith("am") or filename.lower().endswith("pm")):
                                 # Run all uploads concurrently
-                                await asyncio.gather(
-                                    upload_to_ia(filepath, filename),
-                                    upload_to_youtube(filepath, filename)
-                                )
+                                await asyncio.gather(upload_to_ia(filepath, filename),
+                                                     upload_to_youtube(filepath, filename)
+                                                     )
 
                                 LogManager.log_upload_posted(f"Completed upload of file: {file} to video hosts")
                                 uploaded_filepath = os.path.join(cls.Posted_CompletedUploads_Dir, file)

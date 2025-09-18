@@ -38,6 +38,7 @@ async def main():
 
             disable_live_download = Config.get_value("Maintenance", "disable_live_download").lower()
             disable_posted_download = Config.get_value("Maintenance", "disable_posted_download").lower()
+            disable_posted_notices_download = Config.get_value("Maintenance", "disable_posted_notices_download").lower()
             disable_live_upload = Config.get_value("Maintenance", "disable_live_upload").lower()
             disable_posted_upload = Config.get_value("Maintenance", "disable_posted_upload").lower()
             disable_live_recovery_download = Config.get_value("Maintenance", "disable_live_recovery_download").lower()
@@ -61,6 +62,12 @@ async def main():
             else:
                 LogManager.log_core("Posted Download is disabled in INI Maintenance Section. Skipping...")
 
+            if disable_posted_notices_download != "true":
+                from downloader.posts import CommunityDownloader
+                tasks.append(CommunityDownloader.monitor_channel())
+            else:
+                LogManager.log_core("Posted Community Message Download is disabled in INI Maintenance Section. Skipping...")
+
             if disable_live_upload != "true":
                 from uploader.livestreams import LiveStreamUploader
                 tasks.append(LiveStreamUploader.upload_live_videos())
@@ -72,6 +79,7 @@ async def main():
                 tasks.append(VideoUploader.upload_videos())
             else:
                 LogManager.log_core("Posted Upload is disabled in INI Maintenance Section. Skipping...")
+
 
             if not tasks:
                 LogManager.log_core("All Tasks are disabled in INI Maintenance Section. Exiting...")

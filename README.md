@@ -9,9 +9,10 @@ Automatically downloads all their YouTube....
 	Livestream Comments (even hidden or removed ones) to a .txt file
 	Videos
 	Shorts
+	Community Posts
 
 Automatically uploads....
-
+	Their Livestreams, Videos, Shorts
 	To internet archive which is practically unbannable
 	To youtube (to seed google search results with links to the internet archive page we dont care if this gets taken down)
 
@@ -92,6 +93,7 @@ Here is a quick breakdown of the config file
 	core_log_filter = []                                          = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
 	download_live_log_filter = []                                 = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
 	download_posted_log_filter = []                               = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
+	download_posted_notices_log_filter = []                       = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
 	upload_posted_log_filter = []                                 = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
 	upload_live_log_filter = []                                   = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
 	upload_ia_log_filter = []                                     = ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy
@@ -106,6 +108,7 @@ Here is a quick breakdown of the config file
 	posted_downloadqueue_dir = _Posted_DownloadQueue              = The name of the directory is customizable for reasons
 	posted_completeduploads_dir = _Posted_CompletedUploads        = The name of the directory is customizable for reasons
 	posted_playlists_dir = _Posted_Playlists                      = The name of the directory is customizable for reasons
+	posted_notices_dir = _Posted_CommunityMessages                = The name of the directory is customizable for reasons
 	metadata_dir = _Meta                                          = The name of the directory is customizable for reasons
 	log_dir = _Logs                                               = The name of the directory is customizable for reasons
 	auth_dir = _Auth                                              = The name of the directory is customizable for reasons
@@ -119,6 +122,7 @@ Here is a quick breakdown of the config file
 	disable_live_recovery_download = false                        = If true we dont download livestreams again for recovery after they have finished
 	disable_comment_download = false                              = If true we dont download comments from livestreams
 	disable_posted_download = false                               = if true we dont download shorts or posted videos
+	disable_posted_notices_download = false						  = if true we dont archive community posts to \_Posted_CommunityMessages\Community_Post_Archive.html
 	disable_live_upload = true                                    = if true we dont upload livestreams
 	disable_posted_upload = true                                  = if true we dont upload shorts or posted videos
 	disable_log_archiving = true                                  = if true we dont archive logs into folders based on the video filename (useful for troubleshooting)
