@@ -8,11 +8,11 @@ import tarfile
 import tempfile
 import shutil
 from utils.logging_utils import LogManager
-from config import Config
+from config_settings import DVR_Config
 
 
 class DependencyManager:
-    bin_dir = Config.get_bin_dir()
+    bin_dir = DVR_Config.get_bin_dir()
 
     @classmethod
     async def install_pip_dependency(cls, package_name):

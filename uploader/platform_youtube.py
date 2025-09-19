@@ -11,7 +11,8 @@ from googleapiclient.http import MediaFileUpload
 from googleapiclient.discovery import build
 from utils.logging_utils import LogManager
 from utils.meta_utils import MetaDataManager
-from config import Config
+from config_settings import DVR_Config
+from config_accounts import Account_Config
 
 
 async def upload_to_youtube(filepath, filename):
@@ -19,8 +20,8 @@ async def upload_to_youtube(filepath, filename):
     media_upload = None
     try:
         LogManager.log_upload_yt(f"Attempting upload of file: {filepath} to YouTube")
-        YT_ClientSecretFile = Config.get_yt_client_secret_file()
-        YT_CredentialsFile = Config.get_yt_credentials_file()
+        YT_ClientSecretFile = DVR_Config.get_yt_client_secret_file()
+        YT_CredentialsFile = DVR_Config.get_yt_credentials_file()
 
         storage = Storage(YT_CredentialsFile)
         credentials = storage.get()

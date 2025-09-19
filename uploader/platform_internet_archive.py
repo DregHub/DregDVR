@@ -3,7 +3,8 @@ import traceback
 from datetime import datetime
 from utils.logging_utils import LogManager
 from utils.subprocess_utils import run_subprocess
-from config import Config
+from config_settings import DVR_Config
+from config_accounts import Account_Config
 
 IA_LastSessionTime = None
 
@@ -45,9 +46,9 @@ async def login_ia_session(email, password):
 async def upload_to_ia(filepath, filename):
     """Upload a video file to Internet Archive."""
     try:
-        IA_ItemID = Config.get_ia_itemid()
-        IA_Email = Config.get_ia_email()
-        IA_Password = Config.get_ia_password()
+        IA_ItemID = Account_Config.get_ia_itemid()
+        IA_Email = Account_Config.get_ia_email()
+        IA_Password = Account_Config.get_ia_password()
         await login_ia_session(IA_Email, IA_Password)
         LogManager.log_upload_ia(f"Attempting archive of file: {filepath} to InternetArchive")
 

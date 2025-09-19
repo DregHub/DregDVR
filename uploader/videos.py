@@ -3,14 +3,14 @@ import os
 import shutil
 import traceback
 from utils.logging_utils import LogManager
-from config import Config
+from config_settings import DVR_Config
 from uploader.platform_internet_archive import upload_to_ia
 from uploader.platform_youtube import upload_to_youtube
 
 
 class VideoUploader:
-    Posted_UploadQueue_Dir = Config.get_posted_uploadqueue_dir()
-    Posted_CompletedUploads_Dir = Config.get_posted_completeduploads_dir()
+    Posted_UploadQueue_Dir = DVR_Config.get_posted_uploadqueue_dir()
+    Posted_CompletedUploads_Dir = DVR_Config.get_posted_completeduploads_dir()
     _upload_videos_lock = asyncio.Lock()
 
     @classmethod
@@ -29,7 +29,7 @@ class VideoUploader:
                         if not os.path.isfile(filepath):
                             continue  # Skip directories or non-files
 
-                        if file.lower().endswith(Config.get_video_file_extensions()):
+                        if file.lower().endswith(DVR_Config.get_video_file_extensions()):
                             filename = os.path.splitext(file)[0]  # Extract file name without extension
 
                             if (filename.lower().endswith("am") or filename.lower().endswith("pm")):

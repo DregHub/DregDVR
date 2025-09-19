@@ -3,16 +3,14 @@ import csv
 import traceback
 from utils.logging_utils import LogManager
 from utils.subprocess_utils import run_subprocess
-from config import Config
-
+from config_settings import DVR_Config
+from config_accounts import Account_Config
 
 class PlaylistManager:
-
-
-    playlist_dir = Config.get_posted_playlists_dir()
-    Posted_DownloadQueue_Dir =  Config.get_posted_downloadqueue_dir()
-    delta_playlist = Config.get_posted_delta_playlist()
-    persistent_playlist = Config.get_posted_persistent_playlist()
+    playlist_dir = DVR_Config.get_posted_playlists_dir()
+    Posted_DownloadQueue_Dir =  DVR_Config.get_posted_downloadqueue_dir()
+    delta_playlist = DVR_Config.get_posted_delta_playlist()
+    persistent_playlist = DVR_Config.get_posted_persistent_playlist()
 
     @classmethod
     async def download_channel_playlist(cls):
@@ -27,7 +25,7 @@ class PlaylistManager:
             "--print-to-file",
             "'%(id)s,%(title)s,%(url)s,0'",
             cls.delta_playlist,
-            Config.get_youtube_handle()
+            Account_Config.get_youtube_handle()
         ]
         
         MiniLog, exit_code = await run_subprocess(

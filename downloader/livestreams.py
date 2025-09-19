@@ -5,25 +5,26 @@ from utils.index_utils import IndexManager
 from utils.logging_utils import LogManager
 from utils.subprocess_utils import run_subprocess, run_subprocess_realtime
 from downloader.recovery import RecoveryDownloader
-from config import Config
+from config_settings import DVR_Config
+from config_accounts import Account_Config
 
 
 class LivestreamDownloader:
     _download_execution_lock = asyncio.Lock()
     _monitor_execution_lock = asyncio.Lock()
-    youtube_source = Config.get_youtube_source()
-    Live_DownloadQueue_Dir = Config.get_live_downloadqueue_dir()
-    Live_UploadQueue_Dir = Config.get_live_uploadqueue_dir()
-    Live_CompletedUploads_Dir = Config.get_live_completeduploads_dir()
-    DownloadFilePrefix = Config.get_live_downloadprefix()
-    DownloadTimeStampFormat = Config.get_download_timestamp_format()
-    dlp_verbose = Config.get_verbose_dlp_mode()
-    dlp_keep_fragments = Config.get_keep_fragments_dlp_downloads()
-    dlp_no_progress = Config.no_progress_dlp_downloads()
-    dlp_max_fragment_retries = Config.get_max_dlp_fragment_retries()
-    dlp_max_dlp_download_retries = Config.get_max_dlp_download_retries()
-    dlp_max_title_chars = Config.get_max_title_filename_chars()
-    disable_comment_download = Config.get_disable_comment_download()
+    youtube_source = Account_Config.get_youtube_source()
+    Live_DownloadQueue_Dir = DVR_Config.get_live_downloadqueue_dir()
+    Live_UploadQueue_Dir = DVR_Config.get_live_uploadqueue_dir()
+    Live_CompletedUploads_Dir = DVR_Config.get_live_completeduploads_dir()
+    DownloadFilePrefix = Account_Config.get_live_downloadprefix()
+    DownloadTimeStampFormat = DVR_Config.get_download_timestamp_format()
+    dlp_verbose = DVR_Config.get_verbose_dlp_mode()
+    dlp_keep_fragments = DVR_Config.get_keep_fragments_dlp_downloads()
+    dlp_no_progress = DVR_Config.no_progress_dlp_downloads()
+    dlp_max_fragment_retries = DVR_Config.get_max_dlp_fragment_retries()
+    dlp_max_dlp_download_retries = DVR_Config.get_max_dlp_download_retries()
+    dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
+    disable_comment_download = DVR_Config.get_disable_comment_download()
 
     @classmethod
     def extract_username(cls, url):
@@ -121,7 +122,7 @@ class LivestreamDownloader:
                     command.append("--keep-fragments")
 
                 if cls.dlp_no_progress == "true":
-                    for filt in Config.get_no_progress_dlp_filters():
+                    for filt in DVR_Config.get_no_progress_dlp_filters():
                         if filt not in LogManager.DOWNLOAD_LIVE_LOG_FILTER:
                             LogManager.DOWNLOAD_LIVE_LOG_FILTER.append(filt)
 

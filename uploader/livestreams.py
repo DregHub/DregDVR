@@ -3,15 +3,15 @@ import os
 import shutil
 import traceback
 from utils.logging_utils import LogManager
-from config import Config
+from config_settings import DVR_Config
 from uploader.platform_internet_archive import upload_to_ia
 from uploader.platform_youtube import upload_to_youtube
 
 
 class LiveStreamUploader:
-    Live_DownloadQueue_Dir = Config.get_live_downloadqueue_dir()
-    Live_UploadQueue_Dir = Config.get_live_uploadqueue_dir()
-    Live_CompletedUploads_Dir = Config.get_live_completeduploads_dir()
+    Live_DownloadQueue_Dir = DVR_Config.get_live_downloadqueue_dir()
+    Live_UploadQueue_Dir = DVR_Config.get_live_uploadqueue_dir()
+    Live_CompletedUploads_Dir = DVR_Config.get_live_completeduploads_dir()
     upload_live_videos_lock = asyncio.Lock()
 
     @classmethod
@@ -26,7 +26,7 @@ class LiveStreamUploader:
                 try:
                     files = [
                         file for file in os.listdir(cls.Live_UploadQueue_Dir)
-                        if file.lower().endswith(Config.get_video_file_extensions())
+                        if file.lower().endswith(DVR_Config.get_video_file_extensions())
                     ]
                     for file in files:
                         filepath = os.path.join(cls.Live_UploadQueue_Dir, file)
@@ -57,7 +57,7 @@ class LiveStreamUploader:
                     # Log files with wrong extension
                     other_files = [
                         file for file in os.listdir(cls.Live_UploadQueue_Dir)
-                        if not file.lower().endswith(Config.get_video_file_extensions())
+                        if not file.lower().endswith(DVR_Config.get_video_file_extensions())
                     ]
                     for file in other_files:
                         LogManager.log_upload_live(f"file: {file} has the wrong file extension")

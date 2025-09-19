@@ -3,7 +3,8 @@ import traceback
 import asyncio
 from datetime import datetime
 from chat_downloader import ChatDownloader
-from config import Config
+from config_settings import DVR_Config
+from config_accounts import Account_Config
 from utils.logging_utils import LogManager
 from utils.index_utils import IndexManager
 from downloader.livestreams import LivestreamDownloader
@@ -16,9 +17,9 @@ except ImportError:
 
 
 class LiveCommentsDownloader:
-    DownloadFilePrefix = Config.get_live_downloadprefix()
-    DownloadTimeStampFormat = Config.get_download_timestamp_format()
-    Live_Comments_Dir = Config.get_live_comments_dir()
+    DownloadFilePrefix = Account_Config.get_live_downloadprefix()
+    DownloadTimeStampFormat = DVR_Config.get_download_timestamp_format()
+    Live_Comments_Dir = DVR_Config.get_live_comments_dir()
     _download_lock = asyncio.Lock()
 
     @classmethod

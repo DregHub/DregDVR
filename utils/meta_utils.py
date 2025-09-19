@@ -2,7 +2,7 @@ import os
 import xml.etree.ElementTree as ET
 import traceback
 from utils.logging_utils import LogManager
-from config import Config
+from config_settings import DVR_Config
 
 
 class MetaDataManager:
@@ -13,7 +13,7 @@ class MetaDataManager:
     @classmethod
     def init_reader(cls):
         try:
-            MetaData_Dir =  Config.get_meta_data_dir()
+            MetaData_Dir =  DVR_Config.get_meta_data_dir()
             return os.path.join(MetaData_Dir, "Default.xml")
         except Exception as e:
             LogManager.log_core(f"Failed to read value from meta:  {e}\n{traceback.format_exc()}")

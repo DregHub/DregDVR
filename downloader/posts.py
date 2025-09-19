@@ -7,17 +7,18 @@ import dateparser
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from utils.logging_utils import LogManager
-from config import Config
+from config_settings import DVR_Config
+from config_accounts import Account_Config
 from utils.file_utils import FileManager
 
 
 class CommunityDownloader:
     _download_lock = asyncio.Lock()
-    json_dir = os.path.join(Config.get_posted_notices_dir(), Config.get_youtube_handle_name().lstrip('/'))
-    community_archive = os.path.join(Config.get_posted_notices_dir(), "Community_Post_Archive.html")
+    json_dir = os.path.join(DVR_Config.get_posted_notices_dir(), Account_Config.get_youtube_handle_name().lstrip('/'))
+    community_archive = os.path.join(DVR_Config.get_posted_notices_dir(), "Community_Post_Archive.html")
     json_path = os.path.join(json_dir, 'posts_posts.json')
-    posts_url = f'{Config.get_youtube_handle()}/posts'
-    ythandle = Config.get_youtube_handle_name()
+    posts_url = f'{Account_Config.get_youtube_handle()}/posts'
+    ythandle = Account_Config.get_youtube_handle_name()
 
     @classmethod
     async def monitor_channel(cls):
@@ -42,7 +43,7 @@ class CommunityDownloader:
         except Exception as e:
             LogManager.log_download_posted_notices(f"Error loading JSON: {e}")
             return
-        pagetitle = f"Community Posts Archive for {Config.get_youtube_handle_name()}"
+        pagetitle = f"Community Posts Archive for {Account_Config.get_youtube_handle_name()}"
         # Ensure HTML file exists with base structure
         if not os.path.exists(output_html_path):
             with open(output_html_path, "w", encoding="utf-8") as f:
@@ -160,10 +161,10 @@ class CommunityDownloader:
             firstrun = False
             if not os.path.exists(cls.json_path):
                 LogManager.log_download_posted_notices(f"Creating new Community Posts Archive for {cls.ythandle}")
-                args = ['python3', '-m', 'yp_dl.yp_dl', '-f', Config.get_posted_notices_dir(), cls.posts_url]
+                args = ['python3', '-m', 'yp_dl.yp_dl', '-f', DVR_Config.get_posted_notices_dir(), cls.posts_url]
                 firstrun = True
             else:
-                args = ['python3', '-m', 'yp_dl.yp_dl', '-f', Config.get_posted_notices_dir(), '-u', cls.posts_url]
+                args = ['python3', '-m', 'yp_dl.yp_dl', '-f', DVR_Config.get_posted_notices_dir(), '-u', cls.posts_url]
                 firstrun = False
 
             process = await asyncio.create_subprocess_exec(

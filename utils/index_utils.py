@@ -2,16 +2,17 @@ import os
 import re
 import traceback
 from utils.logging_utils import LogManager
-from config import Config
+from config_settings import DVR_Config
+from config_accounts import Account_Config
 
 class IndexManager:
-    Live_DownloadQueue_Dir = Config.get_live_downloadqueue_dir()
-    Live_UploadQueue_Dir = Config.get_live_uploadqueue_dir()
-    Live_CompletedUploads_Dir = Config.get_live_completeduploads_dir()
+    Live_DownloadQueue_Dir = DVR_Config.get_live_downloadqueue_dir()
+    Live_UploadQueue_Dir = DVR_Config.get_live_uploadqueue_dir()
+    Live_CompletedUploads_Dir = DVR_Config.get_live_completeduploads_dir()
 
-    Posted_DownloadQueue_Dir = Config.get_posted_downloadqueue_dir()
-    Posted_UploadQueue_Dir = Config.get_posted_uploadqueue_dir()
-    Posted_CompletedUploads_Dir = Config.get_posted_completeduploads_dir()
+    Posted_DownloadQueue_Dir = DVR_Config.get_posted_downloadqueue_dir()
+    Posted_UploadQueue_Dir = DVR_Config.get_posted_uploadqueue_dir()
+    Posted_CompletedUploads_Dir = DVR_Config.get_posted_completeduploads_dir()
 
     @staticmethod
     def find_current_live_index(log_file):
@@ -34,7 +35,7 @@ class IndexManager:
                 if not os.path.isdir(dir_path):
                     continue
                 for fname in os.listdir(dir_path):
-                    if fname.lower().endswith(Config.get_video_file_extensions()):
+                    if fname.lower().endswith(DVR_Config.get_video_file_extensions()):
                         previous_videos = True
                         if match := pattern.match(fname):
                             idx = int(match[1])
@@ -85,9 +86,9 @@ class IndexManager:
                 if not os.path.isdir(dir_path):
                     continue
                 for fname in os.listdir(dir_path):
-                    if fname.lower().endswith(Config.get_video_file_extensions()):
+                    if fname.lower().endswith(DVR_Config.get_video_file_extensions()):
                         previous_videos = True
-                        cleaned_name = fname.replace(Config.get_posted_downloadprefix(), "")
+                        cleaned_name = fname.replace(Account_Config.get_posted_downloadprefix(), "")
                         if match := pattern.match(cleaned_name):
                             idx = int(match[1])
                             if idx > max_index:

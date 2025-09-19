@@ -8,27 +8,28 @@ from utils.subprocess_utils import run_subprocess
 from utils.file_utils import FileManager
 from downloader.playlist import PlaylistManager
 from utils.index_utils import IndexManager
-from config import Config
+from config_settings import DVR_Config
+from config_accounts import Account_Config
 
 
 class VideoDownloader:
     playlist = PlaylistManager()
-    DownloadTimeStampFormat = Config.get_download_timestamp_format()
-    posted_downloadprefix = Config.get_posted_downloadprefix()
-    playlist_dir = Config.get_posted_playlists_dir()
-    Posted_DownloadQueue_Dir = Config.get_posted_downloadqueue_dir()
-    Posted_UploadQueue_Dir = Config.get_posted_uploadqueue_dir()
-    posted_download_list = Config.get_posted_download_list()
-    delta_playlist = Config.get_posted_delta_playlist()
-    persistent_playlist = Config.get_posted_persistent_playlist()
-    dlp_verbose = Config.get_verbose_dlp_mode()
-    dlp_no_progress = Config.no_progress_dlp_downloads()
-    dlp_keep_fragments = Config.get_keep_fragments_dlp_downloads()
-    dlp_max_fragment_retry = Config.get_max_dlp_fragment_retries()
-    dlp_max_dlp_download_retries = Config.get_max_dlp_download_retries()
-    dlp_max_title_chars = Config.get_max_title_filename_chars()
-    youtube_source = Config.get_youtube_source()
-    youtube_handle = Config.get_youtube_handle()
+    DownloadTimeStampFormat = DVR_Config.get_download_timestamp_format()
+    posted_downloadprefix = Account_Config.get_posted_downloadprefix()
+    playlist_dir = DVR_Config.get_posted_playlists_dir()
+    Posted_DownloadQueue_Dir = DVR_Config.get_posted_downloadqueue_dir()
+    Posted_UploadQueue_Dir = DVR_Config.get_posted_uploadqueue_dir()
+    posted_download_list = DVR_Config.get_posted_download_list()
+    delta_playlist = DVR_Config.get_posted_delta_playlist()
+    persistent_playlist = DVR_Config.get_posted_persistent_playlist()
+    dlp_verbose = DVR_Config.get_verbose_dlp_mode()
+    dlp_no_progress = DVR_Config.no_progress_dlp_downloads()
+    dlp_keep_fragments = DVR_Config.get_keep_fragments_dlp_downloads()
+    dlp_max_fragment_retry = DVR_Config.get_max_dlp_fragment_retries()
+    dlp_max_dlp_download_retries = DVR_Config.get_max_dlp_download_retries()
+    dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
+    youtube_source = Account_Config.get_youtube_source()
+    youtube_handle = Account_Config.get_youtube_handle()
 
     @classmethod
     async def generate_download_List(cls):
@@ -141,7 +142,7 @@ class VideoDownloader:
                                 command.append("--verbose")
 
                             if cls.dlp_no_progress == "true":
-                                for filt in Config.get_no_progress_dlp_filters():
+                                for filt in DVR_Config.get_no_progress_dlp_filters():
                                     if filt not in LogManager.DOWNLOAD_POSTED_LOG_FILTER:
                                         LogManager.DOWNLOAD_POSTED_LOG_FILTER.append(filt)
 
