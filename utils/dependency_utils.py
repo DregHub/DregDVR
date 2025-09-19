@@ -4,9 +4,6 @@ import os
 import traceback
 import aiohttp
 import aiofiles
-import tarfile
-import tempfile
-import shutil
 from utils.logging_utils import LogManager
 from config_settings import DVR_Config
 

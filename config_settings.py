@@ -6,13 +6,14 @@ from configparser import ConfigParser, NoSectionError, NoOptionError
 
 class DVR_Config:
     ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
+    Config_Dir = os.path.join(ProjRoot_Dir,"_Config")
 
     settings_parser = None
 
     @classmethod
     def _init_settings_parser(cls):
         if cls.settings_parser is None:
-            settings_config_path = os.path.join(cls.ProjRoot_Dir, "dvr_settings.cfg")
+            settings_config_path = os.path.join(cls.Config_Dir, "dvr_settings.cfg")
             # Disable interpolation to allow raw % in values
             cls.settings_parser = ConfigParser(interpolation=None)
             if not os.path.exists(settings_config_path):
@@ -44,7 +45,7 @@ class DVR_Config:
         if not cls.settings_parser.has_section(section):
             cls.settings_parser.add_section(section)
         cls.settings_parser.set(section, key, value)
-        config_path = os.path.join(cls.ProjRoot_Dir, "dvr_settings.cfg")
+        config_path = os.path.join(cls.Config_Dir, "dvr_settings.cfg")
         with open(config_path, "w") as cfg:
             cls.settings_parser.write(cfg)
 
@@ -237,11 +238,7 @@ class DVR_Config:
 
     @classmethod
     def get_disable_log_archiving(cls):
-        return cls.get_value("Maintenance", "disable_log_archiving").lower()
-
-    @classmethod
-    def get_disable_comment_download(cls):
-        return cls.get_value("Maintenance", "disable_comment_download").lower()
+        return cls.get_value("Logging", "disable_log_archiving").lower()
 
     @classmethod
     def get_download_timestamp_format(cls):

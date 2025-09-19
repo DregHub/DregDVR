@@ -4,6 +4,7 @@ import asyncio
 import json
 from utils.logging_utils import LogManager
 from config_settings import DVR_Config
+from config_tasks import DVR_Tasks
 from utils.dependency_utils import DependencyManager
 
 
@@ -25,7 +26,7 @@ async def main():
             for dependency in pip_dependencies:
                 await DependencyManager.install_pip_dependency(dependency)
             LogManager.log_core("All required dependencies installed/updated successfully.")
-        ContainerMaintenance = DVR_Config.get_value("Maintenance", "container_maintenance_inf_loop")
+        ContainerMaintenance = DVR_Tasks.get_disable_container_maintenance_inf_loop()
         if ContainerMaintenance.lower() == "true":
             LogManager.log_core("Container Maintenance Mode is ON")
             LogManager.log_core("Script Will Loop Forever...")
@@ -35,54 +36,61 @@ async def main():
 
         else:
             LogManager.log_core("Starting Dregg's DVR... Am i 4k wecording? Yes im 4k wecording!")
-
-            disable_live_download = DVR_Config.get_value("Maintenance", "disable_live_download").lower()
-            disable_posted_download = DVR_Config.get_value("Maintenance", "disable_posted_download").lower()
-            disable_posted_notices_download = DVR_Config.get_value("Maintenance", "disable_posted_notices_download").lower()
-            disable_live_upload = DVR_Config.get_value("Maintenance", "disable_live_upload").lower()
-            disable_posted_upload = DVR_Config.get_value("Maintenance", "disable_posted_upload").lower()
-            disable_live_recovery_download = DVR_Config.get_value("Maintenance", "disable_live_recovery_download").lower()
+            disable_livestream_download = DVR_Tasks.get_disable_livestream_download()
+            disable_livestream_recovery_download = DVR_Tasks.get_disable_livestream_recovery_download()
+            disable_captions_download = DVR_Tasks.get_disable_captions_download()
+            disable_posted_videos_download = DVR_Tasks.get_disable_posted_videos_download()
+            disable_posted_notices_download = DVR_Tasks.get_disable_posted_notices_download()
+            disable_livestream_upload = DVR_Tasks.get_disable_livestream_upload()
+            disable_posted_videos_upload = DVR_Tasks.get_disable_posted_videos_upload()
 
             tasks = []
-            if disable_live_download != "true":
+            if disable_livestream_download != "true":
                 from downloader.livestreams import LivestreamDownloader
                 tasks.append(LivestreamDownloader.download_livestreams())
             else:
-                LogManager.log_core("Live Download is disabled in INI Maintenance Section. Skipping...")
+                LogManager.log_core("Livestream Download is disabled in INI Tasks. Skipping...")
 
-            if disable_live_recovery_download != "true":
+            if disable_livestream_recovery_download != "true":
                 from downloader.recovery import RecoveryDownloader
                 tasks.append(RecoveryDownloader.monitor_recoveryqueue())
             else:
-                LogManager.log_core("Live Recovery Download is disabled in INI Maintenance Section. Skipping...")
+                LogManager.log_core("Livestream Recovery Download is disabled in INI Tasks. Skipping...")
 
-            if disable_posted_download != "true":
+            if disable_posted_videos_download != "true":
                 from downloader.videos import VideoDownloader
                 tasks.append(VideoDownloader.download_videos())
             else:
-                LogManager.log_core("Posted Download is disabled in INI Maintenance Section. Skipping...")
+                LogManager.log_core("Posted Video Download is disabled in INI Tasks. Skipping...")
+
+            if disable_captions_download != "true":
+                from downloader.captions import CaptionDownloader
+                tasks.append(CaptionDownloader.monitor_channel())
+            else:
+                LogManager.log_core("Caption Download is disabled in INI Tasks. Skipping...")
+
 
             if disable_posted_notices_download != "true":
                 from downloader.posts import CommunityDownloader
                 tasks.append(CommunityDownloader.monitor_channel())
             else:
-                LogManager.log_core("Posted Community Message Download is disabled in INI Maintenance Section. Skipping...")
+                LogManager.log_core("Posted Community Message Download is disabled in INI Tasks. Skipping...")
 
-            if disable_live_upload != "true":
+            if disable_livestream_upload != "true":
                 from uploader.livestreams import LiveStreamUploader
                 tasks.append(LiveStreamUploader.upload_live_videos())
             else:
-                LogManager.log_core("Live Upload is disabled in INI Maintenance Section. Skipping...")
+                LogManager.log_core("Livestream Upload is disabled in INI Tasks. Skipping...")
 
-            if disable_posted_upload != "true":
+            if disable_posted_videos_upload != "true":
                 from uploader.videos import VideoUploader
                 tasks.append(VideoUploader.upload_videos())
             else:
-                LogManager.log_core("Posted Upload is disabled in INI Maintenance Section. Skipping...")
+                LogManager.log_core("Posted Video Upload is disabled in INI Tasks. Skipping...")
 
 
             if not tasks:
-                LogManager.log_core("All Tasks are disabled in INI Maintenance Section. Exiting...")
+                LogManager.log_core("All Tasks are disabled in INI Tasks. Exiting...")
             else:
                 await asyncio.gather(*tasks)
 

@@ -7,6 +7,7 @@ from utils.subprocess_utils import run_subprocess, run_subprocess_realtime
 from downloader.recovery import RecoveryDownloader
 from config_settings import DVR_Config
 from config_accounts import Account_Config
+from config_tasks import DVR_Tasks
 
 
 class LivestreamDownloader:
@@ -24,7 +25,7 @@ class LivestreamDownloader:
     dlp_max_fragment_retries = DVR_Config.get_max_dlp_fragment_retries()
     dlp_max_dlp_download_retries = DVR_Config.get_max_dlp_download_retries()
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
-    disable_comment_download = DVR_Config.get_disable_comment_download()
+    disable_comment_download = DVR_Tasks.get_disable_comments_download()
 
     @classmethod
     def extract_username(cls, url):

@@ -3,7 +3,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 import os
 
-class CaptionManager:
+class CaptionDownloader:
     XML_FILE = "video_data.xml"
 
     @classmethod
@@ -36,7 +36,7 @@ class CaptionManager:
         await asyncio.to_thread(tree.write, cls.XML_FILE)
 
     @classmethod
-    async def monitor_channel(cls, channel_url):
+    async def monitor_channel(cls):
         await cls._init_xml()
 
         async def monitor():
@@ -44,7 +44,7 @@ class CaptionManager:
                 try:
                     result = await asyncio.to_thread(
                         subprocess.run,
-                        ["yt-dlp", "--flat-playlist", "--print", "%(id)s", channel_url],
+                        ["yt-dlp", "--flat-playlist", "--print", "%(id)s", "channel_url"],
                         capture_output=True, text=True
                     )
                     video_ids = result.stdout.strip().split("\n")

@@ -7,13 +7,14 @@ from configparser import ConfigParser, NoSectionError, NoOptionError
 
 class Account_Config:
     ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
+    Config_Dir = os.path.join(ProjRoot_Dir,"_Config")
 
     account_parser = None
 
     @classmethod
     def _init_account_parser(cls):
         if cls.account_parser is None:
-            account_config_path = os.path.join(cls.ProjRoot_Dir, "dvr_accounts.cfg")
+            account_config_path = os.path.join(cls.Config_Dir, "dvr_accounts.cfg")
             # Disable interpolation to allow raw % in values
             cls.account_parser = ConfigParser(interpolation=None)
             if not os.path.exists(account_config_path):
@@ -46,7 +47,7 @@ class Account_Config:
         if not cls.account_parser.has_section(section):
             cls.account_parser.add_section(section)
         cls.account_parser.set(section, key, value)
-        config_path = os.path.join(cls.ProjRoot_Dir, "dvr_accounts.cfg")
+        config_path = os.path.join(cls.Config_Dir, "dvr_accounts.cfg")
         with open(config_path, "w") as cfg:
             cls.account_parser.write(cfg)
 

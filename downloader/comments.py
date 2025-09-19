@@ -7,7 +7,6 @@ from config_settings import DVR_Config
 from config_accounts import Account_Config
 from utils.logging_utils import LogManager
 from utils.index_utils import IndexManager
-from downloader.livestreams import LivestreamDownloader
 
 # Import specific chat_downloader errors
 try:
