@@ -4,9 +4,10 @@ import traceback
 import json
 from configparser import ConfigParser, NoSectionError, NoOptionError
 
+
 class DVR_Config:
     ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
-    Config_Dir = os.path.join(ProjRoot_Dir,"_Config")
+    Config_Dir = os.path.join(ProjRoot_Dir, "_Config")
 
     settings_parser = None
 
@@ -79,7 +80,7 @@ class DVR_Config:
     @classmethod
     def get_live_comments_dir(cls):
         return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Live_Comments_Dir"))
-    
+
     @classmethod
     def get_live_captions_dir(cls):
         return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Captions_Dir"))
@@ -159,7 +160,11 @@ class DVR_Config:
     # Log File References
     @classmethod
     def get_core_log_file(cls):
-        return os.path.join(cls.get_log_dir(), "_Core_ContentGrabber.log")
+        return os.path.join(cls.get_log_dir(), "_Core_Package_Updater.log")
+
+    @classmethod
+    def get_captions_log_file(cls):
+        return os.path.join(cls.get_log_dir(), "Download_YouTube_Captions.log")
 
     @classmethod
     def get_download_comments_log_file(cls):
@@ -167,7 +172,7 @@ class DVR_Config:
 
     @classmethod
     def get_download_live_log_file(cls):
-        return os.path.join(cls.get_log_dir(), "Download_YouTube_Live.log")
+        return os.path.join(cls.get_log_dir(), "Download_YouTube_LiveStreams.log")
 
     @classmethod
     def get_download_live_recovery_log_file(cls):
@@ -175,7 +180,7 @@ class DVR_Config:
 
     @classmethod
     def get_download_posted_log_file(cls):
-        return os.path.join(cls.get_log_dir(), "Download_YouTube_Posted.log")
+        return os.path.join(cls.get_log_dir(), "Download_YouTube_Posted_videos.log")
 
     @classmethod
     def get_download_posted_notices_log_file(cls):
@@ -183,11 +188,11 @@ class DVR_Config:
 
     @classmethod
     def get_upload_posted_log_file(cls):
-        return os.path.join(cls.get_log_dir(), "Upload_Manager_Posted.log")
+        return os.path.join(cls.get_log_dir(), "Upload_Manager_Posted_Videos.log")
 
     @classmethod
     def get_upload_live_log_file(cls):
-        return os.path.join(cls.get_log_dir(), "Upload_Manager_Live.log")
+        return os.path.join(cls.get_log_dir(), "Upload_Manager_LiveStreams.log")
 
     @classmethod
     def get_upload_ia_log_file(cls):
@@ -201,6 +206,10 @@ class DVR_Config:
     @classmethod
     def core_log_filter(cls):
         return cls.parse_string_list(cls.get_value("Log_Filters", "CORE_LOG_FILTER"))
+
+    @classmethod
+    def captions_log_filter(cls):
+        return cls.parse_string_list(cls.get_value("Log_Filters", "CAPTIONS_LOG_FILTER"))
 
     @classmethod
     def download_live_log_filter(cls):
@@ -277,3 +286,12 @@ class DVR_Config:
     def get_video_file_extensions(cls):
         file_extensions = json.loads(cls.get_value("YT_DownloadSettings", "download_file_extentions"))
         return tuple(file_extensions)
+
+    @classmethod
+    def get_required_dependencies(cls):
+        dependencies = json.loads(cls.get_value("General", "required_dependencies"))
+        return tuple(dependencies)
+
+    @classmethod
+    def get_maximum_threads(cls):
+        return cls.get_value("General", "maximum_threads")

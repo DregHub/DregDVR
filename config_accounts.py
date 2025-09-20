@@ -7,7 +7,7 @@ from configparser import ConfigParser, NoSectionError, NoOptionError
 
 class Account_Config:
     ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
-    Config_Dir = os.path.join(ProjRoot_Dir,"_Config")
+    Config_Dir = os.path.join(ProjRoot_Dir, "_Config")
 
     account_parser = None
 
@@ -66,13 +66,36 @@ class Account_Config:
 
     @classmethod
     def get_youtube_handle(cls):
+        # https://www.youtube.com/@ThoughtsOfPeterFaik
         youtube_source = cls.get_youtube_source().strip('"')
         youtube_channel = youtube_source[:-5] if youtube_source.lower().endswith("/live") else youtube_source
         return youtube_channel
 
     @classmethod
     def get_youtube_handle_name(cls):
+        # @ThoughtsOfPeterFaik
         youtube_source = cls.get_youtube_source().strip('"')
+        match = re.search(r"/@([^/]+)", youtube_source)
+        if match:
+            handle = match.group(1).strip("/")
+            return f'@{handle}'
+        return 'Unknown_Handle'
+
+    @classmethod
+    def get_caption_source(cls):
+        return cls.get_value("YT_Sources", "caption_source")
+
+    @classmethod
+    def get_caption_handle(cls):
+        # https://www.youtube.com/@ThoughtsOfPeterFaik
+        youtube_source = cls.get_caption_source().strip('"')
+        youtube_channel = youtube_source[:-5] if youtube_source.lower().endswith("/live") else youtube_source
+        return youtube_channel
+
+    @classmethod
+    def get_caption_handle_name(cls):
+        # @ThoughtsOfPeterFaik
+        youtube_source = cls.get_caption_source().strip('"')
         match = re.search(r"/@([^/]+)", youtube_source)
         if match:
             handle = match.group(1).strip("/")

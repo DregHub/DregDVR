@@ -22,12 +22,12 @@ async def main():
             await DependencyManager.update_apk_repositories()
             await DependencyManager.update_ia()
             await DependencyManager.update_ytdlp()
-            pip_dependencies = json.loads(DVR_Config.get_value("Maintenance", "required_dependencies"))
+            pip_dependencies = DVR_Config.get_required_dependencies()
             for dependency in pip_dependencies:
                 await DependencyManager.install_pip_dependency(dependency)
             LogManager.log_core("All required dependencies installed/updated successfully.")
         ContainerMaintenance = DVR_Tasks.get_disable_container_maintenance_inf_loop()
-        if ContainerMaintenance.lower() == "true":
+        if ContainerMaintenance.lower() != "true":
             LogManager.log_core("Container Maintenance Mode is ON")
             LogManager.log_core("Script Will Loop Forever...")
             # Infinite loop incase we need to access the containers shell
@@ -64,8 +64,8 @@ async def main():
                 LogManager.log_core("Posted Video Download is disabled in INI Tasks. Skipping...")
 
             if disable_captions_download != "true":
-                from downloader.captions import CaptionDownloader
-                tasks.append(CaptionDownloader.monitor_channel())
+                from downloader.captions import CaptionsDownloader
+                tasks.append(CaptionsDownloader.monitor_channel())
             else:
                 LogManager.log_core("Caption Download is disabled in INI Tasks. Skipping...")
 

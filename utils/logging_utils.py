@@ -10,6 +10,7 @@ from config_settings import DVR_Config
 class LogManager:
     Log_Dir = DVR_Config.get_log_dir()
     CORE_LOG_FILE = DVR_Config.get_core_log_file()
+    DOWNLOAD_CAPTIONS_LOG_FILE = DVR_Config.get_captions_log_file()
     DOWNLOAD_COMMENTS_LOG_FILE = DVR_Config.get_download_comments_log_file()
     DOWNLOAD_LIVE_LOG_FILE = DVR_Config.get_download_live_log_file()
     DOWNLOAD_LIVE_RECOVERY_LOG_FILE = DVR_Config.get_download_live_recovery_log_file()
@@ -21,6 +22,7 @@ class LogManager:
     UPLOAD_YT_LOG_FILE = DVR_Config.get_upload_yt_log_file()
     ArchivedLogs_Dir = DVR_Config.get_archived_logs_dir()
     CORE_LOG_FILTER = DVR_Config.core_log_filter()
+    CAPTIONS_LOG_FILTER = DVR_Config.captions_log_filter()
     DOWNLOAD_LIVE_LOG_FILTER = DVR_Config.download_live_log_filter()
     DOWNLOAD_LIVE_RECOVERY_LOG_FILTER = DVR_Config.download_live_recovery_log_filter()
     DOWNLOAD_POSTED_LOG_FILTER = DVR_Config.download_posted_log_filter()
@@ -29,11 +31,12 @@ class LogManager:
     UPLOAD_LIVE_LOG_FILTER = DVR_Config.upload_live_log_filter()
     UPLOAD_IA_LOG_FILTER = DVR_Config.upload_ia_log_filter()
     UPLOAD_YT_LOG_FILTER = DVR_Config.upload_yt_log_filter()
-    disable_log_archiving = DVR_Config.get_disable_log_archiving().lower() 
+    disable_log_archiving = DVR_Config.get_disable_log_archiving().lower()
 
-
-    LOG_FILTERS = [CORE_LOG_FILTER, DOWNLOAD_LIVE_LOG_FILTER,DOWNLOAD_LIVE_RECOVERY_LOG_FILTER, DOWNLOAD_POSTED_LOG_FILTER,DOWNLOAD_POSTED_NOTICES_LOG_FILTER,UPLOAD_LIVE_LOG_FILTER, UPLOAD_IA_LOG_FILTER, UPLOAD_YT_LOG_FILTER]
-    LOG_FILES = [CORE_LOG_FILE, DOWNLOAD_LIVE_LOG_FILE,DOWNLOAD_LIVE_RECOVERY_LOG_FILE, DOWNLOAD_POSTED_LOG_FILE,DOWNLOAD_POSTED_NOTICES_LOG_FILE,UPLOAD_LIVE_LOG_FILE, UPLOAD_IA_LOG_FILE, UPLOAD_YT_LOG_FILE]
+    LOG_FILTERS = [CORE_LOG_FILTER, CAPTIONS_LOG_FILTER, DOWNLOAD_LIVE_LOG_FILTER, DOWNLOAD_LIVE_RECOVERY_LOG_FILTER,
+                   DOWNLOAD_POSTED_LOG_FILTER, DOWNLOAD_POSTED_NOTICES_LOG_FILTER, UPLOAD_LIVE_LOG_FILTER, UPLOAD_IA_LOG_FILTER, UPLOAD_YT_LOG_FILTER]
+    LOG_FILES = [CORE_LOG_FILE, DOWNLOAD_CAPTIONS_LOG_FILE, DOWNLOAD_LIVE_LOG_FILE, DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
+                 DOWNLOAD_POSTED_LOG_FILE, DOWNLOAD_POSTED_NOTICES_LOG_FILE, UPLOAD_LIVE_LOG_FILE, UPLOAD_IA_LOG_FILE, UPLOAD_YT_LOG_FILE]
 
     @classmethod
     def log_message(cls, message, log_file_name):
@@ -110,6 +113,7 @@ class LogManager:
         """Log a message to the core dreggs dvr log."""
         cls.log_message(message, cls.CORE_LOG_FILE)
 
+
     @classmethod
     def log_download_live(cls, message):
         """Log a message to the Download YouTube Live log."""
@@ -119,6 +123,11 @@ class LogManager:
     def log_download_live_recovery(cls, message):
         """Log a message to the Download YouTube Live Recovery log."""
         cls.log_message(message, cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILE)
+
+    @classmethod
+    def log_download_captions(cls, message):
+        """Log a message to the Download YouTube Captions log."""
+        cls.log_message(message, cls.DOWNLOAD_CAPTIONS_LOG_FILE)
 
     @classmethod
     def log_download_comments(cls, message):
