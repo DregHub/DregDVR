@@ -284,7 +284,7 @@ class DVR_Config:
 
     @classmethod
     def get_video_file_extensions(cls):
-        file_extensions = json.loads(cls.get_value("YT_DownloadSettings", "download_file_extentions"))
+        file_extensions = json.loads(cls.get_value("YT_UploadSettings", "upload_file_extensions"))
         return tuple(file_extensions)
 
     @classmethod
