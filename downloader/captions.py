@@ -200,6 +200,7 @@ class CaptionsDownloader:
             "--convert-subs", "srt",
             "--skip-download",
             "--restrict-filenames",
+            "--use-postprocessor", "srt_fix:when=before_dl",
             "-o", filepath,
             f"https://www.youtube.com/watch?v={video_id}"
         ]
@@ -210,8 +211,21 @@ class CaptionsDownloader:
             stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await process.communicate()
-        if process.returncode == 0:
-            return True
-        else:
+
+        if process.returncode != 0:
             LogManager.log_download_captions(f"yt-dlp error for video {video_id}: {stderr.decode()}")
+            return False
+
+        base_path = os.path.splitext(filepath)[0]
+        original_srt = f"{base_path}.en.srt"
+        fixed_srt = f"{base_path}.en-fixed.srt"
+
+        try:
+            if os.path.exists(original_srt):
+                os.remove(original_srt)
+            if os.path.exists(fixed_srt):
+                os.rename(fixed_srt, original_srt)
+            return True
+        except Exception as e:
+            LogManager.log_download_captions(f"Post-processing error for video {video_id}: {str(e)}")
             return False

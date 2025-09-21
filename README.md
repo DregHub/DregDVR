@@ -171,3 +171,5 @@ https://github.com/yt-dlp/yt-dlp
 https://github.com/xenova/chat-downloader
 
 https://github.com/NothingNaN/YoutubeCommunityScraper/
+
+https://github.com/bindestriche/srt_fix
