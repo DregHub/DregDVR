@@ -6,15 +6,19 @@ from configparser import ConfigParser, NoSectionError, NoOptionError
 
 
 class DVR_Config:
-    ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
-    Config_Dir = os.path.join(ProjRoot_Dir, "_Config")
-
+    ProjRoot_Dir = None
+    DataRoot_Dir = None
+    Config_Dir = None
     settings_parser = None
 
     @classmethod
     def _init_settings_parser(cls):
-        if cls.settings_parser is None:
+        if cls.settings_parser is None: 
+
+            cls.ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
+            cls.Config_Dir = os.path.join(cls.ProjRoot_Dir, "_Config")
             settings_config_path = os.path.join(cls.Config_Dir, "dvr_settings.cfg")
+
             # Disable interpolation to allow raw % in values
             cls.settings_parser = ConfigParser(interpolation=None)
             if not os.path.exists(settings_config_path):
@@ -22,6 +26,10 @@ class DVR_Config:
                 with open(settings_config_path, "w") as f:
                     f.write("")
             cls.settings_parser.read(settings_config_path)
+            
+            root_dir_name = cls.get_value("Directories", "root_dir")
+            cls.DataRoot_Dir = os.path.join(cls.ProjRoot_Dir, root_dir_name)
+
 
     @classmethod
     def get_value(cls, section, key):
@@ -63,70 +71,75 @@ class DVR_Config:
     # Live Directories
     @classmethod
     def get_live_downloadqueue_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Live_DownloadQueue_Dir"))
+        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "Live_DownloadQueue_Dir"))
 
     @classmethod
     def get_live_downloadrecovery_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "live_downloadrecovery_dir"))
+        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "live_downloadrecovery_dir"))
 
     @classmethod
     def get_live_completeduploads_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "live_completeduploads_dir"))
+        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "live_completeduploads_dir"))
 
     @classmethod
     def get_live_uploadqueue_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Live_UploadQueue_Dir"))
-
+        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "Live_UploadQueue_Dir"))
     @classmethod
     def get_live_comments_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Live_Comments_Dir"))
+        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "Live_Comments_Dir"))
 
     @classmethod
     def get_live_captions_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Captions_Dir"))
+        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "Captions_Dir"))
 
     # Posted Directories
     @classmethod
     def get_posted_downloadqueue_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "posted_downloadqueue_dir"))
+        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "posted_downloadqueue_dir"))
 
     @classmethod
     def get_posted_completeduploads_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "posted_completeduploads_dir"))
+        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "posted_completeduploads_dir"))
 
     @classmethod
     def get_posted_playlists_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "posted_playlists_dir"))
+        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "posted_playlists_dir"))
 
     @classmethod
     def get_posted_uploadqueue_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "posted_uploadqueue_dir"))
+        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "posted_uploadqueue_dir"))
 
     @classmethod
     def get_posted_notices_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "posted_notices_dir"))
+        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "posted_notices_dir"))
 
     # Misc Directories
     @classmethod
     def get_auth_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Auth_Dir"))
+        ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(ProjRoot_Dir, cls.get_value("Directories", "Auth_Dir"))
 
     @classmethod
     def get_log_dir(cls):
-        return os.path.join(cls.ProjRoot_Dir, cls.get_value("Directories", "Log_Dir"))
+        ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(ProjRoot_Dir, cls.get_value("Directories", "Log_Dir"))
 
     @classmethod
     def get_archived_logs_dir(cls):
         return os.path.join(cls.get_log_dir(), "_ArchivedLogs")
-
+ 
     @classmethod
     def get_bin_dir(cls):
         return cls.get_value("Directories", "bin_dir")
 
     @classmethod
-    def get_meta_data_dir(cls):
-        MetaData_Dir_Name = cls.get_value("Directories", "MetaData_Dir")
-        return os.path.join(cls.ProjRoot_Dir, MetaData_Dir_Name)
+    def get_project_root(cls):
+        return os.path.dirname(os.path.abspath(__file__))
+    
+    @classmethod
+    def get_download_root(cls):
+        root_dir_name = cls.get_value("Directories", "root_dir")
+        return os.path.join(cls.get_project_root(), root_dir_name)
 
     # File References
 
@@ -246,8 +259,8 @@ class DVR_Config:
     # Strings
 
     @classmethod
-    def get_disable_log_archiving(cls):
-        return cls.get_value("Logging", "disable_log_archiving").lower()
+    def get_log_archiving(cls):
+        return cls.get_value("Logging", "log_archiving").lower()
 
     @classmethod
     def get_download_timestamp_format(cls):
@@ -288,8 +301,13 @@ class DVR_Config:
         return tuple(file_extensions)
 
     @classmethod
-    def get_required_dependencies(cls):
-        dependencies = json.loads(cls.get_value("General", "required_dependencies"))
+    def get_required_py_dependencies(cls):
+        dependencies = json.loads(cls.get_value("General", "required_pip_dependencies"))
+        return tuple(dependencies)
+
+    @classmethod
+    def get_required_apk_dependencies(cls):
+        dependencies = json.loads(cls.get_value("General", "required_apk_dependencies"))
         return tuple(dependencies)
 
     @classmethod

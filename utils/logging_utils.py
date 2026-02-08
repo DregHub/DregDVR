@@ -31,7 +31,7 @@ class LogManager:
     UPLOAD_LIVE_LOG_FILTER = DVR_Config.upload_live_log_filter()
     UPLOAD_IA_LOG_FILTER = DVR_Config.upload_ia_log_filter()
     UPLOAD_YT_LOG_FILTER = DVR_Config.upload_yt_log_filter()
-    disable_log_archiving = DVR_Config.get_disable_log_archiving().lower()
+    log_archiving = DVR_Config.get_log_archiving().lower()
 
     LOG_FILTERS = [CORE_LOG_FILTER, CAPTIONS_LOG_FILTER, DOWNLOAD_LIVE_LOG_FILTER, DOWNLOAD_LIVE_RECOVERY_LOG_FILTER,
                    DOWNLOAD_POSTED_LOG_FILTER, DOWNLOAD_POSTED_NOTICES_LOG_FILTER, UPLOAD_LIVE_LOG_FILTER, UPLOAD_IA_LOG_FILTER, UPLOAD_YT_LOG_FILTER]
@@ -168,7 +168,7 @@ class LogManager:
     def archive_logs(cls, filename, parent_folder, log_files):
         """Archive all log files to a folder named after the uploaded file inside the specified parent_folder."""
         try:
-            if cls.disable_log_archiving != "true":
+            if cls.log_archiving == "true":
                 log_archive_path = os.path.join(cls.Log_Dir, parent_folder)
                 # Ensure log_archive_path exists
                 if not os.path.exists(log_archive_path):

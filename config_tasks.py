@@ -60,40 +60,40 @@ class DVR_Tasks:
 
     # Strings
     @classmethod
-    def get_disable_container_maintenance_inf_loop(cls):
-        return cls.get_value("Tasks", "disable_container_maintenance_inf_loop").lower()
+    def get_container_maintenance_inf_loop(cls):
+        return cls.get_value("Tasks", "container_maintenance_inf_loop").lower()
 
     @classmethod
-    def get_disable_livestream_download(cls):
-        return cls.get_value("Tasks", "disable_livestream_download").lower()
+    def get_livestream_download(cls):
+        return cls.get_value("Tasks", "livestream_download").lower()
 
     @classmethod
-    def get_disable_livestream_recovery_download(cls):
-        return cls.get_value("Tasks", "disable_livestream_recovery_download").lower()
+    def get_livestream_recovery_download(cls):
+        return cls.get_value("Tasks", "livestream_recovery_download").lower()
 
     @classmethod
-    def get_disable_comments_download(cls):
-        return cls.get_value("Tasks", "disable_comments_download").lower()
+    def get_comments_download(cls):
+        return cls.get_value("Tasks", "comments_download").lower()
 
     @classmethod
-    def get_disable_captions_download(cls):
-        return cls.get_value("Tasks", "disable_captions_download").lower()
+    def get_captions_download(cls):
+        return cls.get_value("Tasks", "captions_download").lower()
 
     @classmethod
-    def get_disable_posted_videos_download(cls):
-        return cls.get_value("Tasks", "disable_posted_videos_download").lower()
+    def get_posted_videos_download(cls):
+        return cls.get_value("Tasks", "posted_videos_download").lower()
 
     @classmethod
-    def get_disable_posted_notices_download(cls):
-        return cls.get_value("Tasks", "disable_posted_notices_download").lower()
+    def get_posted_notices_download(cls):
+        return cls.get_value("Tasks", "posted_notices_download").lower()
 
     @classmethod
-    def get_disable_livestream_upload(cls):
-        return cls.get_value("Tasks", "disable_livestream_upload").lower()
+    def get_livestream_upload(cls):
+        return cls.get_value("Tasks", "livestream_upload").lower()
 
     @classmethod
-    def get_disable_posted_videos_upload(cls):
-        return cls.get_value("Tasks", "disable_posted_videos_upload").lower()
+    def get_posted_videos_upload(cls):
+        return cls.get_value("Tasks", "posted_videos_upload").lower()
 
 
 

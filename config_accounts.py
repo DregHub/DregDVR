@@ -104,20 +104,24 @@ class Account_Config:
 
     @classmethod
     def get_live_downloadprefix(cls):
-        return cls.get_value("File_Naming", "live_downloadprefix")
+        return cls.get_value("File_Naming", "live_downloadprefix").strip('"')
 
     @classmethod
     def get_posted_downloadprefix(cls):
-        return cls.get_value("File_Naming", "posted_downloadprefix")
+        return cls.get_value("File_Naming", "posted_downloadprefix").strip('"')
 
     @classmethod
     def get_ia_itemid(cls):
-        return cls.get_value("IA_Settings", "itemid")
+        return cls.get_value("IA_Settings", "itemid").strip('"')
+
+    @classmethod
+    def get_ia_user_agent(cls):
+        return cls.get_value("IA_Settings", "user_agent").strip('"')
 
     @classmethod
     def get_ia_email(cls):
-        return cls.get_value("IA_Credentials", "email")
+        return cls.get_value("IA_Credentials", "email").strip('"')
 
     @classmethod
     def get_ia_password(cls):
-        return cls.get_value("IA_Credentials", "password")
+        return cls.get_value("IA_Credentials", "password").strip('"')

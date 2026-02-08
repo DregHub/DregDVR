@@ -1,74 +1,117 @@
-import os
 import traceback
 from datetime import datetime
 from utils.logging_utils import LogManager
-from utils.subprocess_utils import run_subprocess
-from config_settings import DVR_Config
 from config_accounts import Account_Config
+import internetarchive as ia
 
-IA_LastSessionTime = None
+# Global session variables
+_ia_session = None
+_ia_authenticated = False
 
-
-def write_netrc(email, password):
-    """Write credentials to the .netrc/_netrc file for IA CLI authentication."""
-    # Windows uses '_netrc', others use '.netrc'
-    netrc_filename = "_netrc" if os.name == "nt" else ".netrc"
-    netrc_path = os.path.join(os.path.expanduser("~"), netrc_filename)
-    machine = "archive.org"
-    content = f"machine {machine}\n  login {email}\n  password {password}\n"
-    with open(netrc_path, "w") as f:
-        f.write(content)
+async def login_ia_session(email, password, user_agent):
+    """Authenticate with Internet Archive using the Python API."""
+    global _ia_session, _ia_authenticated
+    
     try:
-        os.chmod(netrc_path, 0o600)
+        # Check if already logged in
+        if _ia_authenticated and _ia_session is not None:
+            LogManager.log_upload_ia("Already authenticated with Internet Archive. Skipping login.")
+            return
+
+        if not email or not password:
+            raise ValueError("Email and password must be provided via accounts config.")
+        
+        LogManager.log_upload_ia("Attempting to authenticate with Internet Archive...")
+        ia.configure(email, password)
+        # Verify authentication was successful
+        try:
+            _ia_session = ia.ArchiveSession()
+            _ia_session.headers.update({'User-Agent': user_agent})
+            _ia_authenticated = True
+            LogManager.log_upload_ia("Authentication successful. User Agent set for session.")
+        except Exception as verify_error:
+            _ia_authenticated = False
+            _ia_session = None
+            raise ValueError(f"Authentication succeeded but session verification failed: {verify_error}")
+            
     except Exception as e:
-        LogManager.log_upload_ia("IA Login error. {e}\n{traceback.format_exc()}")
-
-
-async def login_ia_session(email, password):
-    global IA_LastSessionTime
-    current_time = datetime.now()
-
-    if (
-        IA_LastSessionTime
-        and (current_time - IA_LastSessionTime).total_seconds() < 86400
-    ):
-        LogManager.log_upload_ia("Login attempt skipped. Already logged in within the last 24 hours.")
-        return
-
-    try:
-        write_netrc(email, password)
-        LogManager.log_upload_ia("Internet Archive session established successfully (via .netrc/_netrc).")
-        IA_LastSessionTime = current_time
-    except Exception as e:
-        LogManager.log_upload_ia(f"Failed to establish Internet Archive session: {e}\n{traceback.format_exc()}")
+        LogManager.log_upload_ia(f"ERROR: Failed to establish Internet Archive session: {e}\n{traceback.format_exc()}")
+        _ia_authenticated = False
+        _ia_session = None
+        raise
 
 
 async def upload_to_ia(filepath, filename):
-    """Upload a video file to Internet Archive."""
+    """Upload a video file to Internet Archive using the Python API."""
+    global _ia_session, _ia_authenticated
+    
     try:
-        IA_ItemID = Account_Config.get_ia_itemid()
-        IA_Email = Account_Config.get_ia_email()
-        IA_Password = Account_Config.get_ia_password()
-        await login_ia_session(IA_Email, IA_Password)
-        LogManager.log_upload_ia(f"Attempting archive of file: {filepath} to InternetArchive")
+        LogManager.log_upload_ia(f"Starting upload process for: {filepath}")
+        
+        # Retrieve credentials
+        try:
+            IA_ItemID = Account_Config.get_ia_itemid()
+            IA_Email = Account_Config.get_ia_email()
+            IA_Password = Account_Config.get_ia_password()
+            IA_UserAgent = Account_Config.get_ia_user_agent()
+            
+            if not IA_ItemID or not IA_Email or not IA_Password or not IA_UserAgent:
+                raise ValueError("Internet Archive credentials, User Agent, or Item ID missing in config")
+            
+            LogManager.log_upload_ia(f"Retrieved Internet Archive credentials for item: {IA_ItemID}")
+        except Exception as e:
+            LogManager.log_upload_ia(f"ERROR: Failed to retrieve Internet Archive credentials: {e}")
+            raise
 
-        command = [
-            "ia",
-            "upload",
-            f"{IA_ItemID}",
-            f'"{filepath}"',
-            "--retries",
-            "10",
-            f"--metadata='title:{filename},file:{filename}'",
-        ]
+        # Establish session only if not already authenticated
+        if not _ia_authenticated:
+            try:
+                await login_ia_session(IA_Email, IA_Password, IA_UserAgent)
+                LogManager.log_upload_ia("Internet Archive session established")
+            except Exception as e:
+                LogManager.log_upload_ia(f"ERROR: Failed to establish Internet Archive session: {e}")
+                raise
+        else:
+            LogManager.log_upload_ia("Using existing Internet Archive session")
 
-        await run_subprocess(
-            command,
-            LogManager.UPLOAD_IA_LOG_FILE,
-            "IA archive command failed",
-            "Exception in IA",
-        )
+        # Get the Internet Archive item using the stored session
+        try:
+            LogManager.log_upload_ia(f"Attempting to retrieve Internet Archive item: {IA_ItemID}")
+            item = _ia_session.get_item(IA_ItemID)
+            
+            if item is None:
+                raise ValueError(f"Item {IA_ItemID} not found or could not be retrieved")
+            
+            LogManager.log_upload_ia(f"Retrieved Internet Archive item: {IA_ItemID}")
+        except Exception as e:
+            LogManager.log_upload_ia(f"ERROR: Failed to retrieve Internet Archive item {IA_ItemID}: {e}\n{traceback.format_exc()}")
+            raise
 
-        LogManager.log_upload_ia(f"Completed archive of file: {filepath} to InternetArchive")
+        # Upload the file
+        try:
+            LogManager.log_upload_ia(f"Uploading file to Internet Archive: {filepath} as {filename}")
+            
+            response = item.upload_file(
+                filepath,
+                metadata={
+                    'title': filename,
+                    'file': filename
+                },
+                retries=10
+            )
+            
+            # Check if upload response indicates success
+            if response is not None:
+                LogManager.log_upload_ia(f"File uploaded to Internet Archive: {filepath}")
+            else:
+                raise ValueError("Upload returned no response - operation may have failed")
+                
+        except Exception as e:
+            LogManager.log_upload_ia(f"ERROR: Failed to upload file to Internet Archive: {filepath} - {e}\n{traceback.format_exc()}")
+            raise
+            
+        LogManager.log_upload_ia(f"Completed archive of file: {filepath} to Internet Archive")
+        
     except Exception as e:
-        LogManager.log_upload_ia(f"Failed to archive {filepath} to InternetArchive {e}\n{traceback.format_exc()}")
+        LogManager.log_upload_ia(f"ERROR: Upload process failed for {filepath}: {e}\n{traceback.format_exc()}")
+        raise

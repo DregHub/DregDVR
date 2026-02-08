@@ -25,7 +25,7 @@ class LivestreamDownloader:
     dlp_max_fragment_retries = DVR_Config.get_max_dlp_fragment_retries()
     dlp_max_dlp_download_retries = DVR_Config.get_max_dlp_download_retries()
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
-    disable_comment_download = DVR_Tasks.get_disable_comments_download()
+    comment_download = DVR_Tasks.get_comments_download()
 
     @classmethod
     def extract_username(cls, url):
@@ -163,7 +163,7 @@ class LivestreamDownloader:
                         LogManager.log_download_live(
                             f"Detected the start of a live stream https://www.youtube.com/watch?v={current_videoid}, Now we start the comments downloader.")
 
-                        if cls.disable_comment_download != "true":
+                        if cls.comment_download == "true":
                             from downloader.comments import LiveCommentsDownloader
                             asyncio.create_task(LiveCommentsDownloader.download_comments(current_videoid))
 
