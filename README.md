@@ -8,22 +8,39 @@ An automatic YouTube channel archiver & YouTube channel cloner.
 
 Automatically downloads all their YouTube....
 
-> Livestreams
-> Livestream Comments (even hidden or removed ones) to a .txt file
-> Subtitles (for both live and posted videos\shorts
-> Videos
-> Shorts
-> Community Posts
+- Livestreams
 
-Automatically uploads....
+- Livestream Comments (even hidden or removed ones) to a .txt file
 
-> Their Livestreams, Videos, Shorts
-> To internet archive > which is practically unbannable
-> To youtube          > which will show up in google search results
-> 
-> All video information is pulled from \_Meta\Default.xml
+- Subtitles (for both live and posted videos\shorts
 
-Using fuck all resources, no video transcoding, can run on a potato
+- Videos
+
+- Shorts
+
+- Community Posts
+  
+  
+
+**Automatically uploads Their....**
+
+- Livestreams
+
+- Videos
+
+- Shorts
+
+**To....**
+
+- Internet Archive > which is practically unbannable
+
+- Youtube > which will show up in google search results
+  
+  
+
+All information is pulled from \_Meta\Default.xml
+
+Using fuck all resources with no video transcoding . Can run on a potato
 
 # SO MANY FOLDERS, WHAT FOR ?
 
@@ -81,16 +98,16 @@ then look at this command and modify it for your system
 
 **command breakdown...**
 
-> 1. V:\Dregs\SOMEDREG = The folder on the disk for this instance of the dvr, the repo files should already be in here
-> 2. :/dvr = Leave this alone can be the same for multiple dregs
-> 3. python:alpine = the os the container will run only alpine is supported
-> 4. python /dvr/main.py = the command the container will use to start the dregs dvr script
+1. V:\Dregs\SOMEDREG = The folder on the disk for this instance of the dvr, the repo files should already be in here
+2. :/dvr = Leave this alone can be the same for multiple dregs
+3. python:alpine = the os the container will run only alpine is supported
+4. python /dvr/main.py = the command the container will use to start the dregs dvr script
 
 **You need a different folder and container for each dreg you want to record, For example**
 
-> - docker run -v V:\Dregs\PJ:/dvr python:alpine python /dvr/main.py
-> - docker run -v V:\Dregs\Gert:/dvr python:alpine python /dvr/main.py
-> - docker run -v V:\Dregs\Timmy:/dvr python:alpine python /dvr/main.py
+1. docker run -v V:\Dregs\PJ:/dvr python:alpine python /dvr/main.py
+2. docker run -v V:\Dregs\Gert:/dvr python:alpine python /dvr/main.py
+3. docker run -v V:\Dregs\Timmy:/dvr python:alpine python /dvr/main.py
 
 
 
@@ -102,7 +119,7 @@ After you get the thing running and logs appearing in the logs dir more work...
 
 1. An internet archive account and page (https://archive.org/create/ upload any file to community videos and configure a video archive, put the details page in dvr_accounts.cfg)
 2. A YouTube account with advanced features https://support.google.com/youtube/answer/9891124
-3. 1 google account with API access see: https://developers.google.com/youtube/v3/quickstart/python#step_1_set_up_your_project_and_credentials
+3. A Google account with API access see: https://developers.google.com/youtube/v3/quickstart/python#step_1_set_up_your_project_and_credentials
 4. oauth2.json and client_secret.json 
    Download client_secret.json from the portal in step 3
    Use the following example on a computer with a browser to generate oauth2.json https://developers.google.com/youtube/v3/guides/uploading_a_video
