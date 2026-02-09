@@ -2,11 +2,8 @@ import asyncio
 import sys
 import traceback
 from utils.logging_utils import LogManager
-from config_settings import DVR_Config
-
 
 class DependencyManager:
-    bin_dir = DVR_Config.get_bin_dir()
 
     @classmethod
     async def install_apk_dependency(cls, package_name):

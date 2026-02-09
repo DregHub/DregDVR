@@ -1,232 +1,211 @@
 import os
 import re
-import traceback
 import json
-from configparser import ConfigParser, NoSectionError, NoOptionError
+from config import BaseConfig
 
 
-class DVR_Config:
-    ProjRoot_Dir = None
-    DataRoot_Dir = None
-    Config_Dir = None
-    settings_parser = None
-
-    @classmethod
-    def _init_settings_parser(cls):
-        if cls.settings_parser is None: 
-
-            cls.ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
-            cls.Config_Dir = os.path.join(cls.ProjRoot_Dir, "_Config")
-            settings_config_path = os.path.join(cls.Config_Dir, "dvr_settings.cfg")
-
-            # Disable interpolation to allow raw % in values
-            cls.settings_parser = ConfigParser(interpolation=None)
-            if not os.path.exists(settings_config_path):
-                # Create an empty config file if it does not exist
-                with open(settings_config_path, "w") as f:
-                    f.write("")
-            cls.settings_parser.read(settings_config_path)
-            
-            root_dir_name = cls.get_value("Directories", "root_dir")
-            cls.DataRoot_Dir = os.path.join(cls.ProjRoot_Dir, root_dir_name)
-
+class DVR_Config(BaseConfig):
+    parser = None
+    parser_attr_name = "parser"
+    config_filename = "dvr_settings.cfg"
+    Data_Root_Dir = None
 
     @classmethod
-    def get_value(cls, section, key):
-        cls._init_settings_parser()
-        if cls.settings_parser is None:
-            raise RuntimeError("Config parser is not initialized. Check if the config file exists and is readable.")
-        try:
-            return cls.settings_parser.get(section, key)
-        except (NoSectionError, NoOptionError) as e:
-            # Use print instead of log_core to avoid circular import
-            print(f"Config error: {e}\n{traceback.format_exc()}")
-            raise
-
-    @classmethod
-    def set_value(cls, section, key, value):
-        """
-        Set a value in the config file and save it.
-        """
-        cls._init_settings_parser()
-        if cls.settings_parser is None:
-            raise RuntimeError("Config parser is not initialized. Check if the config file exists and is readable.")
-        if not cls.settings_parser.has_section(section):
-            cls.settings_parser.add_section(section)
-        cls.settings_parser.set(section, key, value)
-        config_path = os.path.join(cls.Config_Dir, "dvr_settings.cfg")
-        with open(config_path, "w") as cfg:
-            cls.settings_parser.write(cfg)
-
-    @staticmethod
-    def parse_string_list(str_list):
-        """Convert a string representation of a Python list to an actual list."""
-        try:
-            return json.loads(str_list)
-        except Exception as e:
-            raise RuntimeError(f"Failed to parse string list:  {e}\n{traceback.format_exc()}")
+    def _init_parser(cls):
+        """Initialize the configuration parser and set Data_Root_Dir."""
+        # Only initialize parent parser, do NOT call other DVR_Config methods here
+        super()._init_parser()
+        
+        # Set Data_Root_Dir only if parser is ready and not already set
+        if cls.Data_Root_Dir is None and cls.parser is not None:
+            try:
+                data_dir_name = json.loads(cls.get_value("Directories", "data_dir"))
+                cls.Data_Root_Dir = os.path.join(cls.Root_Dir, data_dir_name)
+            except Exception:
+                # If initialization fails, just skip - will retry on next call
+                pass
 
     # Directory References
 
     # Live Directories
     @classmethod
     def get_live_downloadqueue_dir(cls):
-        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "Live_DownloadQueue_Dir"))
+        cls._init_parser()
+        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "live_downloadqueue_dir").strip('"'))
 
     @classmethod
     def get_live_downloadrecovery_dir(cls):
-        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "live_downloadrecovery_dir"))
+        cls._init_parser()
+        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "live_downloadrecovery_dir").strip('"'))
 
     @classmethod
     def get_live_completeduploads_dir(cls):
-        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "live_completeduploads_dir"))
+        cls._init_parser()
+        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "live_completeduploads_dir").strip('"'))
 
     @classmethod
     def get_live_uploadqueue_dir(cls):
-        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "Live_UploadQueue_Dir"))
+        cls._init_parser()
+        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "live_uploadqueue_dir").strip('"'))
+    
     @classmethod
     def get_live_comments_dir(cls):
-        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "Live_Comments_Dir"))
+        cls._init_parser()
+        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "live_comments_dir").strip('"'))
 
     @classmethod
     def get_live_captions_dir(cls):
-        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "Captions_Dir"))
+        cls._init_parser()
+        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "captions_dir").strip('"'))
 
     # Posted Directories
     @classmethod
     def get_posted_downloadqueue_dir(cls):
-        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "posted_downloadqueue_dir"))
+        cls._init_parser()
+        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "posted_downloadqueue_dir").strip('"'))
 
     @classmethod
     def get_posted_completeduploads_dir(cls):
-        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "posted_completeduploads_dir"))
+        cls._init_parser()
+        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "posted_completeduploads_dir").strip('"'))
 
     @classmethod
     def get_posted_playlists_dir(cls):
-        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "posted_playlists_dir"))
+        cls._init_parser()
+        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "posted_playlists_dir").strip('"'))
 
     @classmethod
     def get_posted_uploadqueue_dir(cls):
-        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "posted_uploadqueue_dir"))
+        cls._init_parser()
+        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "posted_uploadqueue_dir").strip('"'))
 
     @classmethod
     def get_posted_notices_dir(cls):
-        return os.path.join(cls.DataRoot_Dir, cls.get_value("Directories", "posted_notices_dir"))
+        cls._init_parser()
+        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "posted_notices_dir").strip('"'))
 
     # Misc Directories
     @classmethod
     def get_auth_dir(cls):
-        ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
-        return os.path.join(ProjRoot_Dir, cls.get_value("Directories", "Auth_Dir"))
+        cls._init_parser()
+        return os.path.join(cls.Runtime_Profile_Dir, cls.get_value("Directories", "auth_dir").strip('"'))
 
     @classmethod
     def get_log_dir(cls):
-        ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
-        return os.path.join(ProjRoot_Dir, cls.get_value("Directories", "Log_Dir"))
+        cls._init_parser()
+        return os.path.join(cls.Runtime_Profile_Dir, cls.get_value("Directories", "log_dir").strip('"'))
 
     @classmethod
     def get_archived_logs_dir(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "_ArchivedLogs")
- 
-    @classmethod
-    def get_bin_dir(cls):
-        return cls.get_value("Directories", "bin_dir")
-
-    @classmethod
-    def get_project_root(cls):
-        return os.path.dirname(os.path.abspath(__file__))
     
     @classmethod
     def get_download_root(cls):
+        cls._init_parser()
         root_dir_name = cls.get_value("Directories", "root_dir")
-        return os.path.join(cls.get_project_root(), root_dir_name)
+        return os.path.join(cls.Data_Root_Dir, root_dir_name)
 
     # File References
 
     # Posted Files
     @classmethod
     def get_posted_delta_playlist(cls):
+        cls._init_parser()
         playlist_dir = cls.get_posted_playlists_dir()
         return os.path.join(playlist_dir, "_Delta_Playlist.csv")
 
     @classmethod
     def get_posted_persistent_playlist(cls):
+        cls._init_parser()
         playlist_dir = cls.get_posted_playlists_dir()
         return os.path.join(playlist_dir, "_Persistent_Playlist.csv")
 
     @classmethod
     def get_posted_download_list(cls):
+        cls._init_parser()
         playlist_dir = cls.get_posted_playlists_dir()
         return os.path.join(playlist_dir, "_Download_Playlist.txt")
 
     # Upload Files
     @classmethod
     def get_yt_client_secret_file(cls):
-        auth_dir = cls.get_auth_dir()
-        return os.path.join(cls.ProjRoot_Dir, auth_dir, "YT-client_secret.json")
+        cls._init_parser()
+        return os.path.join(cls.get_auth_dir(), "YT-client_secret.json")
 
     @classmethod
     def get_yt_credentials_file(cls):
-        auth_dir = cls.get_auth_dir()
-        return os.path.join(cls.ProjRoot_Dir, auth_dir, "YT-oauth2.json")
+        cls._init_parser()
+        return os.path.join(cls.get_auth_dir(), "YT-oauth2.json")
 
     # Log File References
     @classmethod
     def get_core_log_file(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "_Core_Package_Updater.log")
 
     @classmethod
     def get_captions_log_file(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "Download_YouTube_Captions.log")
 
     @classmethod
     def get_download_comments_log_file(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "Download_YouTube_Comments.log")
 
     @classmethod
     def get_download_live_log_file(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "Download_YouTube_LiveStreams.log")
 
     @classmethod
     def get_download_live_recovery_log_file(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "Download_YouTube_Recovery.log")
 
     @classmethod
     def get_download_posted_log_file(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "Download_YouTube_Posted_videos.log")
 
     @classmethod
     def get_download_posted_notices_log_file(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "Download_YouTube_Posted_Notices.log")
 
     @classmethod
     def get_upload_posted_log_file(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "Upload_Manager_Posted_Videos.log")
 
     @classmethod
     def get_upload_live_log_file(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "Upload_Manager_LiveStreams.log")
 
     @classmethod
     def get_upload_ia_log_file(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "Upload_Platform_InternetArchive.log")
 
     @classmethod
     def get_upload_yt_log_file(cls):
+        cls._init_parser()
         return os.path.join(cls.get_log_dir(), "Upload_Platform_YouTube.log")
 
     # Log Filters
     @classmethod
     def core_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "CORE_LOG_FILTER"))
+        return cls.parse_string_list(cls.get_value("Log_Filters", "core_log_filter"))
 
     @classmethod
     def captions_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "CAPTIONS_LOG_FILTER"))
+        return cls.parse_string_list(cls.get_value("Log_Filters", "captions_log_filter"))
 
     @classmethod
     def download_live_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "DOWNLOAD_LIVE_LOG_FILTER"))
+        return cls.parse_string_list(cls.get_value("Log_Filters", "download_live_log_filter"))
 
     @classmethod
     def download_live_recovery_log_filter(cls):
@@ -234,27 +213,27 @@ class DVR_Config:
 
     @classmethod
     def download_posted_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "DOWNLOAD_POSTED_LOG_FILTER"))
+        return cls.parse_string_list(cls.get_value("Log_Filters", "download_posted_log_filter"))
 
     @classmethod
     def download_posted_notices_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "DOWNLOAD_POSTED_NOTICES_LOG_FILTER"))
+        return cls.parse_string_list(cls.get_value("Log_Filters", "download_posted_notices_log_filter"))
 
     @classmethod
     def upload_posted_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "UPLOAD_POSTED_LOG_FILTER"))
+        return cls.parse_string_list(cls.get_value("Log_Filters", "upload_posted_log_filter"))
 
     @classmethod
     def upload_live_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "UPLOAD_LIVE_LOG_FILTER"))
+        return cls.parse_string_list(cls.get_value("Log_Filters", "upload_live_log_filter"))
 
     @classmethod
     def upload_ia_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "UPLOAD_IA_LOG_FILTER"))
+        return cls.parse_string_list(cls.get_value("Log_Filters", "upload_ia_log_filter"))
 
     @classmethod
     def upload_yt_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "UPLOAD_YT_LOG_FILTER"))
+        return cls.parse_string_list(cls.get_value("Log_Filters", "upload_yt_log_filter"))
 
     # Strings
 

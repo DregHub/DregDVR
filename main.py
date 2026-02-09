@@ -2,29 +2,49 @@ import os
 import traceback
 import asyncio
 import json
+import logging
 from utils.logging_utils import LogManager
 from config_settings import DVR_Config
 from config_tasks import DVR_Tasks
 from utils.dependency_utils import DependencyManager
 
 
+def create_required_dirs():
+    """
+    Create project, runtime and data profile directories and their subdirectories
+    as defined in the configuration.
+    """
+    DVR_Config._init_parser()
+    root = os.getcwd()
+
+    runtime_profiledir_name = json.loads(DVR_Config.get_value("Directories", "runtime_dir"))
+    data_profiledir_name = json.loads(DVR_Config.get_value("Directories", "data_dir"))
+    runtime_profiledir = os.path.join(root, runtime_profiledir_name)
+    data_profiledir = os.path.join(root, data_profiledir_name)
+
+    runtime_subdirs_to_create = json.loads(DVR_Config.get_value("Directories", "runtime_subdirs_to_create"))
+    data_subdirs_to_create = json.loads(DVR_Config.get_value("Directories", "data_subdirs_to_create"))
+
+    for sub in runtime_subdirs_to_create:
+        newdir = os.path.join(runtime_profiledir, sub)
+        # Cant use log manager yet as the dirs may not exist log to container shell instead
+        logging.info(f"making new runtime profile subdirectory: {newdir}")
+        os.makedirs(newdir, exist_ok=True)
+
+    for sub in data_subdirs_to_create:
+        newdir = os.path.join(data_profiledir, sub)
+        logging.info(f"making new dvr data subdirectory: {newdir}")
+        os.makedirs(newdir, exist_ok=True)
+
+    logging.info("Created required directories successfully.")
+
+
 async def main():
     try:
-        ProjRoot_Dir = ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
-        print(f"Project Root Directory: {ProjRoot_Dir}")
-        os.makedirs(ProjRoot_Dir, exist_ok=True)
-        root_dirs_to_create = json.loads(DVR_Config.get_value("Directories", "root_dirs_to_create"))
-        dvr_subdirs_to_create = json.loads(DVR_Config.get_value("Directories", "dvr_subdirs_to_create"))
-        for dir in root_dirs_to_create:
-            newdir = os.path.join(ProjRoot_Dir, dir)
-            print(f"making new root subdirectory: {newdir}")
-            os.makedirs(newdir, exist_ok=True)
-        for dir in dvr_subdirs_to_create:
-            newdir = os.path.join(DVR_Config.get_download_root(), dir)
-            print(f"making new dvr subdirectory: {newdir}")
-            os.makedirs(newdir, exist_ok=True)
-        print("Created required directories successfully.")
-            
+        logging.error(f"Starting Dregg DVR")
+        # Ensure required project/runtime/data directories exist
+        create_required_dirs()
+        
         if os.name == "nt":
             # Windows
             LogManager.log_core("Skipping Dependency Package Update as os = Windows")
@@ -37,10 +57,10 @@ async def main():
             for dependency in pip_dependencies:
                 await DependencyManager.install_pip_dependency(dependency)
 
-            await DependencyManager.update_ia()
             await DependencyManager.update_ytdlp()
                 
             LogManager.log_core("All required dependencies installed/updated successfully.")
+        
         ContainerMaintenance = DVR_Tasks.get_container_maintenance_inf_loop()
         if ContainerMaintenance.lower() == "true":
             LogManager.log_core("Container Maintenance Mode is ON")
@@ -111,6 +131,7 @@ async def main():
 
     except Exception as e:
         LogManager.log_core(f"Exception in main:  {e}\n{traceback.format_exc()}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

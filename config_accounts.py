@@ -1,71 +1,23 @@
 import os
 import re
-import traceback
 import json
-from configparser import ConfigParser, NoSectionError, NoOptionError
+from config import BaseConfig
 
 
-class Account_Config:
-    ProjRoot_Dir = os.path.dirname(os.path.abspath(__file__))
-    Config_Dir = os.path.join(ProjRoot_Dir, "_Config")
-
+class Account_Config(BaseConfig):
     account_parser = None
-
-    @classmethod
-    def _init_account_parser(cls):
-        if cls.account_parser is None:
-            account_config_path = os.path.join(cls.Config_Dir, "dvr_accounts.cfg")
-            # Disable interpolation to allow raw % in values
-            cls.account_parser = ConfigParser(interpolation=None)
-            if not os.path.exists(account_config_path):
-                # Create an empty config file if it does not exist
-                with open(account_config_path, "w") as f:
-                    f.write("")
-            cls.account_parser.read(account_config_path)
-    dvr_parser = None
-
-    @classmethod
-    def get_value(cls, section, key):
-        cls._init_account_parser()
-        if cls.account_parser is None:
-            raise RuntimeError("Config parser is not initialized. Check if the config file exists and is readable.")
-        try:
-            return cls.account_parser.get(section, key)
-        except (NoSectionError, NoOptionError) as e:
-            # Use print instead of log_core to avoid circular import
-            print(f"Config error: {e}\n{traceback.format_exc()}")
-            raise
-
-    @classmethod
-    def set_value(cls, section, key, value):
-        """
-        Set a value in the config file and save it.
-        """
-        cls._init_account_parser()
-        if cls.account_parser is None:
-            raise RuntimeError("Config parser is not initialized. Check if the config file exists and is readable.")
-        if not cls.account_parser.has_section(section):
-            cls.account_parser.add_section(section)
-        cls.account_parser.set(section, key, value)
-        config_path = os.path.join(cls.Config_Dir, "dvr_accounts.cfg")
-        with open(config_path, "w") as cfg:
-            cls.account_parser.write(cfg)
-
-    @staticmethod
-    def parse_string_list(str_list):
-        """Convert a string representation of a Python list to an actual list."""
-        try:
-            return json.loads(str_list)
-        except Exception as e:
-            raise RuntimeError(f"Failed to parse string list:  {e}\n{traceback.format_exc()}")
+    parser_attr_name = "account_parser"
+    config_filename = "dvr_accounts.cfg"
 
     # Strings
     @classmethod
     def get_youtube_source(cls):
+        cls._init_parser()
         return cls.get_value("YT_Sources", "source")
 
     @classmethod
     def get_youtube_handle(cls):
+        cls._init_parser()
         # https://www.youtube.com/@ThoughtsOfPeterFaik
         youtube_source = cls.get_youtube_source().strip('"')
         youtube_channel = youtube_source[:-5] if youtube_source.lower().endswith("/live") else youtube_source
@@ -73,6 +25,7 @@ class Account_Config:
 
     @classmethod
     def get_youtube_handle_name(cls):
+        cls._init_parser()
         # @ThoughtsOfPeterFaik
         youtube_source = cls.get_youtube_source().strip('"')
         match = re.search(r"/@([^/]+)", youtube_source)
@@ -83,10 +36,12 @@ class Account_Config:
 
     @classmethod
     def get_caption_source(cls):
+        cls._init_parser()
         return cls.get_value("YT_Sources", "caption_source")
 
     @classmethod
     def get_caption_handle(cls):
+        cls._init_parser()
         # https://www.youtube.com/@ThoughtsOfPeterFaik
         youtube_source = cls.get_caption_source().strip('"')
         youtube_channel = youtube_source[:-5] if youtube_source.lower().endswith("/live") else youtube_source
@@ -94,6 +49,7 @@ class Account_Config:
 
     @classmethod
     def get_caption_handle_name(cls):
+        cls._init_parser()
         # @ThoughtsOfPeterFaik
         youtube_source = cls.get_caption_source().strip('"')
         match = re.search(r"/@([^/]+)", youtube_source)
@@ -104,24 +60,30 @@ class Account_Config:
 
     @classmethod
     def get_live_downloadprefix(cls):
+        cls._init_parser()
         return cls.get_value("File_Naming", "live_downloadprefix").strip('"')
 
     @classmethod
     def get_posted_downloadprefix(cls):
+        cls._init_parser()
         return cls.get_value("File_Naming", "posted_downloadprefix").strip('"')
 
     @classmethod
     def get_ia_itemid(cls):
+        cls._init_parser()
         return cls.get_value("IA_Settings", "itemid").strip('"')
 
     @classmethod
     def get_ia_user_agent(cls):
+        cls._init_parser()
         return cls.get_value("IA_Settings", "user_agent").strip('"')
 
     @classmethod
     def get_ia_email(cls):
+        cls._init_parser()
         return cls.get_value("IA_Credentials", "email").strip('"')
 
     @classmethod
     def get_ia_password(cls):
+        cls._init_parser()
         return cls.get_value("IA_Credentials", "password").strip('"')

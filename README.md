@@ -64,51 +64,20 @@ Using fuck all resources with no video transcoding . Can run on a potato
 
 # I WANT DIS! HOW I GET....
 
-### To run on your router, tv, calculator, microwave......
+Make a container with the image python:alpine
 
-Just make a container with the image 
+Add 3 mounts 
 
-python:alpine
-
-or
-
-registry-1.docker.io/library/python:alpine
-
-dump the files in the work directory and set the startup to be 
-
-python3 main.py
+| Mount Local Path                              | Mount Containter Path | Permissions | Description                                                                                                         |
+| --------------------------------------------- | --------------------- |:-----------:| ------------------------------------------------------------------------------------------------------------------- |
+| /DreggDVR/DVR_Production                      | /_Dregg_DVR           | Read Only   | Dump the repo code in here this is common to all instences                                                          |
+| DreggDVR/DVR_Instances/YOURDREGG/_DVR_Runtime | /_DVR_Runtime         | Write       | Contains the logs, config files and metadata specific to this dvr instence see the example _DVR_Runtime in the repo |
+| DreggDVR/DVR_Instances/YOURDREGG/_DVR_Data    | /_DVR_Data            | Write       | Contains the recordings for this dvr instence                                                                       |
 
 
+Set the start action to
 
-To run on Windows......
-
- run the command here and reboot
-
-https://learn.microsoft.com/en-us/windows/wsl/install
-
-download this and install
-
-https://www.docker.com/products/docker-desktop/
-
-Clone the repo into a folder structure like V:\Dregs\SOMEDREG first and fill in your dvr_accounts.cfg with real details
-
-then look at this command and modify it for your system 
-
-- docker run -v V:\Dregs\SOMEDREG:/dvr python:alpine python /dvr/main.py
-
-**command breakdown...**
-
-1. V:\Dregs\SOMEDREG = The folder on the disk for this instance of the dvr, the repo files should already be in here
-2. :/dvr = Leave this alone can be the same for multiple dregs
-3. python:alpine = the os the container will run only alpine is supported
-4. python /dvr/main.py = the command the container will use to start the dregs dvr script
-
-**You need a different folder and container for each dreg you want to record, For example**
-
-1. docker run -v V:\Dregs\PJ:/dvr python:alpine python /dvr/main.py
-2. docker run -v V:\Dregs\Gert:/dvr python:alpine python /dvr/main.py
-3. docker run -v V:\Dregs\Timmy:/dvr python:alpine python /dvr/main.py
-
+python3 /_Dregg_DVR/main.py
 
 
 ### Then...

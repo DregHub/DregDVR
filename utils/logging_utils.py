@@ -2,45 +2,64 @@ import datetime
 import os
 import shutil
 import traceback
-import json
+import logging
 import re
 from config_settings import DVR_Config
 
 
 class LogManager:
-    Log_Dir = DVR_Config.get_log_dir()
-    CORE_LOG_FILE = DVR_Config.get_core_log_file()
-    DOWNLOAD_CAPTIONS_LOG_FILE = DVR_Config.get_captions_log_file()
-    DOWNLOAD_COMMENTS_LOG_FILE = DVR_Config.get_download_comments_log_file()
-    DOWNLOAD_LIVE_LOG_FILE = DVR_Config.get_download_live_log_file()
-    DOWNLOAD_LIVE_RECOVERY_LOG_FILE = DVR_Config.get_download_live_recovery_log_file()
-    DOWNLOAD_POSTED_LOG_FILE = DVR_Config.get_download_posted_log_file()
-    DOWNLOAD_POSTED_NOTICES_LOG_FILE = DVR_Config.get_download_posted_notices_log_file()
-    UPLOAD_POSTED_LOG_FILE = DVR_Config.get_upload_posted_log_file()
-    UPLOAD_LIVE_LOG_FILE = DVR_Config.get_upload_live_log_file()
-    UPLOAD_IA_LOG_FILE = DVR_Config.get_upload_ia_log_file()
-    UPLOAD_YT_LOG_FILE = DVR_Config.get_upload_yt_log_file()
-    ArchivedLogs_Dir = DVR_Config.get_archived_logs_dir()
-    CORE_LOG_FILTER = DVR_Config.core_log_filter()
-    CAPTIONS_LOG_FILTER = DVR_Config.captions_log_filter()
-    DOWNLOAD_LIVE_LOG_FILTER = DVR_Config.download_live_log_filter()
-    DOWNLOAD_LIVE_RECOVERY_LOG_FILTER = DVR_Config.download_live_recovery_log_filter()
-    DOWNLOAD_POSTED_LOG_FILTER = DVR_Config.download_posted_log_filter()
-    DOWNLOAD_POSTED_NOTICES_LOG_FILTER = DVR_Config.download_posted_notices_log_filter()
-    UPLOAD_POSTED_LOG_FILTER = DVR_Config.upload_posted_log_filter()
-    UPLOAD_LIVE_LOG_FILTER = DVR_Config.upload_live_log_filter()
-    UPLOAD_IA_LOG_FILTER = DVR_Config.upload_ia_log_filter()
-    UPLOAD_YT_LOG_FILTER = DVR_Config.upload_yt_log_filter()
-    log_archiving = DVR_Config.get_log_archiving().lower()
+    _initialized = False
+    _log_paths = {}
+    _log_filters = {}
 
-    LOG_FILTERS = [CORE_LOG_FILTER, CAPTIONS_LOG_FILTER, DOWNLOAD_LIVE_LOG_FILTER, DOWNLOAD_LIVE_RECOVERY_LOG_FILTER,
-                   DOWNLOAD_POSTED_LOG_FILTER, DOWNLOAD_POSTED_NOTICES_LOG_FILTER, UPLOAD_LIVE_LOG_FILTER, UPLOAD_IA_LOG_FILTER, UPLOAD_YT_LOG_FILTER]
-    LOG_FILES = [CORE_LOG_FILE, DOWNLOAD_CAPTIONS_LOG_FILE, DOWNLOAD_LIVE_LOG_FILE, DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
-                 DOWNLOAD_POSTED_LOG_FILE, DOWNLOAD_POSTED_NOTICES_LOG_FILE, UPLOAD_LIVE_LOG_FILE, UPLOAD_IA_LOG_FILE, UPLOAD_YT_LOG_FILE]
+    @classmethod
+    def _initialize_log_paths(cls):
+        """Initialize log paths and filters on first use to avoid recursion."""
+        if cls._initialized:
+            return
+        
+        cls.Log_Dir = DVR_Config.get_log_dir()
+        cls.CORE_LOG_FILE = DVR_Config.get_core_log_file()
+        cls.DOWNLOAD_CAPTIONS_LOG_FILE = DVR_Config.get_captions_log_file()
+        cls.DOWNLOAD_COMMENTS_LOG_FILE = DVR_Config.get_download_comments_log_file()
+        cls.DOWNLOAD_LIVE_LOG_FILE = DVR_Config.get_download_live_log_file()
+        cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILE = DVR_Config.get_download_live_recovery_log_file()
+        cls.DOWNLOAD_POSTED_LOG_FILE = DVR_Config.get_download_posted_log_file()
+        cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE = DVR_Config.get_download_posted_notices_log_file()
+        cls.UPLOAD_POSTED_LOG_FILE = DVR_Config.get_upload_posted_log_file()
+        cls.UPLOAD_LIVE_LOG_FILE = DVR_Config.get_upload_live_log_file()
+        cls.UPLOAD_IA_LOG_FILE = DVR_Config.get_upload_ia_log_file()
+        cls.UPLOAD_YT_LOG_FILE = DVR_Config.get_upload_yt_log_file()
+        cls.ArchivedLogs_Dir = DVR_Config.get_archived_logs_dir()
+        
+        cls.CORE_LOG_FILTER = DVR_Config.core_log_filter()
+        cls.CAPTIONS_LOG_FILTER = DVR_Config.captions_log_filter()
+        cls.DOWNLOAD_LIVE_LOG_FILTER = DVR_Config.download_live_log_filter()
+        cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER = DVR_Config.download_live_recovery_log_filter()
+        cls.DOWNLOAD_POSTED_LOG_FILTER = DVR_Config.download_posted_log_filter()
+        cls.DOWNLOAD_POSTED_NOTICES_LOG_FILTER = DVR_Config.download_posted_notices_log_filter()
+        cls.UPLOAD_POSTED_LOG_FILTER = DVR_Config.upload_posted_log_filter()
+        cls.UPLOAD_LIVE_LOG_FILTER = DVR_Config.upload_live_log_filter()
+        cls.UPLOAD_IA_LOG_FILTER = DVR_Config.upload_ia_log_filter()
+        cls.UPLOAD_YT_LOG_FILTER = DVR_Config.upload_yt_log_filter()
+        cls.log_archiving = DVR_Config.get_log_archiving().lower()
+
+        cls.LOG_FILTERS = [cls.CORE_LOG_FILTER, cls.CAPTIONS_LOG_FILTER, cls.DOWNLOAD_LIVE_LOG_FILTER, 
+                          cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER, cls.DOWNLOAD_POSTED_LOG_FILTER, 
+                          cls.DOWNLOAD_POSTED_NOTICES_LOG_FILTER, cls.UPLOAD_LIVE_LOG_FILTER, 
+                          cls.UPLOAD_IA_LOG_FILTER, cls.UPLOAD_YT_LOG_FILTER]
+        cls.LOG_FILES = [cls.CORE_LOG_FILE, cls.DOWNLOAD_CAPTIONS_LOG_FILE, cls.DOWNLOAD_LIVE_LOG_FILE, 
+                        cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILE, cls.DOWNLOAD_POSTED_LOG_FILE, 
+                        cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE, cls.UPLOAD_LIVE_LOG_FILE, 
+                        cls.UPLOAD_IA_LOG_FILE, cls.UPLOAD_YT_LOG_FILE]
+        
+        cls._initialized = True
 
     @classmethod
     def log_message(cls, message, log_file_name):
         """Log a message with a timestamp to the specified log file, aggregating consecutive duplicates, and filter messages."""
+        cls._initialize_log_paths()
+        #logging.info(message)
         if not log_file_name:
             return
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -111,62 +130,73 @@ class LogManager:
     @classmethod
     def log_core(cls, message):
         """Log a message to the core dreggs dvr log."""
+        cls._initialize_log_paths()
         cls.log_message(message, cls.CORE_LOG_FILE)
-
 
     @classmethod
     def log_download_live(cls, message):
         """Log a message to the Download YouTube Live log."""
+        cls._initialize_log_paths()
         cls.log_message(message, cls.DOWNLOAD_LIVE_LOG_FILE)
 
     @classmethod
     def log_download_live_recovery(cls, message):
         """Log a message to the Download YouTube Live Recovery log."""
+        cls._initialize_log_paths()
         cls.log_message(message, cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILE)
 
     @classmethod
     def log_download_captions(cls, message):
         """Log a message to the Download YouTube Captions log."""
+        cls._initialize_log_paths()
         cls.log_message(message, cls.DOWNLOAD_CAPTIONS_LOG_FILE)
 
     @classmethod
     def log_download_comments(cls, message):
         """Log a message to the Download YouTube Comments log."""
+        cls._initialize_log_paths()
         cls.log_message(message, cls.DOWNLOAD_COMMENTS_LOG_FILE)
 
     @classmethod
     def log_download_posted(cls, message):
         """Log a message to the Download YouTube Posted log."""
+        cls._initialize_log_paths()
         cls.log_message(message, cls.DOWNLOAD_POSTED_LOG_FILE)
 
     @classmethod
     def log_download_posted_notices(cls, message):
         """Log a message to the Download YouTube Posted Notices log."""
+        cls._initialize_log_paths()
         cls.log_message(message, cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE)
 
     @classmethod
     def log_upload_posted(cls, message):
         """Log a message to the Upload YouTube Posted log."""
+        cls._initialize_log_paths()
         cls.log_message(message, cls.UPLOAD_POSTED_LOG_FILE)
 
     @classmethod
     def log_upload_live(cls, message):
         """Log a message to the Upload YouTube live log."""
+        cls._initialize_log_paths()
         cls.log_message(message, cls.UPLOAD_LIVE_LOG_FILE)
 
     @classmethod
     def log_upload_ia(cls, message):
         """Log a message to the Upload Internet Archive log."""
+        cls._initialize_log_paths()
         cls.log_message(message, cls.UPLOAD_IA_LOG_FILE)
 
     @classmethod
     def log_upload_yt(cls, message):
         """Log a message to the Upload YouTube log."""
+        cls._initialize_log_paths()
         cls.log_message(message, cls.UPLOAD_YT_LOG_FILE)
 
     @classmethod
     def archive_logs(cls, filename, parent_folder, log_files):
         """Archive all log files to a folder named after the uploaded file inside the specified parent_folder."""
+        cls._initialize_log_paths()
         try:
             if cls.log_archiving == "true":
                 log_archive_path = os.path.join(cls.Log_Dir, parent_folder)
