@@ -22,7 +22,14 @@ async def login_ia_session(email, password, user_agent):
             raise ValueError("Email and password must be provided via accounts config.")
         
         LogManager.log_upload_ia("Attempting to authenticate with Internet Archive...")
-        ia.configure(email, password)
+        
+        try:
+            ia.configure(email, password)
+        except Exception as config_error:
+            _ia_authenticated = False
+            _ia_session = None
+            LogManager.log_upload_ia(f"ERROR: ia.configure failed: {config_error}\n email: {email} \n password: {password}  \n {traceback.format_exc()}")
+            return
         # Verify authentication was successful
         try:
             _ia_session = ia.ArchiveSession()

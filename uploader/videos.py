@@ -18,7 +18,7 @@ class VideoUploader:
         LogManager.log_upload_posted(f"Monitoring {cls.Posted_UploadQueue_Dir} For Published Videos & Shorts")
         # Try to acquire the lock without waiting
         if cls._upload_videos_lock.locked():
-            LogManager.log_upload_posted("upload_videos is already running, skipping this call.")
+            LogManager.log_upload_posted("Youtube upload_videos is already running, skipping this call.")
             return
 
         async with cls._upload_videos_lock:

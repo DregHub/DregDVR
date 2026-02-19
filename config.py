@@ -4,6 +4,33 @@ import json
 from configparser import ConfigParser, NoSectionError, NoOptionError
 
 
+class ReadOnlyConfigParser(ConfigParser):
+    """A ConfigParser that prevents any write operations to prevent file corruption."""
+    
+    def write(self, fp, space_around_delimiters=True):
+        """Prevent writing to file."""
+        raise RuntimeError(
+            "Writing to config files is disabled to prevent file corruption. "
+            "Config files are read-only. Use environment variables or other methods to modify runtime behavior."
+        )
+    
+    def add_section(self, section):
+        """Prevent adding sections to prevent in-memory modifications."""
+        raise RuntimeError("Config modifications are disabled. Config files are read-only.")
+    
+    def remove_section(self, section):
+        """Prevent removing sections."""
+        raise RuntimeError("Config modifications are disabled. Config files are read-only.")
+    
+    def set(self, section, option, value):
+        """Prevent setting values to prevent in-memory modifications."""
+        raise RuntimeError("Config modifications are disabled. Config files are read-only.")
+    
+    def remove_option(self, section, option):
+        """Prevent removing options."""
+        raise RuntimeError("Config modifications are disabled. Config files are read-only.")
+
+
 class BaseConfig:
     """Base configuration class with common functionality for all config parsers."""
     
@@ -25,7 +52,8 @@ class BaseConfig:
             config_path = os.path.join(cls.Config_Dir, cls.config_filename)
 
             # Disable interpolation to allow raw % in values
-            parser = ConfigParser(interpolation=None)
+            # Use ReadOnlyConfigParser to prevent accidental writes
+            parser = ReadOnlyConfigParser(interpolation=None)
             if not os.path.exists(config_path):
                 # Create an empty config file if it does not exist
                 os.makedirs(cls.Config_Dir, exist_ok=True)
@@ -47,20 +75,6 @@ class BaseConfig:
             # Use print instead of log_core to avoid circular import
             print(f"Config error: {e}\n{traceback.format_exc()}")
             raise
-
-    @classmethod
-    def set_value(cls, section, key, value):
-        """Set a value in the config file and save it."""
-        cls._init_parser()
-        parser = getattr(cls, cls.parser_attr_name)
-        if parser is None:
-            raise RuntimeError("Config parser is not initialized. Check if the config file exists and is readable.")
-        if not parser.has_section(section):
-            parser.add_section(section)
-        parser.set(section, key, value)
-        config_path = os.path.join(cls.Config_Dir, cls.config_filename)
-        with open(config_path, "w") as cfg:
-            parser.write(cfg)
 
     @staticmethod
     def parse_string_list(str_list):

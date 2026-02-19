@@ -191,6 +191,8 @@ class LogManager:
     def log_upload_yt(cls, message):
         """Log a message to the Upload YouTube log."""
         cls._initialize_log_paths()
+        print(f"Logging to YouTube Upload Log: {message}")
+        print(f"cls.UPLOAD_YT_LOG_FILE: {cls.UPLOAD_YT_LOG_FILE}")
         cls.log_message(message, cls.UPLOAD_YT_LOG_FILE)
 
     @classmethod

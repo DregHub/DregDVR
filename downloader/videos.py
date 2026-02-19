@@ -2,14 +2,15 @@ import asyncio
 import os
 import csv
 import traceback
-import shlex
+import logging
+from yt_dlp import YoutubeDL
 from utils.logging_utils import LogManager
-from utils.subprocess_utils import run_subprocess
 from utils.file_utils import FileManager
 from downloader.playlist import PlaylistManager
 from utils.index_utils import IndexManager
 from config_settings import DVR_Config
 from config_accounts import Account_Config
+from utils.dlp_utils import DLPEvents
 
 
 class VideoDownloader:
@@ -30,6 +31,15 @@ class VideoDownloader:
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
     youtube_source = Account_Config.get_youtube_source()
     youtube_handle = Account_Config.get_youtube_handle()
+    dlp_events = DLPEvents()
+
+    @classmethod
+    def download_started(cls):
+        LogManager.log_download_posted(f"VIDEO DOWNLOAD START EVENT {cls.youtube_source}")
+         
+    @classmethod
+    def download_complete(cls):
+        LogManager.log_download_posted(f"VIDEO DOWNLOAD COMPLETE EVENT {cls.youtube_source}")
 
     @classmethod
     async def generate_download_List(cls):
@@ -49,10 +59,10 @@ class VideoDownloader:
                 headers = next(reader, None)
                 for row in reader:
                     if len(row) < 4:
-                        #LogManager.log_download_posted(f"Row with missing columns found: {row}. Padding to 4 columns.")
+                        LogManager.log_download_posted(f"Row with missing columns found: {row}. Padding to 4 columns.")
                         row += [""] * (4 - len(row))
                     if row[3] == "0":
-                        #LogManager.log_download_posted(f"Queued for download: {row[2]}")
+                        LogManager.log_download_posted(f"Queued for download: {row[2]}")
                         urls_to_download.append(row[2])
                     rows.append(row)
 
@@ -101,7 +111,9 @@ class VideoDownloader:
 
     @classmethod
     async def download_videos(cls):
+        cls.dlp_events = DLPEvents(LogManager.DOWNLOAD_POSTED_LOG_FILE, cls.download_started, cls.download_complete)
         LogManager.log_download_posted(f"Starting Video & Shorts Downloader for {cls.youtube_source}")
+         
         while True:
             try:
                 # Clean up the download old file if it exists
@@ -115,7 +127,6 @@ class VideoDownloader:
                 if os.path.exists(cls.posted_download_list):
                     with open(cls.posted_download_list, "r", encoding="utf-8") as in_file:
                         urls = [line.strip() for line in in_file if line.strip()]
-
                         if len(urls) > 1:
                             LogManager.log_download_posted(f"Found {len(urls)} new videos/shorts to download.")
                         elif len(urls) == 1:
@@ -126,39 +137,48 @@ class VideoDownloader:
                             CurrentIndex = IndexManager.find_new_posted_index(LogManager.DOWNLOAD_POSTED_LOG_FILE)
                             CurrentDownloadFile = f"{cls.posted_downloadprefix}{CurrentIndex} %(title).{cls.dlp_max_title_chars}s {cls.DownloadTimeStampFormat}.%(ext)s"
 
-                            command = [
-                                "yt-dlp",
-                                f"--paths temp:{cls.Posted_DownloadQueue_Dir}",
-                                "--match-filter live_status=not_live",
-                                "--output",
-                                f'"{CurrentDownloadFile}"',
-                                "--downloader-args", f'"ffmpeg_i:-loglevel quiet"',
-                                "--restrict-filenames",
-                                f"--retries {cls.dlp_max_dlp_download_retries}",
-                                f'"{url}"',
-                            ]
+                            # Build yt-dlp options
+                            ydl_opts = {
+                                'paths': {'temp': cls.Posted_DownloadQueue_Dir, 'home': cls.Posted_UploadQueue_Dir},
+                                'match_filters': ['live_status=not_live'],
+                                'outtmpl': CurrentDownloadFile,
+                                'downloader_args': {'ffmpeg_i': '-loglevel quiet'},
+                                'restrictfilenames': True,
+                                'progress_hooks': [cls.dlp_events.on_progress]
+                            }
 
-                            if (cls.dlp_verbose == "true"):
-                                command.append("--verbose")
+                            try:
+                                try:
+                                    ydl_opts['retries'] = int(cls.dlp_max_dlp_download_retries)
+                                except Exception:
+                                    pass
 
-                            if cls.dlp_no_progress == "true":
-                                for filt in DVR_Config.get_no_progress_dlp_filters():
-                                    if filt not in LogManager.DOWNLOAD_POSTED_LOG_FILTER:
-                                        LogManager.DOWNLOAD_POSTED_LOG_FILTER.append(filt)
+                                try:
+                                    ydl_opts['fragment_retries'] = int(cls.dlp_max_fragment_retry)
+                                except Exception:
+                                    pass
 
-                            MiniLog, exit_code = await run_subprocess(
-                                command,
-                                LogManager.DOWNLOAD_POSTED_LOG_FILE,
-                                "yt-dlp video/shorts playlist extraction failed",
-                                "Exception in download_videos",
-                                cls.Posted_UploadQueue_Dir
-                            )
+                                if cls.dlp_keep_fragments == 'true':
+                                    ydl_opts['keep_fragments'] = True
 
-                            if exit_code == 0:
-                                LogManager.log_download_posted(f"Posted Video {url} Downloaded Successfully.")
+                                if cls.dlp_verbose == 'true':
+                                    ydl_opts['verbose'] = True
+
+                                #if cls.dlp_no_progress == 'true':
+                                    #for filt in DVR_Config.get_no_progress_dlp_filters():
+                                        #Lif filt not in LogManager.DOWNLOAD_POSTED_LOG_FILTER:
+                                            #LogManager.DOWNLOAD_POSTED_LOG_FILTER.append(filt)
+                                    #ydl_opts['noprogress'] = True
+                        
+                                with YoutubeDL(ydl_opts) as ydl:
+                                    await asyncio.to_thread(ydl.download, [url])
+ 
+
+                                LogManager.log_download_posted(f"Posted Video {url} Downloaded Successfully to {cls.Posted_DownloadQueue_Dir} as {CurrentDownloadFile}")
                                 await cls.mark_as_downloaded(url)
-                            else:
-                                LogManager.log_download_posted(f"yt-dlp failed for {url} with exit code {exit_code}")
+
+                            except Exception as e:
+                                LogManager.log_download_posted(f"yt-dlp python API failed for {url}: {e}\n{traceback.format_exc()}")
 
                         if len(urls) > 1:
                             LogManager.log_download_posted(f"Finished downloading all {len(urls)} new videos/shorts from channel {cls.youtube_handle}")

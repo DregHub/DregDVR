@@ -55,5 +55,9 @@ class DVR_Tasks(BaseConfig):
         cls._init_parser()
         return cls.get_value("Tasks", "posted_videos_upload").lower()
 
+    @classmethod
+    def get_dependency_package_update(cls):
+        cls._init_parser()
+        return cls.get_value("Tasks", "dependency_package_update").lower()
 
 

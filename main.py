@@ -21,7 +21,7 @@ def create_required_dirs():
     data_profiledir_name = json.loads(DVR_Config.get_value("Directories", "data_dir"))
     runtime_profiledir = os.path.join(root, runtime_profiledir_name)
     data_profiledir = os.path.join(root, data_profiledir_name)
-
+        
     runtime_subdirs_to_create = json.loads(DVR_Config.get_value("Directories", "runtime_subdirs_to_create"))
     data_subdirs_to_create = json.loads(DVR_Config.get_value("Directories", "data_subdirs_to_create"))
 
@@ -45,22 +45,30 @@ async def main():
         # Ensure required project/runtime/data directories exist
         create_required_dirs()
         
-        if os.name == "nt":
-            # Windows
-            LogManager.log_core("Skipping Dependency Package Update as os = Windows")
+        dependency_package_update = DVR_Tasks.get_dependency_package_update()
+
+        if dependency_package_update == "true":
+            if os.name == "nt":
+                # Windows
+                LogManager.log_core("Skipping Dependency Package Update as os = Windows")
+            else:
+                apk_dependencies = DVR_Config.get_required_apk_dependencies()
+                for dependency in apk_dependencies:
+                    await DependencyManager.install_apk_dependency(dependency)
+
+                pip_dependencies = DVR_Config.get_required_py_dependencies()
+                for dependency in pip_dependencies:
+                    await DependencyManager.install_pip_dependency(dependency)
+
+                await DependencyManager.update_ytdlp()
+                    
+                LogManager.log_core("All required dependencies installed/updated successfully.")
         else:
-            apk_dependencies = DVR_Config.get_required_apk_dependencies()
-            for dependency in apk_dependencies:
-                await DependencyManager.install_apk_dependency(dependency)
-
-            pip_dependencies = DVR_Config.get_required_py_dependencies()
-            for dependency in pip_dependencies:
-                await DependencyManager.install_pip_dependency(dependency)
-
-            await DependencyManager.update_ytdlp()
+            LogManager.log_core("Skipping Dependency Package Update as dependency_package_update = false in dvr_tasks.ini")
                 
-            LogManager.log_core("All required dependencies installed/updated successfully.")
-        
+
+
+       
         ContainerMaintenance = DVR_Tasks.get_container_maintenance_inf_loop()
         if ContainerMaintenance.lower() == "true":
             LogManager.log_core("Container Maintenance Mode is ON")
@@ -78,7 +86,7 @@ async def main():
             posted_notices_download = DVR_Tasks.get_posted_notices_download()
             livestream_upload = DVR_Tasks.get_livestream_upload()
             posted_videos_upload = DVR_Tasks.get_posted_videos_upload()
-
+            
             tasks = []
             if livestream_download == "true":
                 from downloader.livestreams import LivestreamDownloader

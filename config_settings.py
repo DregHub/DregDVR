@@ -105,6 +105,12 @@ class DVR_Config(BaseConfig):
         cls._init_parser()
         root_dir_name = cls.get_value("Directories", "root_dir")
         return os.path.join(cls.Data_Root_Dir, root_dir_name)
+    
+    @classmethod
+    def get_meta_data_dir(cls):
+        cls._init_parser()
+        return os.path.join(cls.Runtime_Profile_Dir, cls.get_value("Directories", "metadata_dir").strip('"'))
+    
 
     # File References
 
@@ -278,6 +284,14 @@ class DVR_Config(BaseConfig):
     def get_video_file_extensions(cls):
         file_extensions = json.loads(cls.get_value("YT_UploadSettings", "upload_file_extensions"))
         return tuple(file_extensions)
+
+    @classmethod
+    def get_yt_upload_visibility(cls):
+        return cls.get_value("YT_UploadSettings", "upload_visibility").strip('"')
+
+    @classmethod
+    def get_yt_upload_catagory(cls):
+        return cls.get_value("YT_UploadSettings", "upload_category").strip('"')
 
     @classmethod
     def get_required_py_dependencies(cls):
