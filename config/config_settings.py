@@ -1,7 +1,6 @@
 import os
-import re
 import json
-from config import BaseConfig
+from .config import BaseConfig
 
 
 class DVR_Config(BaseConfig):
@@ -15,7 +14,7 @@ class DVR_Config(BaseConfig):
         """Initialize the configuration parser and set Data_Root_Dir."""
         # Only initialize parent parser, do NOT call other DVR_Config methods here
         super()._init_parser()
-        
+
         # Set Data_Root_Dir only if parser is ready and not already set
         if cls.Data_Root_Dir is None and cls.parser is not None:
             try:
@@ -31,86 +30,132 @@ class DVR_Config(BaseConfig):
     @classmethod
     def get_live_downloadqueue_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "live_downloadqueue_dir").strip('"'))
+        return os.path.join(
+            cls.Data_Root_Dir,
+            cls.get_value("Directories", "live_downloadqueue_dir").strip('"'),
+        )
 
     @classmethod
     def get_live_downloadrecovery_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "live_downloadrecovery_dir").strip('"'))
+        return os.path.join(
+            cls.Data_Root_Dir,
+            cls.get_value("Directories", "live_downloadrecovery_dir").strip('"'),
+        )
 
     @classmethod
     def get_live_completeduploads_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "live_completeduploads_dir").strip('"'))
+        return os.path.join(
+            cls.Data_Root_Dir,
+            cls.get_value("Directories", "live_completeduploads_dir").strip('"'),
+        )
 
     @classmethod
     def get_live_uploadqueue_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "live_uploadqueue_dir").strip('"'))
-    
+        return os.path.join(
+            cls.Data_Root_Dir,
+            cls.get_value("Directories", "live_uploadqueue_dir").strip('"'),
+        )
+
     @classmethod
     def get_live_comments_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "live_comments_dir").strip('"'))
+        return os.path.join(
+            cls.Data_Root_Dir,
+            cls.get_value("Directories", "live_comments_dir").strip('"'),
+        )
 
     @classmethod
     def get_live_captions_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "captions_dir").strip('"'))
+        return os.path.join(
+            cls.Data_Root_Dir, cls.get_value("Directories", "captions_dir").strip('"')
+        )
 
     # Posted Directories
     @classmethod
     def get_posted_downloadqueue_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "posted_downloadqueue_dir").strip('"'))
+        return os.path.join(
+            cls.Data_Root_Dir,
+            cls.get_value("Directories", "posted_downloadqueue_dir").strip('"'),
+        )
 
     @classmethod
     def get_posted_completeduploads_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "posted_completeduploads_dir").strip('"'))
+        return os.path.join(
+            cls.Data_Root_Dir,
+            cls.get_value("Directories", "posted_completeduploads_dir").strip('"'),
+        )
 
     @classmethod
     def get_posted_playlists_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "posted_playlists_dir").strip('"'))
+        return os.path.join(
+            cls.Data_Root_Dir,
+            cls.get_value("Directories", "posted_playlists_dir").strip('"'),
+        )
 
     @classmethod
     def get_posted_uploadqueue_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "posted_uploadqueue_dir").strip('"'))
+        return os.path.join(
+            cls.Data_Root_Dir,
+            cls.get_value("Directories", "posted_uploadqueue_dir").strip('"'),
+        )
 
     @classmethod
     def get_posted_notices_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Data_Root_Dir, cls.get_value("Directories", "posted_notices_dir").strip('"'))
+        return os.path.join(
+            cls.Data_Root_Dir,
+            cls.get_value("Directories", "posted_notices_dir").strip('"'),
+        )
 
     # Misc Directories
     @classmethod
     def get_auth_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Runtime_Profile_Dir, cls.get_value("Directories", "auth_dir").strip('"'))
+        return os.path.join(
+            cls.Runtime_Profile_Dir, cls.get_value("Directories", "auth_dir").strip('"')
+        )
 
     @classmethod
     def get_log_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Runtime_Profile_Dir, cls.get_value("Directories", "log_dir").strip('"'))
+        return os.path.join(
+            cls.Runtime_Profile_Dir, cls.get_value("Directories", "log_dir").strip('"')
+        )
+
+    @classmethod
+    def get_templates_dir(cls):
+        cls._init_parser()
+        return os.path.join(
+            cls.Runtime_Profile_Dir,
+            cls.get_value("Directories", "templates_dir").strip('"'),
+        )
 
     @classmethod
     def get_archived_logs_dir(cls):
         cls._init_parser()
         return os.path.join(cls.get_log_dir(), "_ArchivedLogs")
-    
+
     @classmethod
     def get_download_root(cls):
         cls._init_parser()
         root_dir_name = cls.get_value("Directories", "root_dir")
         return os.path.join(cls.Data_Root_Dir, root_dir_name)
-    
+
     @classmethod
     def get_meta_data_dir(cls):
         cls._init_parser()
-        return os.path.join(cls.Runtime_Profile_Dir, cls.get_value("Directories", "metadata_dir").strip('"'))
-    
+        return os.path.join(
+            cls.Runtime_Profile_Dir,
+            cls.get_value("Directories", "metadata_dir").strip('"'),
+        )
 
     # File References
 
@@ -143,6 +188,11 @@ class DVR_Config(BaseConfig):
     def get_yt_credentials_file(cls):
         cls._init_parser()
         return os.path.join(cls.get_auth_dir(), "YT-oauth2.json")
+
+    @classmethod
+    def get_yt_cookies_file(cls):
+        cls._init_parser()
+        return os.path.join(cls.get_auth_dir(), "cookies.txt")
 
     # Log File References
     @classmethod
@@ -207,39 +257,57 @@ class DVR_Config(BaseConfig):
 
     @classmethod
     def captions_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "captions_log_filter"))
+        return cls.parse_string_list(
+            cls.get_value("Log_Filters", "captions_log_filter")
+        )
 
     @classmethod
     def download_live_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "download_live_log_filter"))
+        return cls.parse_string_list(
+            cls.get_value("Log_Filters", "download_live_log_filter")
+        )
 
     @classmethod
     def download_live_recovery_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "download_live_recovery_log_filter"))
+        return cls.parse_string_list(
+            cls.get_value("Log_Filters", "download_live_recovery_log_filter")
+        )
 
     @classmethod
     def download_posted_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "download_posted_log_filter"))
+        return cls.parse_string_list(
+            cls.get_value("Log_Filters", "download_posted_log_filter")
+        )
 
     @classmethod
     def download_posted_notices_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "download_posted_notices_log_filter"))
+        return cls.parse_string_list(
+            cls.get_value("Log_Filters", "download_posted_notices_log_filter")
+        )
 
     @classmethod
     def upload_posted_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "upload_posted_log_filter"))
+        return cls.parse_string_list(
+            cls.get_value("Log_Filters", "upload_posted_log_filter")
+        )
 
     @classmethod
     def upload_live_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "upload_live_log_filter"))
+        return cls.parse_string_list(
+            cls.get_value("Log_Filters", "upload_live_log_filter")
+        )
 
     @classmethod
     def upload_ia_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "upload_ia_log_filter"))
+        return cls.parse_string_list(
+            cls.get_value("Log_Filters", "upload_ia_log_filter")
+        )
 
     @classmethod
     def upload_yt_log_filter(cls):
-        return cls.parse_string_list(cls.get_value("Log_Filters", "upload_yt_log_filter"))
+        return cls.parse_string_list(
+            cls.get_value("Log_Filters", "upload_yt_log_filter")
+        )
 
     # Strings
 
@@ -277,12 +345,16 @@ class DVR_Config(BaseConfig):
 
     @classmethod
     def get_no_progress_dlp_filters(cls):
-        file_extensions = json.loads(cls.get_value("YT_DownloadSettings", "dlp_no_progress_filters"))
+        file_extensions = json.loads(
+            cls.get_value("YT_DownloadSettings", "dlp_no_progress_filters")
+        )
         return tuple(file_extensions)
 
     @classmethod
     def get_video_file_extensions(cls):
-        file_extensions = json.loads(cls.get_value("YT_UploadSettings", "upload_file_extensions"))
+        file_extensions = json.loads(
+            cls.get_value("YT_UploadSettings", "upload_file_extensions")
+        )
         return tuple(file_extensions)
 
     @classmethod

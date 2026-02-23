@@ -3,12 +3,13 @@ import csv
 import traceback
 from utils.logging_utils import LogManager
 from utils.subprocess_utils import run_subprocess
-from config_settings import DVR_Config
-from config_accounts import Account_Config
+from config.config_settings import DVR_Config
+from config.config_accounts import Account_Config
+
 
 class PlaylistManager:
     playlist_dir = DVR_Config.get_posted_playlists_dir()
-    Posted_DownloadQueue_Dir =  DVR_Config.get_posted_downloadqueue_dir()
+    Posted_DownloadQueue_Dir = DVR_Config.get_posted_downloadqueue_dir()
     delta_playlist = DVR_Config.get_posted_delta_playlist()
     persistent_playlist = DVR_Config.get_posted_persistent_playlist()
 
@@ -25,16 +26,16 @@ class PlaylistManager:
             "--print-to-file",
             "'%(id)s,%(title)s,%(url)s,0'",
             cls.delta_playlist,
-            Account_Config.get_youtube_handle()
+            Account_Config.get_youtube_handle(),
         ]
-        
+
         MiniLog, exit_code = await run_subprocess(
             command,
-            #LogManager.DOWNLOAD_POSTED_LOG_FILE
+            # LogManager.DOWNLOAD_POSTED_LOG_FILE
             None,  # disable logging to file as this function is called frequently
             "yt-dlp video/shorts playlist extraction failed",
             "Exception in download_videos_and_shorts",
-            cls.Posted_DownloadQueue_Dir
+            cls.Posted_DownloadQueue_Dir,
         )
 
         if exit_code != 0:
@@ -46,7 +47,7 @@ class PlaylistManager:
 
         # Skip if delta_playlist is missing or empty
         if not os.path.exists(cls.delta_playlist):
-            #LogManager.log_download_posted(f"Delta playlist file {cls.delta_playlist} does not exist. Skipping merge.")
+            # LogManager.log_download_posted(f"Delta playlist file {cls.delta_playlist} does not exist. Skipping merge.")
             return
 
         try:
@@ -59,11 +60,15 @@ class PlaylistManager:
             existing_ids = set()
             # Create persistent_playlist with headers if it does not exist
             if not os.path.exists(cls.persistent_playlist):
-                with open(cls.persistent_playlist, "w", newline="", encoding="utf-8") as outfile:
+                with open(
+                    cls.persistent_playlist, "w", newline="", encoding="utf-8"
+                ) as outfile:
                     writer = csv.writer(outfile)
                     writer.writerow(headers)
             else:
-                with open(cls.persistent_playlist, "r", encoding="utf-8") as persistent_file:
+                with open(
+                    cls.persistent_playlist, "r", encoding="utf-8"
+                ) as persistent_file:
                     reader = csv.reader(persistent_file)
                     next(reader, None)
                     for row in reader:
@@ -71,7 +76,9 @@ class PlaylistManager:
                             existing_ids.add(row[0])
 
             # Open persistent_playlist in append mode to write new rows
-            with open(cls.persistent_playlist, "a", newline="", encoding="utf-8") as outfile:
+            with open(
+                cls.persistent_playlist, "a", newline="", encoding="utf-8"
+            ) as outfile:
                 writer = csv.writer(outfile)
                 for line in delta_lines:
                     row = line.split(",", 3)
@@ -79,9 +86,13 @@ class PlaylistManager:
                         row.append("")
                     unique_id = row[0]
 
-                    if not existing_ids or (unique_id and unique_id not in existing_ids):
+                    if not existing_ids or (
+                        unique_id and unique_id not in existing_ids
+                    ):
                         writer.writerow(row)
                         existing_ids.add(unique_id)
-            #LogManager.log_download_posted(f"Merged delta playlist written to {cls.persistent_playlist}")
+            # LogManager.log_download_posted(f"Merged delta playlist written to {cls.persistent_playlist}")
         except Exception as e:
-            LogManager.log_download_posted(f"Failed to merge delta playlist:  {e}\n{traceback.format_exc()}")
+            LogManager.log_download_posted(
+                f"Failed to merge delta playlist:  {e}\n{traceback.format_exc()}"
+            )

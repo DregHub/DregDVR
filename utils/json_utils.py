@@ -5,8 +5,9 @@ import traceback
 from typing import Dict, Tuple
 import aiofiles
 from utils.logging_utils import LogManager
-from config_settings import DVR_Config
-from config_accounts import Account_Config
+from config.config_settings import DVR_Config
+from config.config_accounts import Account_Config
+
 
 class JSONUtils:
     @classmethod

@@ -4,7 +4,7 @@ import shutil
 import traceback
 import logging
 import re
-from config_settings import DVR_Config
+from config.config_settings import DVR_Config
 
 
 class LogManager:
@@ -17,49 +17,71 @@ class LogManager:
         """Initialize log paths and filters on first use to avoid recursion."""
         if cls._initialized:
             return
-        
+
         cls.Log_Dir = DVR_Config.get_log_dir()
         cls.CORE_LOG_FILE = DVR_Config.get_core_log_file()
         cls.DOWNLOAD_CAPTIONS_LOG_FILE = DVR_Config.get_captions_log_file()
         cls.DOWNLOAD_COMMENTS_LOG_FILE = DVR_Config.get_download_comments_log_file()
         cls.DOWNLOAD_LIVE_LOG_FILE = DVR_Config.get_download_live_log_file()
-        cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILE = DVR_Config.get_download_live_recovery_log_file()
+        cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILE = (
+            DVR_Config.get_download_live_recovery_log_file()
+        )
         cls.DOWNLOAD_POSTED_LOG_FILE = DVR_Config.get_download_posted_log_file()
-        cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE = DVR_Config.get_download_posted_notices_log_file()
+        cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE = (
+            DVR_Config.get_download_posted_notices_log_file()
+        )
         cls.UPLOAD_POSTED_LOG_FILE = DVR_Config.get_upload_posted_log_file()
         cls.UPLOAD_LIVE_LOG_FILE = DVR_Config.get_upload_live_log_file()
         cls.UPLOAD_IA_LOG_FILE = DVR_Config.get_upload_ia_log_file()
         cls.UPLOAD_YT_LOG_FILE = DVR_Config.get_upload_yt_log_file()
         cls.ArchivedLogs_Dir = DVR_Config.get_archived_logs_dir()
-        
+
         cls.CORE_LOG_FILTER = DVR_Config.core_log_filter()
         cls.CAPTIONS_LOG_FILTER = DVR_Config.captions_log_filter()
         cls.DOWNLOAD_LIVE_LOG_FILTER = DVR_Config.download_live_log_filter()
-        cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER = DVR_Config.download_live_recovery_log_filter()
+        cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER = (
+            DVR_Config.download_live_recovery_log_filter()
+        )
         cls.DOWNLOAD_POSTED_LOG_FILTER = DVR_Config.download_posted_log_filter()
-        cls.DOWNLOAD_POSTED_NOTICES_LOG_FILTER = DVR_Config.download_posted_notices_log_filter()
+        cls.DOWNLOAD_POSTED_NOTICES_LOG_FILTER = (
+            DVR_Config.download_posted_notices_log_filter()
+        )
         cls.UPLOAD_POSTED_LOG_FILTER = DVR_Config.upload_posted_log_filter()
         cls.UPLOAD_LIVE_LOG_FILTER = DVR_Config.upload_live_log_filter()
         cls.UPLOAD_IA_LOG_FILTER = DVR_Config.upload_ia_log_filter()
         cls.UPLOAD_YT_LOG_FILTER = DVR_Config.upload_yt_log_filter()
         cls.log_archiving = DVR_Config.get_log_archiving().lower()
 
-        cls.LOG_FILTERS = [cls.CORE_LOG_FILTER, cls.CAPTIONS_LOG_FILTER, cls.DOWNLOAD_LIVE_LOG_FILTER, 
-                          cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER, cls.DOWNLOAD_POSTED_LOG_FILTER, 
-                          cls.DOWNLOAD_POSTED_NOTICES_LOG_FILTER, cls.UPLOAD_LIVE_LOG_FILTER, 
-                          cls.UPLOAD_IA_LOG_FILTER, cls.UPLOAD_YT_LOG_FILTER]
-        cls.LOG_FILES = [cls.CORE_LOG_FILE, cls.DOWNLOAD_CAPTIONS_LOG_FILE, cls.DOWNLOAD_LIVE_LOG_FILE, 
-                        cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILE, cls.DOWNLOAD_POSTED_LOG_FILE, 
-                        cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE, cls.UPLOAD_LIVE_LOG_FILE, 
-                        cls.UPLOAD_IA_LOG_FILE, cls.UPLOAD_YT_LOG_FILE]
-        
+        cls.LOG_FILTERS = [
+            cls.CORE_LOG_FILTER,
+            cls.CAPTIONS_LOG_FILTER,
+            cls.DOWNLOAD_LIVE_LOG_FILTER,
+            cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER,
+            cls.DOWNLOAD_POSTED_LOG_FILTER,
+            cls.DOWNLOAD_POSTED_NOTICES_LOG_FILTER,
+            cls.UPLOAD_LIVE_LOG_FILTER,
+            cls.UPLOAD_IA_LOG_FILTER,
+            cls.UPLOAD_YT_LOG_FILTER,
+        ]
+        cls.LOG_FILES = [
+            cls.CORE_LOG_FILE,
+            cls.DOWNLOAD_CAPTIONS_LOG_FILE,
+            cls.DOWNLOAD_LIVE_LOG_FILE,
+            cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
+            cls.DOWNLOAD_POSTED_LOG_FILE,
+            cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE,
+            cls.UPLOAD_LIVE_LOG_FILE,
+            cls.UPLOAD_IA_LOG_FILE,
+            cls.UPLOAD_YT_LOG_FILE,
+        ]
+
         cls._initialized = True
 
     @classmethod
     def log_message(cls, message, log_file_name):
         """Log a message with a timestamp to the specified log file, aggregating consecutive duplicates, and filter messages."""
         cls._initialize_log_paths()
-        #logging.info(message)
+        # logging.info(message)
         if not log_file_name:
             return
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -91,9 +113,7 @@ class LogManager:
                 r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) > (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (.+) \[Repeat X (\d+)\]"
             )
             # Pattern to match the normal log format
-            normal_pattern = re.compile(
-                r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - (.+)"
-            )
+            normal_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - (.+)")
 
             if last_line:
                 agg_match = agg_pattern.fullmatch(last_line)
@@ -210,6 +230,11 @@ class LogManager:
                     os.makedirs(archive_folder)
                 for log_file in log_files:
                     if os.path.exists(log_file):
-                        shutil.move(log_file, os.path.join(archive_folder, os.path.basename(log_file)))
+                        shutil.move(
+                            log_file,
+                            os.path.join(archive_folder, os.path.basename(log_file)),
+                        )
         except Exception as e:
-            cls.log_core(f"Failed to archive logs for {filename}: {e}\n{traceback.format_exc()}")
+            cls.log_core(
+                f"Failed to archive logs for {filename}: {e}\n{traceback.format_exc()}"
+            )

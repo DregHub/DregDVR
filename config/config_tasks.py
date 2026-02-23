@@ -1,7 +1,4 @@
-import os
-import re
-import json
-from config import BaseConfig
+from .config import BaseConfig
 
 
 class DVR_Tasks(BaseConfig):
@@ -59,5 +56,3 @@ class DVR_Tasks(BaseConfig):
     def get_dependency_package_update(cls):
         cls._init_parser()
         return cls.get_value("Tasks", "dependency_package_update").lower()
-
-

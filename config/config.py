@@ -6,34 +6,42 @@ from configparser import ConfigParser, NoSectionError, NoOptionError
 
 class ReadOnlyConfigParser(ConfigParser):
     """A ConfigParser that prevents any write operations to prevent file corruption."""
-    
+
     def write(self, fp, space_around_delimiters=True):
         """Prevent writing to file."""
         raise RuntimeError(
             "Writing to config files is disabled to prevent file corruption. "
             "Config files are read-only. Use environment variables or other methods to modify runtime behavior."
         )
-    
+
     def add_section(self, section):
         """Prevent adding sections to prevent in-memory modifications."""
-        raise RuntimeError("Config modifications are disabled. Config files are read-only.")
-    
+        raise RuntimeError(
+            "Config modifications are disabled. Config files are read-only."
+        )
+
     def remove_section(self, section):
         """Prevent removing sections."""
-        raise RuntimeError("Config modifications are disabled. Config files are read-only.")
-    
+        raise RuntimeError(
+            "Config modifications are disabled. Config files are read-only."
+        )
+
     def set(self, section, option, value):
         """Prevent setting values to prevent in-memory modifications."""
-        raise RuntimeError("Config modifications are disabled. Config files are read-only.")
-    
+        raise RuntimeError(
+            "Config modifications are disabled. Config files are read-only."
+        )
+
     def remove_option(self, section, option):
         """Prevent removing options."""
-        raise RuntimeError("Config modifications are disabled. Config files are read-only.")
+        raise RuntimeError(
+            "Config modifications are disabled. Config files are read-only."
+        )
 
 
 class BaseConfig:
     """Base configuration class with common functionality for all config parsers."""
-    
+
     Root_Dir = None
     Data_Root_Dir = None
     Runtime_Profile_Dir = None
@@ -68,7 +76,9 @@ class BaseConfig:
         cls._init_parser()
         parser = getattr(cls, cls.parser_attr_name)
         if parser is None:
-            raise RuntimeError("Config parser is not initialized. Check if the config file exists and is readable.")
+            raise RuntimeError(
+                "Config parser is not initialized. Check if the config file exists and is readable."
+            )
         try:
             return parser.get(section, key)
         except (NoSectionError, NoOptionError) as e:
@@ -82,4 +92,6 @@ class BaseConfig:
         try:
             return json.loads(str_list)
         except Exception as e:
-            raise RuntimeError(f"Failed to parse string list:  {e}\n{traceback.format_exc()}")
+            raise RuntimeError(
+                f"Failed to parse string list:  {e}\n{traceback.format_exc()}"
+            )

@@ -2,8 +2,9 @@ import os
 import re
 import traceback
 from utils.logging_utils import LogManager
-from config_settings import DVR_Config
-from config_accounts import Account_Config
+from config.config_settings import DVR_Config
+from config.config_accounts import Account_Config
+
 
 class IndexManager:
     Live_DownloadQueue_Dir = DVR_Config.get_live_downloadqueue_dir()
@@ -43,12 +44,16 @@ class IndexManager:
                                 max_index = idx
 
             if not previous_videos:
-                LogManager.log_message("No previous videos found, First index will be returned", log_file)
+                LogManager.log_message(
+                    "No previous videos found, First index will be returned", log_file
+                )
                 return "0"
 
             return str(max_index)
         except Exception as e:
-            LogManager.log_message(f"Failed to get index: {e}\n{traceback.format_exc()}", log_file)
+            LogManager.log_message(
+                f"Failed to get index: {e}\n{traceback.format_exc()}", log_file
+            )
             return None
 
     @staticmethod
@@ -57,12 +62,17 @@ class IndexManager:
         try:
             current_index = IndexManager.find_current_live_index(log_file)
             if current_index is None:
-                LogManager.log_message("Current index is None, cannot increment.", log_file)
+                LogManager.log_message(
+                    "Current index is None, cannot increment.", log_file
+                )
                 return None
             current_index_num = int(current_index) + 1
             return str(current_index_num)
         except Exception as e:
-            LogManager.log_message(f"Failed to get next free index: {e}\n{traceback.format_exc()}", log_file)
+            LogManager.log_message(
+                f"Failed to get next free index: {e}\n{traceback.format_exc()}",
+                log_file,
+            )
             return None
 
     @staticmethod
@@ -88,19 +98,25 @@ class IndexManager:
                 for fname in os.listdir(dir_path):
                     if fname.lower().endswith(DVR_Config.get_video_file_extensions()):
                         previous_videos = True
-                        cleaned_name = fname.replace(Account_Config.get_posted_downloadprefix(), "")
+                        cleaned_name = fname.replace(
+                            Account_Config.get_posted_downloadprefix(), ""
+                        )
                         if match := pattern.match(cleaned_name):
                             idx = int(match[1])
                             if idx > max_index:
                                 max_index = idx
 
             if not previous_videos:
-                LogManager.log_message("No previous videos found, First index will be returned", log_file)
+                LogManager.log_message(
+                    "No previous videos found, First index will be returned", log_file
+                )
                 return "0"
 
             return str(max_index)
         except Exception as e:
-            LogManager.log_message(f"Failed to get index: {e}\n{traceback.format_exc()}", log_file)
+            LogManager.log_message(
+                f"Failed to get index: {e}\n{traceback.format_exc()}", log_file
+            )
             return None
 
     @staticmethod
@@ -109,12 +125,17 @@ class IndexManager:
         try:
             current_index = IndexManager.find_current_posted_index(log_file)
             if current_index is None:
-                LogManager.log_message("Current index is None, cannot increment.", log_file)
+                LogManager.log_message(
+                    "Current index is None, cannot increment.", log_file
+                )
                 return None
             current_index_num = int(current_index) + 1
-            
+
             LogManager.log_message(f"Next Free Index: {current_index_num}", log_file)
             return str(current_index_num)
         except Exception as e:
-            LogManager.log_message(f"Failed to get next free index: {e}\n{traceback.format_exc()}", log_file)
+            LogManager.log_message(
+                f"Failed to get next free index: {e}\n{traceback.format_exc()}",
+                log_file,
+            )
             return None

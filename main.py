@@ -4,8 +4,8 @@ import asyncio
 import json
 import logging
 from utils.logging_utils import LogManager
-from config_settings import DVR_Config
-from config_tasks import DVR_Tasks
+from config.config_settings import DVR_Config
+from config.config_tasks import DVR_Tasks
 from utils.dependency_utils import DependencyManager
 
 
@@ -17,13 +17,19 @@ def create_required_dirs():
     DVR_Config._init_parser()
     root = os.getcwd()
 
-    runtime_profiledir_name = json.loads(DVR_Config.get_value("Directories", "runtime_dir"))
+    runtime_profiledir_name = json.loads(
+        DVR_Config.get_value("Directories", "runtime_dir")
+    )
     data_profiledir_name = json.loads(DVR_Config.get_value("Directories", "data_dir"))
     runtime_profiledir = os.path.join(root, runtime_profiledir_name)
     data_profiledir = os.path.join(root, data_profiledir_name)
-        
-    runtime_subdirs_to_create = json.loads(DVR_Config.get_value("Directories", "runtime_subdirs_to_create"))
-    data_subdirs_to_create = json.loads(DVR_Config.get_value("Directories", "data_subdirs_to_create"))
+
+    runtime_subdirs_to_create = json.loads(
+        DVR_Config.get_value("Directories", "runtime_subdirs_to_create")
+    )
+    data_subdirs_to_create = json.loads(
+        DVR_Config.get_value("Directories", "data_subdirs_to_create")
+    )
 
     for sub in runtime_subdirs_to_create:
         newdir = os.path.join(runtime_profiledir, sub)
@@ -41,16 +47,18 @@ def create_required_dirs():
 
 async def main():
     try:
-        logging.error(f"Starting Dregg DVR")
+        logging.info("Starting Dregg DVR")
         # Ensure required project/runtime/data directories exist
         create_required_dirs()
-        
+
         dependency_package_update = DVR_Tasks.get_dependency_package_update()
 
         if dependency_package_update == "true":
             if os.name == "nt":
                 # Windows
-                LogManager.log_core("Skipping Dependency Package Update as os = Windows")
+                LogManager.log_core(
+                    "Skipping Dependency Package Update as os = Windows"
+                )
             else:
                 apk_dependencies = DVR_Config.get_required_apk_dependencies()
                 for dependency in apk_dependencies:
@@ -61,14 +69,15 @@ async def main():
                     await DependencyManager.install_pip_dependency(dependency)
 
                 await DependencyManager.update_ytdlp()
-                    
-                LogManager.log_core("All required dependencies installed/updated successfully.")
+
+                LogManager.log_core(
+                    "All required dependencies installed/updated successfully."
+                )
         else:
-            LogManager.log_core("Skipping Dependency Package Update as dependency_package_update = false in dvr_tasks.ini")
-                
+            LogManager.log_core(
+                "Skipping Dependency Package Update as dependency_package_update = false in dvr_tasks.ini"
+            )
 
-
-       
         ContainerMaintenance = DVR_Tasks.get_container_maintenance_inf_loop()
         if ContainerMaintenance.lower() == "true":
             LogManager.log_core("Container Maintenance Mode is ON")
@@ -78,7 +87,9 @@ async def main():
                 await asyncio.sleep(600000)
 
         else:
-            LogManager.log_core("Starting Dregg's DVR... Am i 4k wecording? Yes im 4k wecording!")
+            LogManager.log_core(
+                "Starting Dregg's DVR... Am i 4k wecording? Yes im 4k wecording!"
+            )
             livestream_download = DVR_Tasks.get_livestream_download()
             livestream_recovery_download = DVR_Tasks.get_livestream_recovery_download()
             captions_download = DVR_Tasks.get_captions_download()
@@ -86,51 +97,76 @@ async def main():
             posted_notices_download = DVR_Tasks.get_posted_notices_download()
             livestream_upload = DVR_Tasks.get_livestream_upload()
             posted_videos_upload = DVR_Tasks.get_posted_videos_upload()
-            
+
             tasks = []
             if livestream_download == "true":
                 from downloader.livestreams import LivestreamDownloader
+
                 tasks.append(LivestreamDownloader.download_livestreams())
             else:
-                LogManager.log_core("Livestream Download is disabled in INI Tasks. Skipping...")
+                LogManager.log_core(
+                    "Livestream Download is disabled in INI Tasks. Skipping..."
+                )
 
             if livestream_recovery_download == "true":
                 from downloader.recovery import RecoveryDownloader
+
                 tasks.append(RecoveryDownloader.monitor_recoveryqueue())
             else:
-                LogManager.log_core("Livestream Recovery Download is disabled in INI Tasks. Skipping...")
+                LogManager.log_core(
+                    "Livestream Recovery Download is disabled in INI Tasks. Skipping..."
+                )
 
             if posted_videos_download == "true":
                 from downloader.videos import VideoDownloader
+
                 tasks.append(VideoDownloader.download_videos())
             else:
-                LogManager.log_core("Posted Video Download is disabled in INI Tasks. Skipping...")
+                LogManager.log_core(
+                    "Posted Video Download is disabled in INI Tasks. Skipping..."
+                )
 
             if captions_download == "true":
                 from downloader.captions import CaptionsDownloader
+
                 tasks.append(CaptionsDownloader.monitor_channel())
             else:
-                LogManager.log_core("Caption Download is disabled in INI Tasks. Skipping...")
-
+                LogManager.log_core(
+                    "Caption Download is disabled in INI Tasks. Skipping..."
+                )
 
             if posted_notices_download == "true":
                 from downloader.posts import CommunityDownloader
+
                 tasks.append(CommunityDownloader.monitor_channel())
             else:
-                LogManager.log_core("Posted Community Message Download is disabled in INI Tasks. Skipping...")
+                LogManager.log_core(
+                    "Posted Community Message Download is disabled in INI Tasks. Skipping..."
+                )
 
             if livestream_upload == "true":
                 from uploader.livestreams import LiveStreamUploader
+
                 tasks.append(LiveStreamUploader.upload_live_videos())
             else:
-                LogManager.log_core("Livestream Upload is disabled in INI Tasks. Skipping...")
+                LogManager.log_core(
+                    "Livestream Upload is disabled in INI Tasks. Skipping..."
+                )
 
             if posted_videos_upload == "true":
                 from uploader.videos import VideoUploader
+
                 tasks.append(VideoUploader.upload_videos())
             else:
-                LogManager.log_core("Posted Video Upload is disabled in INI Tasks. Skipping...")
+                LogManager.log_core(
+                    "Posted Video Upload is disabled in INI Tasks. Skipping..."
+                )
 
+            from downloader.comments import LiveCommentsDownloader
+
+            await LiveCommentsDownloader.publish_comments(
+                "/_DVR_Data/_Live_Comments/_JSON/1 Peter Faik Incel 23-02-2026_11-17AM.json",
+            )
 
             if not tasks:
                 LogManager.log_core("All Tasks are disabled in INI Tasks. Exiting...")
