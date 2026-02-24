@@ -75,7 +75,7 @@ class RecoveryDownloader:
             LogManager.log_download_live_recovery(
                 f"Starting Recovery Download For {item['url']}"
             )
-            currenturl = f'https://www.youtube.com/watch?v={item["url"]}'
+            currenturl = f'{item["url"]}'
 
             # Progress hook callbacks for recovery downloads
             cls.dlp_events = DLPEvents(

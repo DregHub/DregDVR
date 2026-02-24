@@ -75,9 +75,7 @@ class LivestreamDownloader:
 
     @classmethod
     def download_complete(cls):
-        LogManager.log_download_live(
-            f"VIDEO DOWNLOAD COMPLETE EVENT {cls.youtube_source}"
-        )
+        LogManager.log_download_live(f"{cls.youtube_source} Has finished proccessing")
 
     @classmethod
     async def check_livestream(cls):

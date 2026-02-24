@@ -29,19 +29,7 @@ class LiveCommentsDownloader:
                 os.makedirs(cls.TXT_Comments_Dir, exist_ok=True)
                 os.makedirs(cls.JSON_Comments_Dir, exist_ok=True)
 
-                HTML_LiveChat_File = os.path.join(
-                    cls.Live_Comments_Dir, f"{filename}.html"
-                )
-                JSON_LiveChat_File = os.path.join(
-                    cls.JSON_Comments_Dir, f"{filename}.json"
-                )
-                TXT_LiveChat_File = os.path.join(
-                    cls.TXT_Comments_Dir, f"{filename}.txt"
-                )
-
-                LogManager.log_download_comments(
-                    f"Comment downloader livechat files = {HTML_LiveChat_File} {JSON_LiveChat_File} {TXT_LiveChat_File}"
-                )
+                JSON_LiveChat_File = os.path.join(cls.JSON_Comments_Dir, f"{filename}")
                 livechat_dl_opts = {
                     "skip_download": True,
                     "writesubtitles": True,
@@ -70,7 +58,7 @@ class LiveCommentsDownloader:
                         LogManager.log_download_comments(
                             "Detected the live chat is no longer available, likely because the stream ended. Stopping comment monitor."
                         )
-                # Publish comments (await the async classmethod and pass only the JSON file path)
+                # Publish comments to TXT and HTML after json download finishes
                 await cls.publish_comments(JSON_LiveChat_File)
             except Exception as e:
                 LogManager.log_download_comments(
@@ -81,6 +69,7 @@ class LiveCommentsDownloader:
     async def publish_comments(cls, sourcejson):
         async with cls._publish_lock:
             try:
+
                 # Determine filenames
                 filename = os.path.basename(sourcejson)
                 base, ext = os.path.splitext(filename)
@@ -100,11 +89,107 @@ class LiveCommentsDownloader:
                 HTML_LiveChat_File = os.path.join(cls.Live_Comments_Dir, html_filename)
                 TXT_LiveChat_File = os.path.join(cls.TXT_Comments_Dir, txt_filename)
 
+                # If the provided source path doesn't exist, try to find matching
+                # JSON files in the JSON_Comments_Dir by matching the base filename.
+                # If multiple matching files are found, combine them into a single
+                # JSON file and use that as the source.
                 if not os.path.exists(sourcejson):
-                    LogManager.log_download_comments(
-                        f"Source JSON not found: {sourcejson}"
-                    )
-                    return
+                    matches = []
+                    try:
+                        for fn in os.listdir(cls.JSON_Comments_Dir):
+                            fpath = os.path.join(cls.JSON_Comments_Dir, fn)
+                            if not os.path.isfile(fpath):
+                                continue
+                            name_no_ext = os.path.splitext(fn)[0]
+                            if name_no_ext == base or fn.startswith(base):
+                                matches.append(fpath)
+                    except Exception:
+                        matches = []
+
+                    if not matches:
+                        LogManager.log_download_comments(
+                            f"Source JSON not found: {sourcejson}"
+                        )
+                        return
+                    if len(matches) == 1:
+                        sourcejson = matches[0]
+                    else:
+                        # Combine multiple matching files into one JSON array file.
+                        combined_path = os.path.join(
+                            cls.JSON_Comments_Dir, f"{base}_combined.json"
+                        )
+                        combined_items = []
+                        for m in matches:
+                            try:
+                                with open(m, "r", encoding="utf-8") as mf:
+                                    mtext = mf.read()
+                            except Exception as e:
+                                LogManager.log_download_comments(
+                                    f"Failed reading {m} during combine: {e}"
+                                )
+                                continue
+
+                            # Try to parse each file; support JSON, NDJSON, or concatenated JSON
+                            try:
+                                parsed = json.loads(mtext)
+                            except Exception:
+                                decoder = json.JSONDecoder()
+                                idx = 0
+                                length = len(mtext)
+                                objs = []
+                                try:
+                                    while idx < length:
+                                        while idx < length and mtext[idx].isspace():
+                                            idx += 1
+                                        if idx >= length:
+                                            break
+                                        obj, end = decoder.raw_decode(mtext, idx)
+                                        objs.append(obj)
+                                        idx = end
+                                except Exception:
+                                    LogManager.log_download_comments(
+                                        f"Failed parsing {m} during combine"
+                                    )
+                                    continue
+                                parsed = objs
+
+                            # Normalize parsed into a list of items (same logic as below)
+                            local_items = []
+                            if isinstance(parsed, dict):
+                                if "events" in parsed and isinstance(
+                                    parsed["events"], list
+                                ):
+                                    local_items = parsed["events"]
+                                elif "entries" in parsed and isinstance(
+                                    parsed["entries"], list
+                                ):
+                                    local_items = parsed["entries"]
+                                else:
+                                    for v in parsed.values():
+                                        if isinstance(v, list):
+                                            local_items = v
+                                            break
+                                    if not local_items:
+                                        local_items = [parsed]
+                            elif isinstance(parsed, list):
+                                local_items = parsed
+                            else:
+                                local_items = [parsed]
+
+                            combined_items.extend(local_items)
+
+                        try:
+                            with open(combined_path, "w", encoding="utf-8") as cf:
+                                json.dump(combined_items, cf, ensure_ascii=False)
+                            LogManager.log_download_comments(
+                                f"Combined {len(matches)} JSON files into {combined_path}"
+                            )
+                            sourcejson = combined_path
+                        except Exception as e:
+                            LogManager.log_download_comments(
+                                f"Failed creating combined JSON {combined_path}: {e}"
+                            )
+                            return
 
                 # Read the file and try to parse as JSON. Support single JSON value,
                 # newline-delimited JSON (NDJSON), or concatenated JSON objects.

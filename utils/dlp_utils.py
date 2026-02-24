@@ -270,6 +270,15 @@ class DLPEvents:
         """Convert bytes per second to human-readable format."""
         return f"{cls.format_bytes(bytes_per_sec)}/s"
 
+    @classmethod
+    def format_bytes(bytes_value):
+        """Convert bytes to human-readable format."""
+        for unit in ["B", "KB", "MB", "GB"]:
+            if bytes_value < 1024:
+                return f"{bytes_value:.1f}{unit}"
+            bytes_value /= 1024
+        return f"{bytes_value:.1f}TB"
+
     @staticmethod
     def format_time(seconds):
         """Convert seconds to human-readable time format."""
@@ -284,7 +293,7 @@ class DLPEvents:
             parts.append(f"{minutes} m")
         if secs > 0:
             parts.append(f"{secs} s")
-        return "0s" if not parts else " ".join(parts)
+        return " ".join(parts) or "0s"
 
     def log_message(self, message):
         """

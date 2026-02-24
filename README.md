@@ -46,7 +46,7 @@ Using fuck all resources with no video transcoding . Can run on a potato
 
 | Folder Name                    | Usage                                                                                                                                                 |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _Auth                          | Auth files for automatic youtube uploads                                                                                                              |
+| _Auth                          | Auth files for automatic youtube uploads & cookies.txt                                                                                                |
 | _Captions                      | Automatic subtitles in here enable easy clipping                                                                                                      |
 | _Config                        | Config files for the dvr                                                                                                                              |
 | _Logs                          | Logs go in here and optionally can be archived to subfolders after upload                                                                             |
@@ -74,11 +74,9 @@ Add 3 mounts
 | DreggDVR/DVR_Instances/YOURDREGG/_DVR_Runtime | /_DVR_Runtime         | Write       | Contains the logs, config files and metadata specific to this dvr instence see the example _DVR_Runtime in the repo |
 | DreggDVR/DVR_Instances/YOURDREGG/_DVR_Data    | /_DVR_Data            | Write       | Contains the recordings for this dvr instence                                                                       |
 
-
 Set the start action to
 
 python3 /_Dregg_DVR/main.py
-
 
 ### Then...
 
@@ -93,7 +91,8 @@ After you get the thing running and logs appearing in the logs dir more work...
    Download client_secret.json from the portal in step 3
    Use the following example on a computer with a browser to generate oauth2.json https://developers.google.com/youtube/v3/guides/uploading_a_video
    Once you have successfully uploaded a video to youtube using the example code above you can rename to YT-client_secret.json , YT-oauth2.json and overwrite the examples in the auth folder
-5. ~~run '**ia configure**' within the containers shell to save your archive.org shared secret.~~ Automatically done now yay!
+5. **Optional ** > Export your cookies.txt with a burner account and dump it in the auth folder https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies
+6. ~~run '**ia configure**' within the containers shell to save your archive.org shared secret.~~ Automatically done now yay!
 
 # OPTIONS , WHAT THEY DO!
 
@@ -132,6 +131,8 @@ Here is a quick breakdown of the config files
 | YT_DownloadSettings | dlp_max_fragment_retries           | Mapped to the --fragment-retries option for yt-dlp default is 10                                                 |
 | YT_DownloadSettings | dlp_truncate_title_after_x_chars   | Trim the title of the source video when its too large                                                            |
 | YT_UploadSettings   | upload_file_extensions             | Defines what file extensions the uploader should watch for                                                       |
+| YT_UploadSettings   | upload_visibility                  | Valid values are Public Private or Unlisted                                                                      |
+| YT_UploadSettings   | upload_category                    | 22 = People & Blogs  https://mixedanalytics.com/blog/list-of-youtube-video-category-ids                          |
 | Directories         | live_uploadqueue_dir               | The name of the directory is customizable for reasons                                                            |
 | Directories         | live_downloadqueue_dir             | The name of the directory is customizable for reasons                                                            |
 | Directories         | live_completeduploads_dir          | The name of the directory is customizable for reasons                                                            |
@@ -166,6 +167,7 @@ Here is a quick breakdown of the config files
 | Section | Value                          | Explanation                                                                                           |
 | ------- | ------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | Tasks   | container_maintenance_inf_loop | Stops the dvr from loading if set to true, allows you to mess with the terminal                       |
+| Tasks   | dependency_package_update      | Task control for package dpendencies                                      |
 | Tasks   | livestream_download            | Task control for downloading livestreams                                                              |
 | Tasks   | livestream_recovery_download   | Task control for downloading a second copy of livestreams after they end                              |
 | Tasks   | comments_download              | Task control for downloading comments from livestreams to text files                                  |

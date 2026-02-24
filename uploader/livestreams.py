@@ -50,6 +50,20 @@ class LiveStreamUploader:
                     video_files = [f for f in all_files if f.lower().endswith(exts)]
                     other_files = [f for f in all_files if not f.lower().endswith(exts)]
 
+                    # Sort video files by the leading number before the first space in the filename.
+                    # Filenames without a leading number are placed after numbered ones.
+                    def _leading_num_from_filename(fname):
+                        base = os.path.splitext(fname)[0]
+                        first_part = base.split(" ")[0]
+                        try:
+                            return int(first_part)
+                        except Exception:
+                            return float("inf")
+
+                    video_files.sort(
+                        key=lambda f: (_leading_num_from_filename(f), f.lower())
+                    )
+
                     for file in video_files:
                         filepath = os.path.join(cls.Live_UploadQueue_Dir, file)
                         if not os.path.isfile(filepath):

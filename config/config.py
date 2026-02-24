@@ -94,4 +94,4 @@ class BaseConfig:
         except Exception as e:
             raise RuntimeError(
                 f"Failed to parse string list:  {e}\n{traceback.format_exc()}"
-            )
+            ) from e
