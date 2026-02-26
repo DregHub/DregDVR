@@ -34,24 +34,6 @@ class VideoDownloader:
     YT_Cookies_File = DVR_Config.get_yt_cookies_file()
 
     @classmethod
-    def download_started(cls):
-        LogManager.log_download_posted(
-            f"VIDEO DOWNLOAD START EVENT {cls.youtube_source}"
-        )
-
-    @classmethod
-    def download_processing(cls):
-        LogManager.log_download_posted(
-            f"VIDEO DOWNLOAD PROCESSING EVENT {cls.youtube_source}"
-        )
-
-    @classmethod
-    def download_complete(cls):
-        LogManager.log_download_posted(
-            f"VIDEO DOWNLOAD COMPLETE EVENT {cls.youtube_source}"
-        )
-
-    @classmethod
     async def generate_download_List(cls):
         try:
             open(cls.posted_download_list, "w").close()
@@ -169,13 +151,6 @@ class VideoDownloader:
                                 LogManager.DOWNLOAD_POSTED_LOG_FILE
                             )
                             CurrentDownloadFile = f"{cls.posted_downloadprefix}{CurrentIndex} %(title).{cls.dlp_max_title_chars}s {cls.DownloadTimeStampFormat}.%(ext)s"
-                            cls.dlp_events = DLPEvents(
-                                url,
-                                LogManager.DOWNLOAD_POSTED_LOG_FILE,
-                                cls.download_started,
-                                cls.download_complete,
-                                cls.download_processing,
-                            )
 
                             # Build yt-dlp options
                             ydl_opts = {
@@ -193,7 +168,6 @@ class VideoDownloader:
                                 "fragment_retries": int(cls.dlp_max_fragment_retries),
                                 "retries": int(cls.dlp_max_dlp_download_retries),
                                 "ignore_no_formats_error": True,  # ← prevents livestream errors from crashing
-                                "progress_hooks": [cls.dlp_events.on_progress],
                             }
 
                             # Use cookies file if configured and present
