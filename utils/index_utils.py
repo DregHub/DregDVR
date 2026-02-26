@@ -131,7 +131,7 @@ class IndexManager:
                 return None
             current_index_num = int(current_index) + 1
 
-            LogManager.log_message(f"Next Free Index: {current_index_num}", log_file)
+            # LogManager.log_message(f"Next Free Index: {current_index_num}", log_file)
             return str(current_index_num)
         except Exception as e:
             LogManager.log_message(

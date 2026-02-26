@@ -76,7 +76,6 @@ class VideoDownloader:
                         )
                         row += [""] * (4 - len(row))
                     if row[3] == "0":
-                        LogManager.log_download_posted(f"Queued for download: {row[2]}")
                         urls_to_download.append(row[2])
                     rows.append(row)
 
@@ -166,9 +165,6 @@ class VideoDownloader:
                             )
 
                         for url in urls:
-                            LogManager.log_download_posted(
-                                f"Found new video/short to download: {url}"
-                            )
                             CurrentIndex = IndexManager.find_new_posted_index(
                                 LogManager.DOWNLOAD_POSTED_LOG_FILE
                             )
@@ -187,8 +183,9 @@ class VideoDownloader:
                                     "temp": cls.Posted_DownloadQueue_Dir,
                                     "home": cls.Posted_UploadQueue_Dir,
                                 },
+                                # Add was_live to the exclusion filter to prevent downloading livestreams again
                                 "match_filter": match_filter_func(
-                                    "live_status not in ('is_live','is_upcoming')"
+                                    "live_status!=is_live & live_status!=is_upcoming & live_status!=was_live"
                                 ),
                                 "outtmpl": CurrentDownloadFile,
                                 "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
@@ -224,10 +221,14 @@ class VideoDownloader:
                                     LogManager.log_download_posted(
                                         f"{url} is a live or upcoming stream, skipping download."
                                     )
+                                elif info.get("live_status") == "was_live":
+                                    LogManager.log_download_posted(
+                                        f"{url} is a past livestream, skipping download because this is handled by the livestream downloader."
+                                    )
                                 else:
                                     try:
                                         LogManager.log_download_posted(
-                                            f"{url} is a published video, downloading."
+                                            f"{url} is a published video, Proceding to download."
                                         )
                                         with YoutubeDL(ydl_opts) as ydl:
                                             await asyncio.to_thread(ydl.download, [url])
@@ -262,11 +263,11 @@ class VideoDownloader:
 
                         if len(urls) > 1:
                             LogManager.log_download_posted(
-                                f"Finished downloading all {len(urls)} new videos/shorts from channel {cls.youtube_handle}"
+                                f"Finished processing all {len(urls)} new videos/shorts from channel {cls.youtube_handle}"
                             )
                         elif len(urls) == 1:
                             LogManager.log_download_posted(
-                                f"Finished downloading the new video/short from channel {cls.youtube_handle}"
+                                f"Finished processing the new video/short from channel {cls.youtube_handle}"
                             )
 
                         LogManager.log_download_posted(

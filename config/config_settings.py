@@ -174,7 +174,7 @@ class DVR_Config(BaseConfig):
         try:
             cls._init_parser()
             return os.path.join(
-                cls.Data_Root_Dir,
+                cls.Runtime_Profile_Dir,
                 cls.get_value("Directories", "posted_playlists_dir").strip('"'),
             )
         except Exception as e:
