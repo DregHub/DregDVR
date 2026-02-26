@@ -1,4 +1,5 @@
 import re
+import traceback
 from .config import BaseConfig
 
 
@@ -10,82 +11,130 @@ class Account_Config(BaseConfig):
     # Strings
     @classmethod
     def get_youtube_source(cls):
-        cls._init_parser()
-        return cls.get_value("YT_Sources", "source").strip('"')
+        try:
+            cls._init_parser()
+            return cls.get_value("YT_Sources", "source").strip('"')
+        except Exception as e:
+            print(f"Error in get_youtube_source: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_youtube_handle(cls):
-        cls._init_parser()
-        # https://www.youtube.com/@ThoughtsOfPeterFaik
-        youtube_source = cls.get_youtube_source().strip('"')
-        return (
-            youtube_source[:-5]
-            if youtube_source.lower().endswith("/live")
-            else youtube_source
-        )
+        try:
+            cls._init_parser()
+            # https://www.youtube.com/@ThoughtsOfPeterFaik
+            youtube_source = cls.get_youtube_source().strip('"')
+            return (
+                youtube_source[:-5]
+                if youtube_source.lower().endswith("/live")
+                else youtube_source
+            )
+        except Exception as e:
+            print(f"Error in get_youtube_handle: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_youtube_handle_name(cls):
-        cls._init_parser()
-        # @ThoughtsOfPeterFaik
-        youtube_source = cls.get_youtube_source().strip('"')
-        if match := re.search(r"/@([^/]+)", youtube_source):
-            handle = match[1].strip("/")
-            return f"@{handle}"
-        return "Unknown_Handle"
+        try:
+            cls._init_parser()
+            # @ThoughtsOfPeterFaik
+            youtube_source = cls.get_youtube_source().strip('"')
+            if match := re.search(r"/@([^/]+)", youtube_source):
+                handle = match[1].strip("/")
+                return f"@{handle}"
+            return "Unknown_Handle"
+        except Exception as e:
+            print(f"Error in get_youtube_handle_name: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_caption_source(cls):
-        cls._init_parser()
-        return cls.get_value("YT_Sources", "caption_source")
+        try:
+            cls._init_parser()
+            return cls.get_value("YT_Sources", "caption_source")
+        except Exception as e:
+            print(f"Error in get_caption_source: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_caption_handle(cls):
-        cls._init_parser()
-        # https://www.youtube.com/@ThoughtsOfPeterFaik
-        youtube_source = cls.get_caption_source().strip('"')
-        return (
-            youtube_source[:-5]
-            if youtube_source.lower().endswith("/live")
-            else youtube_source
-        )
+        try:
+            cls._init_parser()
+            # https://www.youtube.com/@ThoughtsOfPeterFaik
+            youtube_source = cls.get_caption_source().strip('"')
+            return (
+                youtube_source[:-5]
+                if youtube_source.lower().endswith("/live")
+                else youtube_source
+            )
+        except Exception as e:
+            print(f"Error in get_caption_handle: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_caption_handle_name(cls):
-        cls._init_parser()
-        # @ThoughtsOfPeterFaik
-        youtube_source = cls.get_caption_source().strip('"')
-        if match := re.search(r"/@([^/]+)", youtube_source):
-            handle = match[1].strip("/")
-            return f"@{handle}"
-        return "Unknown_Handle"
+        try:
+            cls._init_parser()
+            # @ThoughtsOfPeterFaik
+            youtube_source = cls.get_caption_source().strip('"')
+            if match := re.search(r"/@([^/]+)", youtube_source):
+                handle = match[1].strip("/")
+                return f"@{handle}"
+            return "Unknown_Handle"
+        except Exception as e:
+            print(f"Error in get_caption_handle_name: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_live_downloadprefix(cls):
-        cls._init_parser()
-        return cls.get_value("File_Naming", "live_downloadprefix").strip('"')
+        try:
+            cls._init_parser()
+            return cls.get_value("File_Naming", "live_downloadprefix").strip('"')
+        except Exception as e:
+            print(f"Error in get_live_downloadprefix: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_posted_downloadprefix(cls):
-        cls._init_parser()
-        return cls.get_value("File_Naming", "posted_downloadprefix").strip('"')
+        try:
+            cls._init_parser()
+            return cls.get_value("File_Naming", "posted_downloadprefix").strip('"')
+        except Exception as e:
+            print(f"Error in get_posted_downloadprefix: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_ia_itemid(cls):
-        cls._init_parser()
-        return cls.get_value("IA_Settings", "itemid").strip('"')
+        try:
+            cls._init_parser()
+            return cls.get_value("IA_Settings", "itemid").strip('"')
+        except Exception as e:
+            print(f"Error in get_ia_itemid: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_ia_user_agent(cls):
-        cls._init_parser()
-        return cls.get_value("IA_Settings", "user_agent").strip('"')
+        try:
+            cls._init_parser()
+            return cls.get_value("IA_Settings", "user_agent").strip('"')
+        except Exception as e:
+            print(f"Error in get_ia_user_agent: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_ia_email(cls):
-        cls._init_parser()
-        return cls.get_value("IA_Credentials", "email").strip('"')
+        try:
+            cls._init_parser()
+            return cls.get_value("IA_Credentials", "email").strip('"')
+        except Exception as e:
+            print(f"Error in get_ia_email: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_ia_password(cls):
-        cls._init_parser()
-        return cls.get_value("IA_Credentials", "password").strip('"')
+        try:
+            cls._init_parser()
+            return cls.get_value("IA_Credentials", "password").strip('"')
+        except Exception as e:
+            print(f"Error in get_ia_password: {e}\n{traceback.format_exc()}")
+            raise

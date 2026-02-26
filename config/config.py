@@ -53,22 +53,26 @@ class BaseConfig:
     @classmethod
     def _init_parser(cls):
         """Initialize the configuration parser. Override in subclasses for custom behavior."""
-        if getattr(cls, cls.parser_attr_name) is None:
-            cls.Root_Dir = os.getcwd()
-            cls.Runtime_Profile_Dir = os.path.join(cls.Root_Dir, "_DVR_Runtime")
-            cls.Config_Dir = os.path.join(cls.Runtime_Profile_Dir, "_Config")
-            config_path = os.path.join(cls.Config_Dir, cls.config_filename)
+        try:
+            if getattr(cls, cls.parser_attr_name) is None:
+                cls.Root_Dir = os.getcwd()
+                cls.Runtime_Profile_Dir = os.path.join(cls.Root_Dir, "_DVR_Runtime")
+                cls.Config_Dir = os.path.join(cls.Runtime_Profile_Dir, "_Config")
+                config_path = os.path.join(cls.Config_Dir, cls.config_filename)
 
-            # Disable interpolation to allow raw % in values
-            # Use ReadOnlyConfigParser to prevent accidental writes
-            parser = ReadOnlyConfigParser(interpolation=None)
-            if not os.path.exists(config_path):
-                # Create an empty config file if it does not exist
-                os.makedirs(cls.Config_Dir, exist_ok=True)
-                with open(config_path, "w") as f:
-                    f.write("")
-            parser.read(config_path)
-            setattr(cls, cls.parser_attr_name, parser)
+                # Disable interpolation to allow raw % in values
+                # Use ReadOnlyConfigParser to prevent accidental writes
+                parser = ReadOnlyConfigParser(interpolation=None)
+                if not os.path.exists(config_path):
+                    # Create an empty config file if it does not exist
+                    os.makedirs(cls.Config_Dir, exist_ok=True)
+                    with open(config_path, "w") as f:
+                        f.write("")
+                parser.read(config_path)
+                setattr(cls, cls.parser_attr_name, parser)
+        except Exception as e:
+            print(f"Config initialization error: {e}\n{traceback.format_exc()}")
+            raise
 
     @classmethod
     def get_value(cls, section, key):

@@ -3,18 +3,24 @@ import shutil
 import traceback
 import mmap
 import asyncio
+import re
+import unicodedata
 from utils.logging_utils import LogManager
 
 
 class FileManager:
     """Utility class for file operations."""
+
     @classmethod
     def move_file(cls, src, dst, logfile):
         """Move a file from src to dst."""
         try:
             shutil.move(src, dst)
         except Exception as e:
-            LogManager.log_message(f"Failed to move file from {src} to {dst}:  {e}\n{traceback.format_exc()}", logfile)
+            LogManager.log_message(
+                f"Failed to move file from {src} to {dst}:  {e}\n{traceback.format_exc()}",
+                logfile,
+            )
 
     @classmethod
     def delete_file(cls, filepath, logfile):
@@ -23,7 +29,10 @@ class FileManager:
             if os.path.exists(filepath):
                 os.remove(filepath)
         except Exception as e:
-            LogManager.log_message(f"Failed to delete file {filepath}:  {e}\n{traceback.format_exc()}", logfile)
+            LogManager.log_message(
+                f"Failed to delete file {filepath}:  {e}\n{traceback.format_exc()}",
+                logfile,
+            )
 
     @classmethod
     def create_directory(cls, directory, logfile):
@@ -32,12 +41,19 @@ class FileManager:
             if not os.path.exists(directory):
                 os.makedirs(directory)
         except Exception as e:
-            LogManager.log_message(f"Failed to create directory {directory}:  {e}\n{traceback.format_exc()}", logfile)
+            LogManager.log_message(
+                f"Failed to create directory {directory}:  {e}\n{traceback.format_exc()}",
+                logfile,
+            )
 
     @classmethod
-    async def file_contains_string_mmap_async(cls, file_path: str, search_string: str) -> bool:
+    async def file_contains_string_mmap_async(
+        cls, file_path: str, search_string: str
+    ) -> bool:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, cls._file_contains_string_mmap, file_path, search_string)
+        return await loop.run_in_executor(
+            None, cls._file_contains_string_mmap, file_path, search_string
+        )
 
     @classmethod
     def _file_contains_string_mmap(cls, file_path: str, search_string: str) -> bool:
@@ -46,5 +62,25 @@ class FileManager:
                 with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                     return mm.find(search_string.encode()) != -1
         except Exception as e:
-            LogManager.log_download_posted_notices(f"Error reading file {file_path}: {e}\n{traceback.format_exc()}")
+            LogManager.log_download_posted_notices(
+                f"Error reading file {file_path}: {e}\n{traceback.format_exc()}"
+            )
             return False
+
+    @classmethod
+    def gen_safe_filename(cls, name: str) -> str:
+        # 1. Normalize Unicode → ASCII
+        name = unicodedata.normalize("NFKD", name)
+        name = name.encode("ascii", "ignore").decode("ascii")
+
+        # 2. Replace invalid characters with "_"
+        # Allowed: A-Z a-z 0-9 . _ -
+        name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+
+        # 3. Collapse multiple underscores
+        name = re.sub(r"_+", "_", name)
+
+        # 4. Strip leading/trailing underscores
+        name = name.strip("_")
+
+        return name

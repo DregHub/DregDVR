@@ -116,29 +116,54 @@ class RecoveryDownloader:
                     if filt not in LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER:
                         LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER.append(filt)
 
-            log_lines = []
-            exit_code = None
+            with YoutubeDL({"quiet": True, "ignore_no_formats_error": True}) as ydl:
+                info = ydl.extract_info(currenturl, download=False)
 
-            try:
-                with YoutubeDL(ydl_opts) as ydl:
-                    # Run blocking download in thread to avoid blocking event loop
-                    await asyncio.to_thread(ydl.download, [currenturl])
-                exit_code = 0
-                LogManager.log_download_live_recovery(
-                    f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
-                )
-                LogManager.log_download_live_recovery(
-                    f"Recovery download for {item['url']} completed successfully."
-                )
-                item["download_complete"] = True
+                if info.get("live_status") in (
+                    "is_live",
+                    "is_upcoming",
+                ):
+                    LogManager.log_download_posted(
+                        f"Video {currenturl} is a live or upcoming stream, skipping download."
+                    )
+                    exit_code = None
+                else:
+                    try:
+                        with YoutubeDL(ydl_opts) as ydl:
+                            # Run blocking download in thread to avoid blocking event loop
+                            await asyncio.to_thread(ydl.download, [currenturl])
+                    except Exception as e:
+                        msg = str(e)
+                        if (
+                            ("429" in msg)
+                            or ("rate limit" in msg.lower())
+                            or ("too many requests" in msg.lower())
+                        ) and "cookiefile" in ydl_opts:
+                            LogManager.log_download_live_recovery(
+                                "Rate limit detected, retrying recovery download without cookiefile"
+                            )
+                            ydl_opts_no_cookie = dict(ydl_opts)
+                            ydl_opts_no_cookie.pop("cookiefile", None)
+                            with YoutubeDL(ydl_opts_no_cookie) as ydl2:
+                                await asyncio.to_thread(ydl2.download, [currenturl])
+                        else:
+                            raise e
+                    except Exception as e:
+                        exit_code = 1
+                        LogManager.log_download_live_recovery(
+                            f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
+                        )
+                        LogManager.log_download_live_recovery(
+                            f"Recovery download for {item['url']} did not complete successfully: {e}"
+                        )
+                        item["download_complete"] = False
+                        item["recovery_attempts"] += 1
 
-            except Exception as e:
-                exit_code = 1
-                LogManager.log_download_live_recovery(
-                    f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
-                )
-                LogManager.log_download_live_recovery(
-                    f"Recovery download for {item['url']} did not complete successfully: {e}"
-                )
-                item["download_complete"] = False
-                item["recovery_attempts"] += 1
+                    exit_code = 0
+                    LogManager.log_download_live_recovery(
+                        f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
+                    )
+                    LogManager.log_download_live_recovery(
+                        f"Recovery download for {item['url']} completed successfully."
+                    )
+                    item["download_complete"] = True

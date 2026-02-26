@@ -145,7 +145,7 @@ class LivestreamDownloader:
                     "live_from_start": True,
                     "match_filter": match_filter_func("live_status=is_live"),
                     "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
-                    "ignore_no_formats_error": True,
+                    "ignore_no_formats_error": True,  # ← prevents livestream errors from crashing
                     "fragment_retries": int(cls.dlp_max_fragment_retries),
                     "retries": int(cls.dlp_max_dlp_download_retries),
                     "skip_unavailable_fragments": True,
@@ -161,6 +161,12 @@ class LivestreamDownloader:
                 # Use a temporary YoutubeDL to extract info only (do not call download here)
                 with yt_dlp.YoutubeDL(dlp_download_opts) as ydl:
                     info = ydl.extract_info(cls.youtube_source, download=False)
+
+                    if info.get("live_status") in ("is_upcoming"):
+                        LogManager.log_download_posted(
+                            "Current Video is an upcoming stream, skipping download for now."
+                        )
+                        return
                     current_videofilepath = ydl.prepare_filename(info)
                     cls.current_videofile = os.path.splitext(
                         os.path.basename(current_videofilepath)
@@ -184,10 +190,29 @@ class LivestreamDownloader:
                 dlp_download_opts["progress_hooks"] = [cls.dlp_events.on_progress]
 
                 # Create a fresh YoutubeDL with progress hooks and run download in a thread
-                with yt_dlp.YoutubeDL(dlp_download_opts) as ydl_with_hooks:
-                    await asyncio.to_thread(
-                        ydl_with_hooks.download, cls.current_videourl
-                    )
+                try:
+                    with yt_dlp.YoutubeDL(dlp_download_opts) as ydl_with_hooks:
+                        await asyncio.to_thread(
+                            ydl_with_hooks.download, cls.current_videourl
+                        )
+                except Exception as e:
+                    msg = str(e)
+                    if (
+                        ("429" in msg)
+                        or ("rate limit" in msg.lower())
+                        or ("too many requests" in msg.lower())
+                    ) and "cookiefile" in dlp_download_opts:
+                        LogManager.log_download_live(
+                            "Rate limit detected, retrying livestream download without cookiefile"
+                        )
+                        dlp_opts_no_cookie = dict(dlp_download_opts)
+                        dlp_opts_no_cookie.pop("cookiefile", None)
+                        with yt_dlp.YoutubeDL(dlp_opts_no_cookie) as ydl_no_cookie:
+                            await asyncio.to_thread(
+                                ydl_no_cookie.download, cls.current_videourl
+                            )
+                    else:
+                        raise
 
             except Exception as e:
                 msg = str(e)

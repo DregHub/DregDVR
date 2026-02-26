@@ -162,12 +162,6 @@ async def main():
                     "Posted Video Upload is disabled in INI Tasks. Skipping..."
                 )
 
-            from downloader.comments import LiveCommentsDownloader
-
-            await LiveCommentsDownloader.publish_comments(
-                "/_DVR_Data/_Live_Comments/_JSON/1 Peter Faik Incel 23-02-2026_11-17AM.json",
-            )
-
             if not tasks:
                 LogManager.log_core("All Tasks are disabled in INI Tasks. Exiting...")
             else:

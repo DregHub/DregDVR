@@ -188,13 +188,14 @@ class VideoDownloader:
                                     "home": cls.Posted_UploadQueue_Dir,
                                 },
                                 "match_filter": match_filter_func(
-                                    "live_status!=is_live"
+                                    "live_status not in ('is_live','is_upcoming')"
                                 ),
                                 "outtmpl": CurrentDownloadFile,
                                 "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
                                 "restrictfilenames": True,
                                 "fragment_retries": int(cls.dlp_max_fragment_retries),
                                 "retries": int(cls.dlp_max_dlp_download_retries),
+                                "ignore_no_formats_error": True,  # ← prevents livestream errors from crashing
                                 "progress_hooks": [cls.dlp_events.on_progress],
                             }
 
@@ -211,13 +212,48 @@ class VideoDownloader:
                                 if cls.dlp_verbose == "true":
                                     ydl_opts["verbose"] = True
 
-                                with YoutubeDL(ydl_opts) as ydl:
-                                    await asyncio.to_thread(ydl.download, [url])
+                                with YoutubeDL(
+                                    {"quiet": True, "ignore_no_formats_error": True}
+                                ) as ydl:
+                                    info = ydl.extract_info(url, download=False)
 
-                                LogManager.log_download_posted(
-                                    f"Posted Video {url} Downloaded Successfully to {cls.Posted_DownloadQueue_Dir} as {CurrentDownloadFile}"
-                                )
-                                await cls.mark_as_downloaded(url)
+                                if info.get("live_status") in (
+                                    "is_live",
+                                    "is_upcoming",
+                                ):
+                                    LogManager.log_download_posted(
+                                        f"{url} is a live or upcoming stream, skipping download."
+                                    )
+                                else:
+                                    try:
+                                        LogManager.log_download_posted(
+                                            f"{url} is a published video, downloading."
+                                        )
+                                        with YoutubeDL(ydl_opts) as ydl:
+                                            await asyncio.to_thread(ydl.download, [url])
+                                    except Exception as e:
+                                        msg = str(e)
+                                        if (
+                                            "429" not in msg
+                                            and "rate limit" not in msg.lower()
+                                            and "too many requests" not in msg.lower()
+                                            or "cookiefile" not in ydl_opts
+                                        ):
+                                            raise
+
+                                        LogManager.log_download_posted(
+                                            "Rate limit detected, retrying download without cookiefile"
+                                        )
+                                        ydl_opts_no_cookie = dict(ydl_opts)
+                                        ydl_opts_no_cookie.pop("cookiefile", None)
+                                        with YoutubeDL(ydl_opts_no_cookie) as ydl2:
+                                            await asyncio.to_thread(
+                                                ydl2.download, [url]
+                                            )
+                                    LogManager.log_download_posted(
+                                        f"Posted Video {url} Downloaded Successfully to {cls.Posted_DownloadQueue_Dir} as {CurrentDownloadFile}"
+                                    )
+                                    await cls.mark_as_downloaded(url)
 
                             except Exception as e:
                                 LogManager.log_download_posted(
