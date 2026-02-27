@@ -11,7 +11,6 @@ from utils.logging_utils import LogManager
 
 
 class LiveCommentsDownloader:
-    YT_Cookies_File = DVR_Config.get_yt_cookies_file()
     Live_Comments_Dir = DVR_Config.get_live_comments_dir()
     TXT_Comments_Dir = os.path.join(Live_Comments_Dir, "_TXT")
     JSON_Comments_Dir = os.path.join(Live_Comments_Dir, "_JSON")
@@ -37,9 +36,7 @@ class LiveCommentsDownloader:
                     "subtitleslangs": ["live_chat"],
                     "outtmpl": JSON_LiveChat_File,
                 }
-                # Use cookies file if configured and present
-                if cls.YT_Cookies_File and os.path.exists(cls.YT_Cookies_File):
-                    livechat_dl_opts["cookiefile"] = cls.YT_Cookies_File
+
                 with yt_dlp.YoutubeDL(livechat_dl_opts) as ydl:
                     try:
                         ydl.download([yturl])

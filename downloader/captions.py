@@ -38,7 +38,6 @@ class CaptionsDownloader:
 
     video_playlist = f"{Account_Config.get_caption_handle()}/videos"
     shorts_playlist = f"{Account_Config.get_caption_handle()}/shorts"
-    YT_Cookies_File = DVR_Config.get_yt_cookies_file()
 
     @classmethod
     async def monitor_channel(cls):
@@ -336,8 +335,6 @@ class CaptionsDownloader:
                 "quiet": False,
                 "progress_hooks": [cls.dlp_events.on_progress],
             }
-            if cls.YT_Cookies_File and os.path.exists(cls.YT_Cookies_File):
-                ydl_opts["cookiefile"] = cls.YT_Cookies_File
 
             LogManager.log_download_captions(
                 f"Saving JSON from {playlist_url} to {output_path}"

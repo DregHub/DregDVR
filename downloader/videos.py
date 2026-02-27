@@ -9,8 +9,7 @@ from downloader.playlist import PlaylistManager
 from utils.index_utils import IndexManager
 from config.config_settings import DVR_Config
 from config.config_accounts import Account_Config
-from utils.dlp_utils import DLPEvents
-from yt_dlp.utils import match_filter_func
+from utils.dlp_utils import download_with_retry, getinfo_with_retry
 
 
 class VideoDownloader:
@@ -31,7 +30,6 @@ class VideoDownloader:
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
     youtube_source = Account_Config.get_youtube_source()
     youtube_handle = Account_Config.get_youtube_handle()
-    YT_Cookies_File = DVR_Config.get_yt_cookies_file()
 
     @classmethod
     async def generate_download_List(cls):
@@ -158,10 +156,6 @@ class VideoDownloader:
                                     "temp": cls.Posted_DownloadQueue_Dir,
                                     "home": cls.Posted_UploadQueue_Dir,
                                 },
-                                # Add was_live to the exclusion filter to prevent downloading livestreams again
-                                "match_filter": match_filter_func(
-                                    "live_status!=is_live & live_status!=is_upcoming & live_status!=was_live"
-                                ),
                                 "outtmpl": CurrentDownloadFile,
                                 "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
                                 "restrictfilenames": True,
@@ -170,12 +164,6 @@ class VideoDownloader:
                                 "ignore_no_formats_error": True,  # ← prevents livestream errors from crashing
                             }
 
-                            # Use cookies file if configured and present
-                            if cls.YT_Cookies_File and os.path.exists(
-                                cls.YT_Cookies_File
-                            ):
-                                ydl_opts["cookiefile"] = cls.YT_Cookies_File
-
                             try:
                                 if cls.dlp_keep_fragments == "true":
                                     ydl_opts["keep_fragments"] = True
@@ -183,52 +171,40 @@ class VideoDownloader:
                                 if cls.dlp_verbose == "true":
                                     ydl_opts["verbose"] = True
 
-                                with YoutubeDL(
-                                    {"quiet": True, "ignore_no_formats_error": True}
-                                ) as ydl:
-                                    info = ydl.extract_info(url, download=False)
+                                info = await getinfo_with_retry(
+                                    ydl_opts, url, LogManager.DOWNLOAD_POSTED_LOG_FILE
+                                )
+                                live_status = info.get("live_status")
 
-                                if info.get("live_status") in (
-                                    "is_live",
-                                    "is_upcoming",
-                                ):
+                                if live_status in ["is_live", "is_upcoming"]:
                                     LogManager.log_download_posted(
                                         f"{url} is a live or upcoming stream, skipping download."
                                     )
-                                elif info.get("live_status") == "was_live":
+                                elif live_status == "was_live":
                                     LogManager.log_download_posted(
                                         f"{url} is a past livestream, skipping download because this is handled by the livestream downloader."
                                     )
-                                else:
+                                elif live_status == "not_live":
                                     try:
                                         LogManager.log_download_posted(
                                             f"{url} is a published video, Proceding to download."
                                         )
-                                        with YoutubeDL(ydl_opts) as ydl:
-                                            await asyncio.to_thread(ydl.download, [url])
-                                    except Exception as e:
-                                        msg = str(e)
-                                        if (
-                                            "429" not in msg
-                                            and "rate limit" not in msg.lower()
-                                            and "too many requests" not in msg.lower()
-                                            or "cookiefile" not in ydl_opts
-                                        ):
-                                            raise
-
-                                        LogManager.log_download_posted(
-                                            "Rate limit detected, retrying download without cookiefile"
+                                        await download_with_retry(
+                                            ydl_opts,
+                                            [url],
+                                            LogManager.DOWNLOAD_POSTED_LOG_FILE,
                                         )
-                                        ydl_opts_no_cookie = dict(ydl_opts)
-                                        ydl_opts_no_cookie.pop("cookiefile", None)
-                                        with YoutubeDL(ydl_opts_no_cookie) as ydl2:
-                                            await asyncio.to_thread(
-                                                ydl2.download, [url]
-                                            )
+                                    except Exception:
+                                        # Let outer exception handler log details
+                                        raise
                                     LogManager.log_download_posted(
-                                        f"Posted Video {url} Downloaded Successfully to {cls.Posted_DownloadQueue_Dir} as {CurrentDownloadFile}"
+                                        f"Posted Video {url} Downloaded Successfully"
                                     )
                                     await cls.mark_as_downloaded(url)
+                                else:
+                                    LogManager.log_download_posted(
+                                        f"{url} Has an unknown live status type {live_status} skipping download"
+                                    )
 
                             except Exception as e:
                                 LogManager.log_download_posted(

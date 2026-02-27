@@ -1,6 +1,99 @@
 import re
 import traceback
+import asyncio
+import contextlib
+from yt_dlp import YoutubeDL
 from utils.logging_utils import LogManager
+from utils.logging_utils import LogManager
+from config.config_settings import DVR_Config
+
+class DLP_Logger:
+    """Minimal yt-dlp logger that detects a specific single-line message.
+
+    It sets `detected` True when a log line contains both the configured
+    `message_source` and `message` substrings on the same line. When a match
+    is found, the `match_found(result)` method is invoked with the configured
+    `result` value.
+    """
+
+    def __init__(
+        self,
+        message_source: str = "",
+        message: str = "",
+        result=None,
+        patterns: list = None,
+    ):
+        # Normalize patterns into a list of dicts: {message_source, message, result}
+        self._patterns = []
+        if patterns:
+            for p in patterns:
+                try:
+                    if isinstance(p, dict):
+                        src = p.get("message_source", "")
+                        msg = p.get("message", "")
+                        res = p.get("result", None)
+                    else:
+                        # treat as tuple/list
+                        src = p[0] if len(p) > 0 else ""
+                        msg = p[1] if len(p) > 1 else ""
+                        res = p[2] if len(p) > 2 else None
+                    self._patterns.append(
+                        {
+                            "message_source": str(src or ""),
+                            "message": str(msg or ""),
+                            "result": res,
+                        }
+                    )
+                except Exception:
+                    continue
+        else:
+            self._patterns.append(
+                {
+                    "message_source": str(message_source or ""),
+                    "message": str(message or ""),
+                    "result": result,
+                }
+            )
+
+        self.detected = False
+        self.last_match_result = None
+
+    def inputs(self):
+        """Return the configured detection patterns as a list of dicts."""
+        return list(self._patterns)
+
+    def _check(self, msg):
+        try:
+            s = str(msg or "")
+        except Exception:
+            s = ""
+        for pat in self._patterns:
+            try:
+                if pat["message_source"] in s and pat["message"] in s:
+                    self.detected = True
+                    with contextlib.suppress(Exception):
+                        self.match_found(pat.get("result"))
+                    break
+            except Exception:
+                continue
+
+    def match_found(self, result):
+        """Called when a configured match is detected. Stores last result and logs."""
+        with contextlib.suppress(Exception):
+            self.last_match_result = result
+            LogManager.log_message(f"YTDLP detect logger match found: {result}")
+
+    def debug(self, msg):
+        return None
+
+    def info(self, msg):
+        self._check(msg)
+
+    def warning(self, msg):
+        self._check(msg)
+
+    def error(self, msg):
+        self._check(msg)
 
 
 class DLPEvents:
@@ -105,15 +198,12 @@ class DLPEvents:
 
             # Compute aggregated values across the stream
             total_downloaded = sum(self._per_file_downloaded.get(f, 0) for f in files)
-            total_estimated = None
             per_file_totals = [
                 self._per_file_total.get(f)
                 for f in files
                 if self._per_file_total.get(f) is not None
             ]
-            if per_file_totals:
-                total_estimated = sum(per_file_totals)
-
+            total_estimated = sum(per_file_totals) if per_file_totals else None
             # Prefer yt-dlp provided `elapsed` (use current event's elapsed for the stream)
             elapsed = d.get("elapsed")
             should_log = False
@@ -157,20 +247,18 @@ class DLPEvents:
                 # Try to fill missing per-file total from yt-dlp's info_dict (provided in the event)
                 if total_estimated is None:
                     info = d.get("info_dict") or {}
-                    filesize = info.get("filesize") or info.get("filesize_approx")
-                    if filesize:
+                    if filesize := info.get("filesize") or info.get("filesize_approx"):
                         # update this file's total and recompute total_estimated
                         try:
                             self._per_file_total[filename] = int(filesize)
                         except Exception:
                             # keep original value if it isn't an int
                             self._per_file_total[filename] = filesize
-                        per_file_totals = [
+                        if per_file_totals := [
                             self._per_file_total.get(f)
                             for f in files
                             if self._per_file_total.get(f) is not None
-                        ]
-                        if per_file_totals:
+                        ]:
                             total_estimated = sum(per_file_totals)
 
                 elapsed_str = (
@@ -252,10 +340,18 @@ class DLPEvents:
             self.log_message(
                 f"Error in dlp_events handler for filename={fname} event_keys={keys}: {e}\n{traceback.format_exc()}"
             )
-        # Defensive: handle None or non-numeric gracefully
+
+    @classmethod
+    def format_bytes_per_sec(cls, bytes_per_sec):
+        """Convert bytes per second to human-readable format."""
+        return f"{cls.format_bytes(bytes_per_sec)}/s"
+
+    @classmethod
+    def format_bytes(cls, bytes_value):
+        """Convert bytes to human-readable format."""
+        if bytes_value is None:
+            return "0 B"
         try:
-            if bytes_value is None:
-                return "0 B"
             bytes_value = float(bytes_value)
         except Exception:
             return "Unknown"
@@ -264,20 +360,6 @@ class DLPEvents:
                 return f"{bytes_value:.1f} {unit}"
             bytes_value /= 1024
         return f"{bytes_value:.1f} TB"
-
-    @classmethod
-    def format_bytes_per_sec(cls, bytes_per_sec):
-        """Convert bytes per second to human-readable format."""
-        return f"{cls.format_bytes(bytes_per_sec)}/s"
-
-    @classmethod
-    def format_bytes(bytes_value):
-        """Convert bytes to human-readable format."""
-        for unit in ["B", "KB", "MB", "GB"]:
-            if bytes_value < 1024:
-                return f"{bytes_value:.1f}{unit}"
-            bytes_value /= 1024
-        return f"{bytes_value:.1f}TB"
 
     @staticmethod
     def format_time(seconds):
@@ -304,3 +386,146 @@ class DLPEvents:
             LogManager.log_message(message, self.log_file_name)
         except Exception as e:
             print(f"Failed to forward log message: {e}")
+
+    RATE_LIMIT_STRINGS = [
+        "429",
+        "rate limit",
+        "quota",
+        "automated queries",
+        "confirm you’re not a bot",
+        "too many requests",
+    ]
+
+    @classmethod
+    def is_rate_limit_error(cls, err: Exception) -> bool:
+        msg = str(err).lower()
+        return any(s in msg for s in cls.RATE_LIMIT_STRINGS)
+
+
+DLP_Logger_Patterns = [
+    {
+        "message_source": "[youtube:tab]",
+        "message": "not currently live",
+        "result": "is_upcoming",
+    },
+    {
+        "message_source": "[youtube]",
+        "message": " This live event will begin in a few moments",
+        "result": "is_upcoming",
+    },
+]
+
+
+async def download_with_retry(ydl_opts, url_or_list, log_file_name=None):
+    """Download using YoutubeDL; retry once without cookiefile on rate-limit.
+
+    Raises the final exception if retry also fails with rate-limit or other errors.
+    """
+    try:
+        #add on the cookie to our dlp options for the first try
+        YT_Cookies_File = DVR_Config.get_yt_cookies_file()
+        if YT_Cookies_File and os.path.exists(YT_Cookies_File):
+                ydl_opts["cookiefile"] = YT_Cookies_File
+        LogManager.log_message(
+            f"Starting youtube downloader helper with options {ydl_opts}",
+            log_file_name,
+        )
+        with YoutubeDL(ydl_opts) as ydl:
+            await asyncio.to_thread(ydl.download, url_or_list)
+        LogManager.log_message("finished youtube downloader helper", log_file_name)
+    except Exception as e:
+        LogManager.log_message(
+            f"Exception in download helper {e}",
+            log_file_name,
+        )
+        if DLPEvents.is_rate_limit_error(e):
+            LogManager.log_message(
+                f"Rate limit detected during download using cookiefile, retrying without cookiefile: {e}",
+                log_file_name,
+            )
+            retry_opts = dict(ydl_opts)
+            retry_opts.pop("cookiefile", None)
+            try:
+                with YoutubeDL(retry_opts) as ydl_retry:
+                    await asyncio.to_thread(ydl_retry.download, url_or_list)
+            except Exception as e2:
+                if DLPEvents.is_rate_limit_error(e2):
+                    LogManager.log_message(
+                        f"Rate limit persists after retry without cookiefile for download: {e2}",
+                        log_file_name,
+                    )
+                else:
+                    LogManager.log_message(
+                        f"Download failed on retry without cookiefile for non-rate-limit reason: {e2}",
+                        log_file_name,
+                    )
+        else:
+            LogManager.log_message(
+                f"Download failed for non-rate-limit reason: {e}",
+                log_file_name,
+            )
+
+
+async def getinfo_with_retry(ydl_opts, url_or_list, log_file_name=None):
+    """Retrieve info using YoutubeDL.extract_info without downloading.
+
+    Mirrors the retry behavior of `download_with_retry`: if a rate-limit
+    error occurs and the original options contained a `cookiefile`, retry
+    once without the cookiefile. Returns the extracted info on success or
+    `None` on failure (errors are logged to `LogManager`).
+    """
+    #add on the cookie to our dlp options for the first try
+    YT_Cookies_File = DVR_Config.get_yt_cookies_file()
+    if YT_Cookies_File and os.path.exists(YT_Cookies_File):
+        ydl_opts["cookiefile"] = YT_Cookies_File
+    DLPLogger = DLP_Logger(patterns=DLP_Logger_Patterns)
+    try:
+        # Attach our detection logger to a shallow copy of the options so we don't mutate caller's dict
+        opts = dict(ydl_opts) if ydl_opts is not None else {}
+
+        opts["logger"] = DLPLogger
+        with YoutubeDL(opts) as ydl:
+            info = await asyncio.to_thread(ydl.extract_info, url_or_list, False)
+            if DLPLogger.detected and DLPLogger.last_match_result == "is_upcoming":
+                # Common stream is not live exception return it as an upcoming stream
+                return {"live_status": "is_upcoming"}
+            else:
+                return info
+    except Exception as e:
+        # If our logger observed the "not currently live" message during the failed attempt,
+        # return the synthetic info immediately rather than retrying.
+        with contextlib.suppress(Exception):
+            if DLPLogger.detected and DLPLogger.last_match_result == "is_upcoming":
+                # Common stream is not live exception return it as an upcoming stream
+                return {"live_status": "is_upcoming"}
+        if DLPEvents.is_rate_limit_error(e) and orig_had_cookie:
+            LogManager.log_message(
+                f"Rate limit detected during extract_info using cookiefile, retrying without cookiefile: {e}",
+                log_file_name,
+            )
+            retry_opts = dict(ydl_opts)
+            retry_opts.pop("cookiefile", None)
+            retry_opts["logger"] = DLPLogger
+            try:
+                with YoutubeDL(retry_opts) as ydl_retry:
+                    info = await asyncio.to_thread(
+                        ydl_retry.extract_info, url_or_list, False
+                    )
+                    return info
+            except Exception as e2:
+                if DLPEvents.is_rate_limit_error(e2):
+                    LogManager.log_message(
+                        f"Rate limit persists after retry without cookiefile for getinfo: {e2}",
+                        log_file_name,
+                    )
+                else:
+                    LogManager.log_message(
+                        f"getinfo failed on retry without cookiefile for non-rate-limit reason: {e2}",
+                        log_file_name,
+                    )
+        else:
+            LogManager.log_message(
+                f"getinfo failed for non-rate-limit reason: {e} {DLPLogger.last_match_result}",
+                log_file_name,
+            )
+    return None

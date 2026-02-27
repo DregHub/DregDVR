@@ -10,7 +10,7 @@ from config.config_settings import DVR_Config
 from config.config_accounts import Account_Config
 from config.config_tasks import DVR_Tasks
 from utils.dlp_utils import DLPEvents
-from yt_dlp.utils import UserNotLive, match_filter_func
+from utils.dlp_utils import download_with_retry, getinfo_with_retry
 from downloader.comments import LiveCommentsDownloader
 
 
@@ -30,7 +30,6 @@ class LivestreamDownloader:
     dlp_max_dlp_download_retries = DVR_Config.get_max_dlp_download_retries()
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
     comment_download = DVR_Tasks.get_comments_download()
-    YT_Cookies_File = DVR_Config.get_yt_cookies_file()
 
     current_videourl = None
     current_videofile = None
@@ -40,11 +39,11 @@ class LivestreamDownloader:
 
     @classmethod
     def download_started(cls):
-        LogManager.log_download_live(
-            f"DOWNLOAD STARTED CALLBACK FOR  {cls.current_videourl}"
-        )
         if cls.comment_download == "true":
             try:
+                LogManager.log_download_live(
+                    f"Scheduling Live Comments Downloader for livestream {cls.current_videourl}"
+                )
                 scheduled = AsyncScheduler.schedule_nonblocking(
                     LiveCommentsDownloader.download_comments(
                         cls.current_videourl, cls.current_videofile
@@ -67,7 +66,7 @@ class LivestreamDownloader:
     @classmethod
     def download_processing(cls):
         LogManager.log_download_live(
-            f"Detected end of livestream {cls.current_videourl}, Adding this to the download recovery queue while we continue proccessing the file."
+            f"Detected end of livestream {cls.current_videourl}, Adding this to the download recovery queue while we continue proccessing the file for publishing."
         )
         RecoveryDownloader.add_to_recoveryqueue(
             cls.current_videourl, cls.current_videofile
@@ -87,42 +86,38 @@ class LivestreamDownloader:
                     "forcejson": True,
                     "extract_flat": False,
                     "ignore-errors": True,
-                    "match_filter": match_filter_func("live_status=is_live"),
                 }
 
-                # Add cookiefile if present
-                if cls.YT_Cookies_File and os.path.exists(cls.YT_Cookies_File):
-                    mon_ydl_opts["cookiefile"] = cls.YT_Cookies_File
-
-                with yt_dlp.YoutubeDL(mon_ydl_opts) as ydl:
-                    try:
-                        try:
-                            info = ydl.extract_info(cls.youtube_source, download=False)
-                        except UserNotLive:
-                            # Channel not live — silently ignore and don't treat as failure
-                            # Dont waste further resources we will recheck next cycle
-                            return
-                        # ignore errors, if the stream is not live or scheduled, it will raise a DownloadError
-                        is_live = info.get("live_status")
+                try:
+                    info = await getinfo_with_retry(
+                        mon_ydl_opts,
+                        cls.youtube_source,
+                        LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                    )
+                    LiveStatus = info.get("live_status")
+                    if LiveStatus == "is_live":
                         livestream_url = info.get("webpage_url")
-                        if is_live:
-                            if all(
-                                item["url"] != livestream_url
-                                for item in cls.download_queue
-                            ):
-                                LogManager.log_download_live(
-                                    f"Adding new active livestream {livestream_url} to download queue"
-                                )
-                                CurrentIndex = IndexManager.find_new_live_index(
-                                    LogManager.DOWNLOAD_LIVE_LOG_FILE
-                                )
-                                await cls.add_to_downloadqueue(
-                                    livestream_url, CurrentIndex
-                                )
-                            return
-                    except yt_dlp.utils.DownloadError as e:
-                        # Ignore the error is due to the stream not being live or scheduled
+                        if all(
+                            item["url"] != livestream_url for item in cls.download_queue
+                        ):
+                            LogManager.log_download_live(
+                                f"Adding new active livestream {livestream_url} to download queue"
+                            )
+                            CurrentIndex = IndexManager.find_new_live_index(
+                                LogManager.DOWNLOAD_LIVE_LOG_FILE
+                            )
+                            await cls.add_to_downloadqueue(livestream_url, CurrentIndex)
                         return
+                    else:
+                        LogManager.log_download_live(
+                            f"Discovered Stream is not live (live_status={LiveStatus}), skipping download."
+                        )
+                except Exception as e:
+                    # let the helper have already logged; escalate so caller can handle if desired
+                    LogManager.log_download_live(
+                        f"Exception in download_livestreams:  {e}\n{traceback.format_exc()}"
+                    )
+                    raise
 
             except Exception as e:
                 LogManager.log_download_live(
@@ -134,6 +129,8 @@ class LivestreamDownloader:
     async def download_livestream(cls, item):
         async with cls._download_execution_lock:
             CurrentIndex = item["index"]
+            # Increment attempt count for bookkeeping
+            item["download_attempts"] = item.get("download_attempts", 0) + 1
             try:
                 current_nametemplate = f"{CurrentIndex} {cls.DownloadFilePrefix} {cls.DownloadTimeStampFormat}.%(ext)s"
                 dlp_download_opts = {
@@ -143,7 +140,6 @@ class LivestreamDownloader:
                     },
                     "outtmpl": current_nametemplate,
                     "live_from_start": True,
-                    "match_filter": match_filter_func("live_status == 'is_live'"),
                     "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
                     "ignore_no_formats_error": True,  # ← prevents livestream errors from crashing
                     "fragment_retries": int(cls.dlp_max_fragment_retries),
@@ -154,23 +150,36 @@ class LivestreamDownloader:
                     "noprogress": True,
                 }
 
-                # Add cookiefile if present
-                if cls.YT_Cookies_File and os.path.exists(cls.YT_Cookies_File):
-                    dlp_download_opts["cookiefile"] = cls.YT_Cookies_File
-                # Convert the /@channel/live into an actual video url and get the publish file name
-                # Use a temporary YoutubeDL to extract info only (do not call download here)
-                with yt_dlp.YoutubeDL(dlp_download_opts) as ydl:
-                    info = ydl.extract_info(cls.youtube_source, download=False)
+                if cls.dlp_verbose == "true":
+                    dlp_download_opts["verbose"] = True
 
-                    if info.get("live_status") in ("is_upcoming"):
-                        LogManager.log_download_posted(
-                            "Current Video is an upcoming stream, skipping download for now."
+                # Convert the /@channel/live into an actual video url and get the publish file name
+                # Use helper to extract info with retry behavior
+                info = await getinfo_with_retry(
+                    dlp_download_opts,
+                    cls.youtube_source,
+                    LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                )
+
+                if info.get("live_status") in ("is_live"):
+                    # Derive a safe publish filename from the info title (fallback to index+prefix)
+                    raw_title = (
+                        info.get("title") or f"{CurrentIndex} {cls.DownloadFilePrefix}"
+                    )
+                    # Truncate to configured max chars if set and ensure it's a string
+                    try:
+                        max_chars = (
+                            int(cls.dlp_max_title_chars)
+                            if cls.dlp_max_title_chars
+                            else None
                         )
-                        return
-                    current_videofilepath = ydl.prepare_filename(info)
-                    cls.current_videofile = os.path.splitext(
-                        os.path.basename(current_videofilepath)
-                    )[0].rstrip()
+                    except Exception:
+                        max_chars = None
+                    if max_chars and isinstance(raw_title, str):
+                        safe_title = raw_title[:max_chars].strip()
+                    else:
+                        safe_title = raw_title.strip()
+                    cls.current_videofile = safe_title
                     cls.current_videourl = info.get("webpage_url")
                     LogManager.log_download_live(
                         f"Resolved video url to: {cls.current_videourl}"
@@ -179,48 +188,39 @@ class LivestreamDownloader:
                         f"Publish video file name will be: {cls.current_videofile}"
                     )
 
-                # Now attach the progress hooks and download the actual livestream using a new YoutubeDL instance
-                cls.dlp_events = DLPEvents(
-                    cls.current_videourl,
-                    LogManager.DOWNLOAD_LIVE_LOG_FILE,
-                    cls.download_started,
-                    cls.download_complete,
-                    cls.download_processing,
-                )
-                dlp_download_opts["progress_hooks"] = [cls.dlp_events.on_progress]
-
-                # Create a fresh YoutubeDL with progress hooks and run download in a thread
-                try:
-                    with yt_dlp.YoutubeDL(dlp_download_opts) as ydl_with_hooks:
-                        await asyncio.to_thread(
-                            ydl_with_hooks.download, cls.current_videourl
-                        )
-                except Exception as e:
-                    msg = str(e)
-                    if (
-                        "429" not in msg
-                        and "rate limit" not in msg.lower()
-                        and "too many requests" not in msg.lower()
-                        or "cookiefile" not in dlp_download_opts
-                    ):
-                        raise
-
-                    LogManager.log_download_live(
-                        "Rate limit detected, retrying livestream download without cookiefile"
+                    # Now attach the progress hooks and download the actual livestream using a new YoutubeDL instance
+                    cls.dlp_events = DLPEvents(
+                        cls.current_videourl,
+                        LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                        cls.download_started,
+                        cls.download_complete,
+                        cls.download_processing,
                     )
-                    dlp_opts_no_cookie = dict(dlp_download_opts)
-                    dlp_opts_no_cookie.pop("cookiefile", None)
-                    with yt_dlp.YoutubeDL(dlp_opts_no_cookie) as ydl_no_cookie:
-                        await asyncio.to_thread(
-                            ydl_no_cookie.download, cls.current_videourl
-                        )
+                    dlp_download_opts["progress_hooks"] = [cls.dlp_events.on_progress]
+                    await download_with_retry(
+                        dlp_download_opts,
+                        cls.current_videourl,
+                        LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                    )
+
+                    # If we reach here, download succeeded; mark item complete
+                    item["download_complete"] = True
+                    LogManager.log_download_live(
+                        f"Download completed for {cls.current_videourl}"
+                    )
+                else:
+                    skipped_video = info.get("webpage_url")
+                    skipped_status = info.get("live_status")
+                    LogManager.log_download_live(
+                        f"Skipping {skipped_video} as it has an unsupported live status {skipped_status}"
+                    )
+
             except Exception as e:
-                msg = str(e)
-                # Only log if the error is not related to the channel not being live, since that can be expected if the stream ends while we are trying to download it
-                if "The channel is not currently live" not in msg:
-                    LogManager.log_download_live(
-                        f"yt-dlp python API failed for {cls.current_videourl}: {e}\n{traceback.format_exc()}"
-                    )
+                LogManager.log_download_live(
+                    f"Exception while downloading livestream {item.get('url')}: {e}\n{traceback.format_exc()}"
+                )
+                # Do not re-raise; monitor loop will retry based on download_attempts.
+                return
 
     @classmethod
     async def add_to_downloadqueue(cls, url, index):

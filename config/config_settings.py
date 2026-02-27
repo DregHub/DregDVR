@@ -390,7 +390,7 @@ class DVR_Config(BaseConfig):
     def get_download_posted_log_file(cls):
         try:
             cls._init_parser()
-            return os.path.join(cls.get_log_dir(), "Download_YouTube_Posted_videos.log")
+            return os.path.join(cls.get_log_dir(), "Download_YouTube_Posted_Videos.log")
         except Exception as e:
             print(
                 f"Error in get_download_posted_log_file: {e}\n{traceback.format_exc()}"

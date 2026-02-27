@@ -10,6 +10,7 @@ from utils.logging_utils import LogManager
 from config.config_settings import DVR_Config
 from config.config_accounts import Account_Config
 from utils.file_utils import FileManager
+from yp_dl.yp_dl import YoutubePosts, get_SOCS_cookie
 
 
 class CommunityDownloader:
@@ -84,7 +85,7 @@ class CommunityDownloader:
             html_content = f.read()
 
         # Prepare new post blocks
-        new_posts_html = f' <h1 style="text-align:center;">{pagetitle}</h1></br></>'
+        new_posts_html = f' <h1 style="text-align:center;">{pagetitle}</h1><br/>'
         for post in posts:
             post_link = post.get("post_link")
             unique_id = post_link.rsplit("/", 1)[-1]
@@ -126,117 +127,55 @@ class CommunityDownloader:
     @classmethod
     async def download_community_messages(cls):
         async with cls._download_lock:
-            firstrun = False
-            if not os.path.exists(cls.json_path):
-                LogManager.log_download_posted_notices(
-                    f"Creating new Community Posts Archive for {cls.ythandle}"
-                )
-                args = [
-                    "python3",
-                    "-m",
-                    "yp_dl.yp_dl",
-                    "-f",
-                    DVR_Config.get_posted_notices_dir(),
-                    cls.posts_url,
-                ]
-                firstrun = True
-            else:
-                args = [
-                    "python3",
-                    "-m",
-                    "yp_dl.yp_dl",
-                    "-f",
-                    DVR_Config.get_posted_notices_dir(),
-                    "-u",
-                    cls.posts_url,
-                ]
-                firstrun = False
+            cookies = {"SOCS": get_SOCS_cookie()}
+            yp = YoutubePosts(cls.posts_url, cookies)
+            try:
+                if not os.path.exists(cls.json_path):
+                    LogManager.log_download_posted_notices(
+                        f"Creating new Community Posts Archive for {cls.ythandle}"
+                    )
+                    os.makedirs(cls.json_dir, exist_ok=True)
+                    await yp.scrape(pbar=None, limit=None)
+                    yp.save(
+                        pbar=None,
+                        folder=DVR_Config.get_posted_notices_dir(),
+                        reverse=False,
+                        update=False,
+                    )
+                    firstrun = True
+                else:
+                    await yp.scrape(pbar=None, limit=None)
+                    yp.save(
+                        pbar=None,
+                        folder=DVR_Config.get_posted_notices_dir(),
+                        reverse=False,
+                        update=True,
+                    )
+                    firstrun = False
 
-            process = await asyncio.create_subprocess_exec(
-                *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
-
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
-                if stdout:
-                    newposts_match = re.search(r"New posts:\s*(\d+)", stdout.decode())
-                    totalposts_match = re.search(r"(?<=\/)\d+(?=\s)", stdout.decode())
-                    if newposts_match or totalposts_match:
-                        new_posts_count = (
-                            int(newposts_match[1]) if newposts_match else 0
+                if firstrun:
+                    try:
+                        await cls.export_json_to_html(
+                            cls.json_path, cls.community_archive
                         )
-                        total_posts_count = (
-                            int(totalposts_match[0]) if totalposts_match else 0
-                        )
-
-                        if total_posts_count > 0 and firstrun:
-                            LogManager.log_download_posted_notices(
-                                f"{total_posts_count} New Community Posts Found for new Community Archive."
-                            )
-                            try:
-                                LogManager.log_download_posted_notices(
-                                    "Adding new community posts to html archive."
-                                )
-                                await cls.export_json_to_html(
-                                    cls.json_path, cls.community_archive
-                                )
-                            except Exception as e:
-                                LogManager.log_download_posted_notices(
-                                    f"Error updating Community Posts HTML archive: {e}"
-                                )
-
-                        elif new_posts_count > 0 and not firstrun:
-                            try:
-                                LogManager.log_download_posted_notices(
-                                    f"Adding {new_posts_count} new community posts to html archive."
-                                )
-                                await cls.export_json_to_html(
-                                    cls.json_path, cls.community_archive
-                                )
-                            except Exception as e:
-                                LogManager.log_download_posted_notices(
-                                    f"Error updating Community Posts HTML archive: {e}"
-                                )
-                    else:
+                    except Exception as e:
                         LogManager.log_download_posted_notices(
-                            "No output from community posts downloader try restarting to update the module."
+                            f"Error updating Community Posts HTML archive: {e}\n{traceback.format_exc()}"
                         )
-            else:
+                else:
+                    await cls.export_json_to_html(cls.json_path, cls.community_archive)
+            except Exception as e:
                 LogManager.log_download_posted_notices(
-                    f"Community Posts Downloader exited with code {process.returncode} Check the channel hasnt been banned or made private."
+                    f"Error in download_community_messages: {e}\n{traceback.format_exc()}"
                 )
-                if stdout:
-                    LogManager.log_download_posted_notices(
-                        f"STDOUT:\n{stdout.decode().strip()}"
-                    )
-                if stderr:
-                    LogManager.log_download_posted_notices(
-                        f"STDERR:\n{stderr.decode().strip()}"
-                    )
 
-    @classmethod
-    def parse_friendly_time(cls, time_str):
-        if not isinstance(time_str, str):
-            return "Invalid input"
-        # Try parsing with dateparser first
-        dt = dateparser.parse(time_str)
-        if dt is not None:
-            return dt.strftime("%d/%m/%Y %I:%M %p")
-
-        now = datetime.now()
-
-        # Fallbacks for relative time expressions
-        patterns = [
-            (r"(\d+)\s+months?\s+ago", lambda n: now - relativedelta(months=n)),
-            (r"(\d+)\s+weeks?\s+ago", lambda n: now - relativedelta(weeks=n)),
-            (r"(\d+)\s+years?\s+ago", lambda n: now - relativedelta(years=n)),
-        ]
-
-        for pattern, adjust_func in patterns:
-            if match := re.search(pattern, time_str):
-                amount = int(match[1])
-                dt = adjust_func(amount)
-                return dt.strftime("%d/%m/%Y %I:%M %p")
-
-        return f"Invalid date format {time_str}"
+    @staticmethod
+    def parse_friendly_time(time_str: str) -> str:
+        try:
+            # Simple parsing using dateparser; fall back to original string if parsing fails
+            dt = dateparser.parse(time_str)
+            if not dt:
+                return time_str
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return time_str

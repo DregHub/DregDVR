@@ -2,9 +2,8 @@ import asyncio
 import traceback
 import os
 from utils.logging_utils import LogManager
-from utils.subprocess_utils import run_subprocess_realtime
 from utils.dlp_utils import DLPEvents
-from yt_dlp import YoutubeDL
+from utils.dlp_utils import download_with_retry, getinfo_with_retry
 from config.config_settings import DVR_Config
 from config.config_accounts import Account_Config
 
@@ -21,7 +20,6 @@ class RecoveryDownloader:
     dlp_max_fragment_retry = DVR_Config.get_max_dlp_fragment_retries()
     dlp_max_dlp_download_retries = DVR_Config.get_max_dlp_download_retries()
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
-    YT_Cookies_File = DVR_Config.get_yt_cookies_file()
 
     # Recovery queue: list of dicts with url, filename, download_complete, and recovery_attempts
     recoveryqueue = []
@@ -91,7 +89,7 @@ class RecoveryDownloader:
             )
 
             # Build yt-dlp options similar to downloader/videos.py
-            ydl_opts = {
+            download_ydl_opts = {
                 "paths": {"temp": cls.Live_DownloadRecovery_dir},
                 "outtmpl": item["filename"],
                 "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
@@ -101,69 +99,56 @@ class RecoveryDownloader:
                 "progress_hooks": [cls.dlp_events.on_progress],
             }
 
-            # Use cookies file if configured and present
-            if cls.YT_Cookies_File and os.path.exists(cls.YT_Cookies_File):
-                ydl_opts["cookiefile"] = cls.YT_Cookies_File
-
             if cls.dlp_keep_fragments == "true":
-                ydl_opts["keep_fragments"] = True
+                download_ydl_opts["keep_fragments"] = True
 
             if cls.dlp_verbose == "true":
-                ydl_opts["verbose"] = True
+                download_ydl_opts["verbose"] = True
 
+            # If no-progress mode is enabled, check live status first and skip download if it's still live/upcoming.
             if cls.dlp_no_progress == "true":
                 for filt in DVR_Config.get_no_progress_dlp_filters():
                     if filt not in LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER:
                         LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER.append(filt)
 
-            with YoutubeDL({"quiet": True, "ignore_no_formats_error": True}) as ydl:
-                info = ydl.extract_info(currenturl, download=False)
+                mon_ydl_opts = {
+                    "quiet": True,
+                    "skip_download": True,
+                }
 
-                if info.get("live_status") in (
-                    "is_live",
-                    "is_upcoming",
-                ):
+                info = await getinfo_with_retry(
+                    mon_ydl_opts, currenturl, LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE
+                )
+
+                if info.get("live_status") in ("is_live", "is_upcoming"):
                     LogManager.log_download_posted(
                         f"Video {currenturl} is a live or upcoming stream, skipping download."
                     )
                     exit_code = None
-                else:
-                    try:
-                        with YoutubeDL(ydl_opts) as ydl:
-                            # Run blocking download in thread to avoid blocking event loop
-                            await asyncio.to_thread(ydl.download, [currenturl])
-                    except Exception as e:
-                        msg = str(e)
-                        if (
-                            ("429" in msg)
-                            or ("rate limit" in msg.lower())
-                            or ("too many requests" in msg.lower())
-                        ) and "cookiefile" in ydl_opts:
-                            LogManager.log_download_live_recovery(
-                                "Rate limit detected, retrying recovery download without cookiefile"
-                            )
-                            ydl_opts_no_cookie = dict(ydl_opts)
-                            ydl_opts_no_cookie.pop("cookiefile", None)
-                            with YoutubeDL(ydl_opts_no_cookie) as ydl2:
-                                await asyncio.to_thread(ydl2.download, [currenturl])
-                        else:
-                            raise e
-                    except Exception as e:
-                        exit_code = 1
-                        LogManager.log_download_live_recovery(
-                            f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
-                        )
-                        LogManager.log_download_live_recovery(
-                            f"Recovery download for {item['url']} did not complete successfully: {e}"
-                        )
-                        item["download_complete"] = False
-                        item["recovery_attempts"] += 1
+                    return
 
-                    exit_code = 0
-                    LogManager.log_download_live_recovery(
-                        f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
-                    )
-                    LogManager.log_download_live_recovery(
-                        f"Recovery download for {item['url']} completed successfully."
-                    )
-                    item["download_complete"] = True
+            try:
+                await download_with_retry(
+                    download_ydl_opts,
+                    [currenturl],
+                    LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
+                )
+            except Exception as e:
+                exit_code = 1
+                LogManager.log_download_live_recovery(
+                    f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
+                )
+                LogManager.log_download_live_recovery(
+                    f"Recovery download for {item['url']} did not complete successfully: {e}"
+                )
+                item["download_complete"] = False
+                item["recovery_attempts"] += 1
+            else:
+                exit_code = 0
+                LogManager.log_download_live_recovery(
+                    f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
+                )
+                LogManager.log_download_live_recovery(
+                    f"Recovery download for {item['url']} completed successfully."
+                )
+                item["download_complete"] = True
