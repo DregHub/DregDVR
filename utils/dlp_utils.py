@@ -1,4 +1,4 @@
-import re
+import os
 import traceback
 import asyncio
 import contextlib
@@ -6,6 +6,7 @@ from yt_dlp import YoutubeDL
 from utils.logging_utils import LogManager
 from utils.logging_utils import LogManager
 from config.config_settings import DVR_Config
+
 
 class DLP_Logger:
     """Minimal yt-dlp logger that detects a specific single-line message.
@@ -422,10 +423,10 @@ async def download_with_retry(ydl_opts, url_or_list, log_file_name=None):
     Raises the final exception if retry also fails with rate-limit or other errors.
     """
     try:
-        #add on the cookie to our dlp options for the first try
+        # add on the cookie to our dlp options for the first try
         YT_Cookies_File = DVR_Config.get_yt_cookies_file()
         if YT_Cookies_File and os.path.exists(YT_Cookies_File):
-                ydl_opts["cookiefile"] = YT_Cookies_File
+            ydl_opts["cookiefile"] = YT_Cookies_File
         LogManager.log_message(
             f"Starting youtube downloader helper with options {ydl_opts}",
             log_file_name,
@@ -474,7 +475,7 @@ async def getinfo_with_retry(ydl_opts, url_or_list, log_file_name=None):
     once without the cookiefile. Returns the extracted info on success or
     `None` on failure (errors are logged to `LogManager`).
     """
-    #add on the cookie to our dlp options for the first try
+    # add on the cookie to our dlp options for the first try
     YT_Cookies_File = DVR_Config.get_yt_cookies_file()
     if YT_Cookies_File and os.path.exists(YT_Cookies_File):
         ydl_opts["cookiefile"] = YT_Cookies_File

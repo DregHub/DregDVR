@@ -1,6 +1,5 @@
 import asyncio
 import os
-import csv
 import traceback
 from yt_dlp import YoutubeDL
 from utils.logging_utils import LogManager
@@ -28,94 +27,13 @@ class VideoDownloader:
     dlp_max_fragment_retries = DVR_Config.get_max_dlp_fragment_retries()
     dlp_max_dlp_download_retries = DVR_Config.get_max_dlp_download_retries()
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
-    youtube_source = Account_Config.get_youtube_source()
-    youtube_handle = Account_Config.get_youtube_handle()
 
-    @classmethod
-    async def generate_download_List(cls):
-        try:
-            open(cls.posted_download_list, "w").close()
-            rows = []
-            urls_to_download = []
-            # Create persistent_playlist if it does not exist
-            if not os.path.exists(cls.persistent_playlist):
-                with open(
-                    cls.persistent_playlist, "w", encoding="utf-8", newline=""
-                ) as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["UniqueID", "Title", "URL", "Downloaded"])
-
-            # LogManager.log_download_posted(f"Reading {cls.persistent_playlist}.")
-            with open(cls.persistent_playlist, "r", encoding="utf-8") as in_file:
-                reader = csv.reader(in_file)
-                headers = next(reader, None)
-                for row in reader:
-                    if len(row) < 4:
-                        LogManager.log_download_posted(
-                            f"Row with missing columns found: {row}. Padding to 4 columns."
-                        )
-                        row += [""] * (4 - len(row))
-                    if row[3] == "0":
-                        urls_to_download.append(row[2])
-                    rows.append(row)
-
-            if urls_to_download:
-                # LogManager.log_download_posted(f"Writing {len(urls_to_download)} URLs to {cls.posted_download_list}.")
-                with open(cls.posted_download_list, "w", encoding="utf-8") as out_file:
-                    for url in urls_to_download:
-                        out_file.write(url + "\n")
-            elif os.path.exists(cls.posted_download_list):
-                # LogManager.log_download_posted(f"No URLs to download. Deleting {cls.posted_download_list}.")
-                FileManager.delete_file(
-                    cls.posted_download_list, LogManager.DOWNLOAD_POSTED_LOG_FILE
-                )
-
-            # LogManager.log_download_posted(f"Writing updated rows back to {cls.persistent_playlist}.")
-            with open(
-                cls.persistent_playlist, "w", newline="", encoding="utf-8"
-            ) as out_file:
-                writer = csv.writer(out_file)
-                if headers:
-                    writer.writerow(headers)
-                writer.writerows(rows)
-
-        except Exception as e:
-            LogManager.log_download_posted(
-                f"Failed in generate_download_List:  {e}\n{traceback.format_exc()}"
-            )
-
-    @classmethod
-    async def mark_as_downloaded(cls, url):
-        try:
-            rows = []
-            updated = False
-            with open(cls.persistent_playlist, "r", encoding="utf-8") as in_file:
-                reader = csv.reader(in_file)
-                headers = next(reader, None)
-                for row in reader:
-                    if len(row) < 4:
-                        row += [""] * (4 - len(row))
-                    if row[2] == url and row[3] == "0":
-                        row[3] = "1"
-                        updated = True
-                    rows.append(row)
-            if updated:
-                with open(
-                    cls.persistent_playlist, "w", newline="", encoding="utf-8"
-                ) as out_file:
-                    writer = csv.writer(out_file)
-                    if headers:
-                        writer.writerow(headers)
-                    writer.writerows(rows)
-        except Exception as e:
-            LogManager.log_download_posted(
-                f"Failed to mark as downloaded: {e}\n{traceback.format_exc()}"
-            )
+    youtube_channel = Account_Config.get_youtube_handle()
 
     @classmethod
     async def download_videos(cls):
         LogManager.log_download_posted(
-            f"Starting Video & Shorts Downloader for {cls.youtube_source}"
+            f"Starting Video & Shorts Downloader for {cls.youtube_channel}"
         )
 
         while True:
@@ -128,7 +46,7 @@ class VideoDownloader:
 
                 await cls.playlist.download_channel_playlist()
                 await cls.playlist.merge_delta_playlist()
-                await cls.generate_download_List()
+                await cls.playlist.generate_download_List()
 
                 if os.path.exists(cls.posted_download_list):
                     with open(
@@ -178,16 +96,16 @@ class VideoDownloader:
 
                                 if live_status in ["is_live", "is_upcoming"]:
                                     LogManager.log_download_posted(
-                                        f"{url} is a live or upcoming stream, skipping download."
+                                        f"{url} is a live or upcoming stream live_status = {live_status} , skipping download."
                                     )
-                                elif live_status == "was_live":
+                                elif live_status in ["post_live", "was_live"]:
                                     LogManager.log_download_posted(
-                                        f"{url} is a past livestream, skipping download because this is handled by the livestream downloader."
+                                        f"{url} is a past livestream live_status = {live_status} , skipping download because this is handled by the livestream downloader."
                                     )
                                 elif live_status == "not_live":
                                     try:
                                         LogManager.log_download_posted(
-                                            f"{url} is a published video, Proceding to download."
+                                            f"{url} is a published video live_status = {live_status} , Proceding to download."
                                         )
                                         await download_with_retry(
                                             ydl_opts,
@@ -200,10 +118,10 @@ class VideoDownloader:
                                     LogManager.log_download_posted(
                                         f"Posted Video {url} Downloaded Successfully"
                                     )
-                                    await cls.mark_as_downloaded(url)
+                                    await cls.playlist.mark_as_downloaded(url)
                                 else:
                                     LogManager.log_download_posted(
-                                        f"{url} Has an unknown live status type {live_status} skipping download"
+                                        f"{url} Has an unknown live status type live_status = {live_status} skipping download"
                                     )
 
                             except Exception as e:
@@ -213,15 +131,15 @@ class VideoDownloader:
 
                         if len(urls) > 1:
                             LogManager.log_download_posted(
-                                f"Finished processing all {len(urls)} new videos/shorts from channel {cls.youtube_handle}"
+                                f"Finished processing all {len(urls)} new videos/shorts from channel {cls.youtube_channel}"
                             )
                         elif len(urls) == 1:
                             LogManager.log_download_posted(
-                                f"Finished processing the new video/short from channel {cls.youtube_handle}"
+                                f"Finished processing the new video/short from channel {cls.youtube_channel}"
                             )
 
                         LogManager.log_download_posted(
-                            f"Download cycle complete. Waiting 1 minute before checking {cls.youtube_handle} for new videos/shorts."
+                            f"Download cycle complete. Waiting 1 minute before checking {cls.youtube_channel} for new videos/shorts."
                         )
                         await asyncio.sleep(60)
                 else:
