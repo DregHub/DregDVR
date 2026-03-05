@@ -68,7 +68,7 @@ async def upload_to_youtube(filepath, filename):
             },
             "status": {"privacyStatus": str(YT_PrivacyMode)},
         }
-        #LogManager.log_upload_yt(request_body)
+        # LogManager.log_upload_yt(request_body)
         request = youtube.videos().insert(
             part="snippet,status", body=request_body, media_body=media_upload
         )

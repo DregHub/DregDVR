@@ -4,8 +4,7 @@ import os
 import yt_dlp
 import traceback
 import asyncio
-from yt_dlp.utils import DownloadError
-from yt_dlp.utils import match_filter_func
+from utils.dlp_utils import download_with_retry
 from config.config_settings import DVR_Config
 from utils.logging_utils import LogManager
 
@@ -16,6 +15,8 @@ class LiveCommentsDownloader:
     JSON_Comments_Dir = os.path.join(Live_Comments_Dir, "_JSON")
     _download_lock = asyncio.Lock()
     _publish_lock = asyncio.Lock()
+    templates_dir = DVR_Config.get_templates_dir()
+    HTML_Template_File = os.path.join(templates_dir, "comments.html")
 
     @classmethod
     async def download_comments(cls, yturl, filename):
@@ -37,24 +38,14 @@ class LiveCommentsDownloader:
                     "outtmpl": JSON_LiveChat_File,
                 }
 
-                with yt_dlp.YoutubeDL(livechat_dl_opts) as ydl:
-                    try:
-                        ydl.download([yturl])
-                    except DownloadError as e:
-                        msg = str(e)
-                        LogManager.log_download_comments(
-                            f"Error downloading live comments: {msg}"
-                        )
-                        if (
-                            "Unable to download video subtitles for 'live_chat'"
-                            not in msg
-                            and ("HTTP Error 404" not in msg or "live_chat" not in msg)
-                            and ("live_chat" not in msg or "404" not in msg)
-                        ):
-                            raise
-                        LogManager.log_download_comments(
-                            "Detected the live chat is no longer available, likely because the stream ended. Stopping comment monitor."
-                        )
+                try:
+                    await download_with_retry(livechat_dl_opts, [yturl], filename)
+                except Exception as e:
+                    # download_with_retry logs details; still catch here to
+                    # ensure publish_comments runs and errors are recorded.
+                    LogManager.log_download_comments(
+                        f"Error downloading live comments: {e}\n{traceback.format_exc()}"
+                    )
                 # Publish comments to TXT and HTML after json download finishes
                 await cls.publish_comments(JSON_LiveChat_File)
             except Exception as e:
@@ -79,9 +70,6 @@ class LiveCommentsDownloader:
                 os.makedirs(cls.Live_Comments_Dir, exist_ok=True)
                 os.makedirs(cls.TXT_Comments_Dir, exist_ok=True)
                 os.makedirs(cls.JSON_Comments_Dir, exist_ok=True)
-
-                Templates_Dir = DVR_Config.get_templates_dir()
-                HTML_Template_File = os.path.join(Templates_Dir, "Comments.html")
 
                 HTML_LiveChat_File = os.path.join(cls.Live_Comments_Dir, html_filename)
                 TXT_LiveChat_File = os.path.join(cls.TXT_Comments_Dir, txt_filename)
@@ -470,19 +458,120 @@ class LiveCommentsDownloader:
                         .replace(">", "&gt;")
                     )
 
+                    # Embed any media (video/images) if present in the item
+                    media_html = ""
+                    video_url = None
+                    images_val = None
+                    if isinstance(it, dict):
+                        video_url = it.get("video") or it.get("video_url") or None
+                        images_val = it.get("images") if "images" in it else None
+
+                    if video_url:
+                        try:
+                            if "watch?v=" in video_url or "youtu.be/" in video_url:
+                                if "watch?v=" in video_url:
+                                    vid = video_url.split("watch?v=")[1].split("&")[0]
+                                else:
+                                    vid = video_url.split("youtu.be/")[1].split("?")[0]
+                                thumb = (
+                                    f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
+                                )
+                                placeholder = (
+                                    f'<div class="media video"><div class="yt-placeholder" data-vid="{vid}" '
+                                    f'style="position:relative;max-width:560px;margin-top:10px;">'
+                                    f'<img src="{thumb}" alt="YouTube thumbnail" '
+                                    f'style="width:100%;height:auto;display:block;" />'
+                                    f'<div class="yt-play" '
+                                    f'style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);'
+                                    f"width:72px;height:72px;border-radius:50%;background:rgba(0,0,0,0.6);"
+                                    f'display:flex;align-items:center;justify-content:center;">'
+                                    f'<svg width="36" height="36" viewBox="0 0 24 24" fill="white">'
+                                    f'<path d="M8 5v14l11-7z"/></svg></div>'
+                                    f'<div class="yt-spinner" '
+                                    f'style="display:none;width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);'
+                                    f"border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;"
+                                    f'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);"></div>'
+                                    f'<div style="text-align:center;margin-top:6px;">'
+                                    f'<a href="https://www.youtube.com/watch?v={vid}" target="_blank" '
+                                    f'style="color:#90caf9;">Watch on YouTube</a></div>'
+                                    f"</div></div>"
+                                )
+                                media_html += placeholder
+                            else:
+                                media_html += f'<div class="media video"><a href="{video_url}">Video</a></div>'
+                        except Exception:
+                            media_html += f'<div class="media video"><a href="{video_url}">Video</a></div>'
+
+                    if images_val:
+                        try:
+                            if isinstance(images_val, str):
+                                media_html += (
+                                    f'<div class="media images"><img src="{images_val}" alt="image" '
+                                    f'style="max-width:100%;height:auto;"></div>'
+                                )
+                            elif isinstance(images_val, list):
+                                for img in images_val:
+                                    media_html += (
+                                        f'<div class="media images"><img src="{img}" alt="image" '
+                                        f'style="max-width:100%;height:auto;"></div>'
+                                    )
+                        except Exception:
+                            pass
+
                     html_parts.append(
-                        f'<div class="comment"><span class="time">{time_str}</span> <strong class="author">{safe_author}</strong>: <span class="text">{safe_text}</span></div>'
+                        f'<div class="comment"><span class="time">{time_str}</span> <strong class="author">{safe_author}</strong>: <span class="text">{safe_text}</span>'
+                        + media_html
+                        + "</div>"
                     )
+
+                    # Add metadata about media to TXT output as well
                     if time_str or author:
                         txt_lines.append(f"[{time_str}] {author}: {text}")
                     else:
                         txt_lines.append(text)
+                    if video_url:
+                        txt_lines.append(f"[media] Video: {video_url}")
+                    if images_val:
+                        if isinstance(images_val, str):
+                            txt_lines.append(f"[media] Image: {images_val}")
+                        elif isinstance(images_val, list):
+                            for img in images_val:
+                                txt_lines.append(f"[media] Image: {img}")
 
-                html_body = "\n".join(html_parts)
+                                html_body = "\n".join(html_parts)
+
+                                # Add small JS/CSS to enable click-to-load YouTube placeholders
+                                embed_script = """
+<style>@keyframes spin{to{transform:rotate(360deg);}}</style>
+<script>
+document.addEventListener('click', function(e){
+    var p = e.target.closest && e.target.closest('.yt-placeholder');
+    if(!p) return;
+    if(p.dataset.loaded) return;
+    var vid = p.dataset.vid;
+    var spinner = p.querySelector('.yt-spinner');
+    var img = p.querySelector('img');
+    var play = p.querySelector('.yt-play');
+    if(spinner) spinner.style.display='block';
+    if(play) play.style.display='none';
+    var iframe = document.createElement('iframe');
+    iframe.width='560'; iframe.height='315';
+    iframe.src='https://www.youtube-nocookie.com/embed/'+vid+'?rel=0&autoplay=1';
+    iframe.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    iframe.allowFullscreen=true; iframe.loading='lazy'; iframe.style.border='0';
+    iframe.addEventListener('load', function(){ if(spinner) spinner.style.display='none'; });
+    p.insertBefore(iframe, img);
+    if(img) img.style.display='none';
+    p.dataset.loaded=1;
+});
+</script>
+"""
+
+                                html_body += embed_script
 
                 template = ""
-                if os.path.exists(HTML_Template_File):
-                    with open(HTML_Template_File, "r", encoding="utf-8") as tf:
+                if os.path.exists(cls.HTML_Template_File):
+                    with open(cls.HTML_Template_File, "r", encoding="utf-8") as tf:
                         template = tf.read()
 
                 if template:

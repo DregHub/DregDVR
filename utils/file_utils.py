@@ -68,6 +68,25 @@ class FileManager:
             return False
 
     @classmethod
+    async def append_line_async(cls, file_path: str, line: str):
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, cls._append_line, file_path, line)
+
+    @classmethod
+    def _append_line(cls, file_path: str, line: str):
+        try:
+            # Ensure directory exists
+            parent = os.path.dirname(file_path)
+            if parent and not os.path.exists(parent):
+                os.makedirs(parent, exist_ok=True)
+            with open(file_path, "a", encoding="utf-8", newline="") as f:
+                f.write(line + "\n")
+        except Exception as e:
+            LogManager.log_download_posted_notices(
+                f"Error appending to file {file_path}: {e}\n{traceback.format_exc()}"
+            )
+
+    @classmethod
     def gen_safe_filename(cls, name: str) -> str:
         # 1. Normalize Unicode → ASCII
         name = unicodedata.normalize("NFKD", name)

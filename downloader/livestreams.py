@@ -253,8 +253,16 @@ class LivestreamDownloader:
     @classmethod
     async def monitor_livestreams(cls):
         while True:
-            await cls.check_livestream()
-            await asyncio.sleep(30)
+            try:
+                await cls.check_livestream()
+            except Exception as e:
+                LogManager.log_download_live(
+                    f"Unhandled exception in monitor_livestreams: {e}\n{traceback.format_exc()}"
+                )
+            try:
+                await asyncio.sleep(30)
+            except Exception:
+                LogManager.log_download_live("Sleep interrupted in monitor_livestreams")
 
     @classmethod
     async def download_livestreams(cls):
@@ -262,4 +270,9 @@ class LivestreamDownloader:
             f"Starting Livestream Downloader for {cls.youtube_source}"
         )
         tasks = [cls.monitor_downloadqueue(), cls.monitor_livestreams()]
-        await asyncio.gather(*tasks)
+        try:
+            await asyncio.gather(*tasks)
+        except Exception as e:
+            LogManager.log_download_live(
+                f"Unhandled exception in download_livestreams gather: {e}\n{traceback.format_exc()}"
+            )

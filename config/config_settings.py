@@ -9,6 +9,7 @@ class DVR_Config(BaseConfig):
     parser = None
     parser_attr_name = "parser"
     config_filename = "dvr_settings.cfg"
+    Project_Root_Dir = None
     Data_Root_Dir = None
 
     @classmethod
@@ -234,10 +235,8 @@ class DVR_Config(BaseConfig):
     def get_templates_dir(cls):
         try:
             cls._init_parser()
-            return os.path.join(
-                cls.Runtime_Profile_Dir,
-                cls.get_value("Directories", "templates_dir").strip('"'),
-            )
+            # Remove user customise option as its now part of the project
+            return os.path.join(cls.Project_Root_Dir, "templates")
         except Exception as e:
             print(f"Error in get_templates_dir: {e}\n{traceback.format_exc()}")
             raise
@@ -276,36 +275,17 @@ class DVR_Config(BaseConfig):
     # File References
 
     # Posted Files
-    @classmethod
-    def get_posted_delta_playlist(cls):
-        try:
-            cls._init_parser()
-            playlist_dir = cls.get_posted_playlists_dir()
-            return os.path.join(playlist_dir, "_Delta_Playlist.csv")
-        except Exception as e:
-            print(f"Error in get_posted_delta_playlist: {e}\n{traceback.format_exc()}")
-            raise
 
     @classmethod
     def get_posted_persistent_playlist(cls):
         try:
             cls._init_parser()
             playlist_dir = cls.get_posted_playlists_dir()
-            return os.path.join(playlist_dir, "_Persistent_Playlist.csv")
+            return os.path.join(playlist_dir, "Combined_Playlist.json")
         except Exception as e:
             print(
                 f"Error in get_posted_persistent_playlist: {e}\n{traceback.format_exc()}"
             )
-            raise
-
-    @classmethod
-    def get_posted_download_list(cls):
-        try:
-            cls._init_parser()
-            playlist_dir = cls.get_posted_playlists_dir()
-            return os.path.join(playlist_dir, "_Download_Playlist.txt")
-        except Exception as e:
-            print(f"Error in get_posted_download_list: {e}\n{traceback.format_exc()}")
             raise
 
     # Upload Files
@@ -341,7 +321,7 @@ class DVR_Config(BaseConfig):
     def get_core_log_file(cls):
         try:
             cls._init_parser()
-            return os.path.join(cls.get_log_dir(), "_Core_Package_Updater.log")
+            return os.path.join(cls.get_log_dir(), "Core_Package_Updater.log")
         except Exception as e:
             print(f"Error in get_core_log_file: {e}\n{traceback.format_exc()}")
             raise
@@ -391,6 +371,19 @@ class DVR_Config(BaseConfig):
         try:
             cls._init_parser()
             return os.path.join(cls.get_log_dir(), "Download_YouTube_Posted_Videos.log")
+        except Exception as e:
+            print(
+                f"Error in get_download_posted_log_file: {e}\n{traceback.format_exc()}"
+            )
+            raise
+
+    @classmethod
+    def get_posted_playlist_log_file(cls):
+        try:
+            cls._init_parser()
+            return os.path.join(
+                cls.get_log_dir(), "Download_YouTube_Posted_Playlist.log"
+            )
         except Exception as e:
             print(
                 f"Error in get_download_posted_log_file: {e}\n{traceback.format_exc()}"
@@ -499,6 +492,16 @@ class DVR_Config(BaseConfig):
             )
         except Exception as e:
             print(f"Error in download_posted_log_filter: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def posted_playlist_log_filter(cls):
+        try:
+            return cls.parse_string_list(
+                cls.get_value("Log_Filters", "posted_playlist_log_filter")
+            )
+        except Exception as e:
+            print(f"Error in posted_playlist_log_filter: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod

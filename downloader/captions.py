@@ -89,45 +89,56 @@ class CaptionsDownloader:
                 "output_path is required because process_srt expects two arguments"
             )
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None, srt_fix_module.process_srt, input_path, output_path
-        )
+        try:
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                None, srt_fix_module.process_srt, input_path, output_path
+            )
+        except Exception as e:
+            LogManager.log_download_captions(
+                f"srtfix failed for {input_path} -> {output_path}: {e}\n{traceback.format_exc()}"
+            )
+            raise
 
     @classmethod
     async def manage_caption_index_file(cls):
         while True:
             async with cls._monitor_execution_lock:
-                if cls._download_execution_lock.locked():
-                    await asyncio.sleep(300)
-                else:
-                    LogManager.log_download_captions(
-                        f"Started Update Captions Index Proccess for {cls.caption_index_file}"
-                    )
-                    await cls.get_flat_playlist_async(
-                        cls.video_playlist, cls.video_json
-                    )
-                    await cls.get_flat_playlist_async(
-                        cls.shorts_playlist, cls.shorts_json
-                    )
+                try:
+                    if cls._download_execution_lock.locked():
+                        await asyncio.sleep(300)
+                    else:
+                        LogManager.log_download_captions(
+                            f"Started Update Captions Index Proccess for {cls.caption_index_file}"
+                        )
+                        await cls.get_flat_playlist_async(
+                            cls.video_playlist, cls.video_json
+                        )
+                        await cls.get_flat_playlist_async(
+                            cls.shorts_playlist, cls.shorts_json
+                        )
 
-                    # Update caption index with new entries from shorts and videos playlists
-                    video_contents = await JSONUtils.read_json(cls.video_json)
-                    await cls.populate_captions_index(
-                        video_contents, cls.caption_index_file
-                    )
-                    shorts_contents = await JSONUtils.read_json(cls.shorts_json)
-                    await cls.populate_captions_index(
-                        shorts_contents, cls.caption_index_file
-                    )
+                        # Update caption index with new entries from shorts and videos playlists
+                        video_contents = await JSONUtils.read_json(cls.video_json)
+                        await cls.populate_captions_index(
+                            video_contents, cls.caption_index_file
+                        )
+                        shorts_contents = await JSONUtils.read_json(cls.shorts_json)
+                        await cls.populate_captions_index(
+                            shorts_contents, cls.caption_index_file
+                        )
 
-                    LogManager.log_download_captions(
-                        "The Captions Index File has been updated with new videos & shorts"
-                    )
+                        LogManager.log_download_captions(
+                            "The Captions Index File has been updated with new videos & shorts"
+                        )
 
-                    await cls.populate_hascaptions_field()
+                        await cls.populate_hascaptions_field()
+                        LogManager.log_download_captions(
+                            f'Finished Updating "has_captions" field in {cls.caption_index_file}'
+                        )
+                except Exception as e:
                     LogManager.log_download_captions(
-                        f'Finished Updating "has_captions" field in {cls.caption_index_file}'
+                        f"Unhandled exception in manage_caption_index_file: {e}\n{traceback.format_exc()}"
                     )
 
             # --- Waiting section ---
@@ -142,17 +153,18 @@ class CaptionsDownloader:
         # await asyncio.sleep(60)
         while True:
             async with cls._download_execution_lock:
-                if cls._monitor_execution_lock.locked():
-                    await asyncio.sleep(300)
-                    continue
+                try:
+                    if cls._monitor_execution_lock.locked():
+                        await asyncio.sleep(300)
+                        continue
 
-                if not os.path.exists(cls.caption_index_file):
-                    # If the caption index file doesn't exist yet, wait and retry
-                    await asyncio.sleep(300)
-                    continue
+                    if not os.path.exists(cls.caption_index_file):
+                        # If the caption index file doesn't exist yet, wait and retry
+                        await asyncio.sleep(300)
+                        continue
 
-                LogManager.log_download_captions("Starting caption download cycle...")
-                index_data = await JSONUtils.read_json(cls.caption_index_file)
+                    LogManager.log_download_captions("Starting caption download cycle...")
+                    index_data = await JSONUtils.read_json(cls.caption_index_file)
 
                 # Build list of items to process
                 items = list(index_data.items())
@@ -261,7 +273,13 @@ class CaptionsDownloader:
                             continue
 
             # --- Waiting section ---
-            await asyncio.sleep(300)
+            try:
+                await asyncio.sleep(300)
+            except Exception:
+                # Sleep interrupted; log and continue
+                LogManager.log_download_captions(
+                    "Sleep interrupted in download_captions loop"
+                )
             # Save any updates to the index file after processing (defensive save)
             await JSONUtils.save_json(index_data, cls.caption_index_file)
 
@@ -308,11 +326,16 @@ class CaptionsDownloader:
                     f"Skipping video ID {video_id} - has_captions: {has_subtitles}, downloaded: {downloaded}, attempts: {download_attempts}"
                 )
 
-        if semaphore:
-            async with semaphore:
+        try:
+            if semaphore:
+                async with semaphore:
+                    await _run()
+            else:
                 await _run()
-        else:
-            await _run()
+        except Exception as e:
+            LogManager.log_download_captions(
+                f"Unhandled exception processing video entry {video_id}: {e}\n{traceback.format_exc()}"
+            )
 
     @classmethod
     def download_started(cls):
@@ -329,22 +352,28 @@ class CaptionsDownloader:
     @classmethod
     async def get_flat_playlist_async(cls, playlist_url: str, output_path: str):
         def run_ytdlp():
-            ydl_opts = {
-                "extract_flat": True,  # --flat-playlist
-                "skip_download": True,
-                "quiet": False,
-                "progress_hooks": [cls.dlp_events.on_progress],
-            }
+            try:
+                ydl_opts = {
+                    "extract_flat": True,  # --flat-playlist
+                    "skip_download": True,
+                    "quiet": False,
+                    "progress_hooks": [cls.dlp_events.on_progress],
+                }
 
-            LogManager.log_download_captions(
-                f"Saving JSON from {playlist_url} to {output_path}"
-            )
-            with YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(playlist_url, download=False)
+                LogManager.log_download_captions(
+                    f"Saving JSON from {playlist_url} to {output_path}"
+                )
+                with YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(playlist_url, download=False)
 
-            # Save JSON to file
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(info, f, indent=2, ensure_ascii=False)
+                # Save JSON to file
+                with open(output_path, "w", encoding="utf-8") as f:
+                    json.dump(info, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                LogManager.log_download_captions(
+                    f"Failed to extract flat playlist {playlist_url}: {e}\n{traceback.format_exc()}"
+                )
+                raise
 
         return await asyncio.to_thread(run_ytdlp)
 

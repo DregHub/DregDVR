@@ -16,7 +16,7 @@ def create_required_dirs():
     """
     DVR_Config._init_parser()
     root = os.getcwd()
-
+    DVR_Config.Project_Root_Dir = os.path.dirname(os.path.abspath(__file__))
     runtime_profiledir_name = json.loads(
         DVR_Config.get_value("Directories", "runtime_dir")
     )

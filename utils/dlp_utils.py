@@ -2,6 +2,7 @@ import os
 import traceback
 import asyncio
 import contextlib
+import json
 from yt_dlp import YoutubeDL
 from utils.logging_utils import LogManager
 from utils.logging_utils import LogManager
@@ -23,6 +24,7 @@ class DLP_Logger:
         message: str = "",
         result=None,
         patterns: list = None,
+        log_file_name: str = None,
     ):
         # Normalize patterns into a list of dicts: {message_source, message, result}
         self._patterns = []
@@ -58,6 +60,8 @@ class DLP_Logger:
 
         self.detected = False
         self.last_match_result = None
+        # optional file name to forward logs to LogManager
+        self.log_file_name = log_file_name
 
     def inputs(self):
         """Return the configured detection patterns as a list of dicts."""
@@ -85,16 +89,34 @@ class DLP_Logger:
             LogManager.log_message(f"YTDLP detect logger match found: {result}")
 
     def debug(self, msg):
+        # forward debug messages to centralized LogManager when available
+        try:
+            LogManager.log_message(str(msg), self.log_file_name)
+        except Exception:
+            pass
         return None
 
     def info(self, msg):
+        # Always check for detection patterns and also forward message to LogManager
         self._check(msg)
+        try:
+            LogManager.log_message(str(msg), self.log_file_name)
+        except Exception:
+            pass
 
     def warning(self, msg):
         self._check(msg)
+        try:
+            LogManager.log_message(str(msg), self.log_file_name)
+        except Exception:
+            pass
 
     def error(self, msg):
         self._check(msg)
+        try:
+            LogManager.log_message(str(msg), self.log_file_name)
+        except Exception:
+            pass
 
 
 class DLPEvents:
@@ -417,29 +439,59 @@ DLP_Logger_Patterns = [
 ]
 
 
+async def download(ydl_opts, url_or_list, log_file_name=None):
+    """Core download helper that invokes YoutubeDL.download with given options.
+
+    This function performs the single attempt; retry behavior is handled
+    by `download_with_retry`.
+    """
+    LogManager.log_message(
+        f"Starting youtube downloader helper with options {ydl_opts}",
+        log_file_name,
+    )
+    with YoutubeDL(ydl_opts) as ydl:
+        await asyncio.to_thread(ydl.download, url_or_list)
+    LogManager.log_message("finished youtube downloader helper", log_file_name)
+
+
+async def getinfo(ydl_opts, url_or_list, log_file_name=None):
+    """Core info helper that invokes YoutubeDL.extract_info with a detection logger.
+
+    This function will return a synthetic upcoming status when the
+    detection logger identifies the common "not live" message. It raises
+    exceptions from YoutubeDL for other failures so retry wrappers can
+    decide on retry behavior.
+    """
+    DLPLogger = DLP_Logger(patterns=DLP_Logger_Patterns)
+    opts = dict(ydl_opts) if ydl_opts is not None else {}
+    opts["logger"] = DLPLogger
+    with YoutubeDL(opts) as ydl:
+        info = await asyncio.to_thread(ydl.extract_info, url_or_list, False)
+        if DLPLogger.detected and DLPLogger.last_match_result == "is_upcoming":
+            return {"live_status": "is_upcoming"}
+        return info
+
+
 async def download_with_retry(ydl_opts, url_or_list, log_file_name=None):
     """Download using YoutubeDL; retry once without cookiefile on rate-limit.
 
     Raises the final exception if retry also fails with rate-limit or other errors.
     """
+    # add on the cookie to our dlp options for the first try
+    YT_Cookies_File = DVR_Config.get_yt_cookies_file()
+    orig_had_cookie = False
+    if YT_Cookies_File and os.path.exists(YT_Cookies_File):
+        ydl_opts["cookiefile"] = YT_Cookies_File
+        orig_had_cookie = True
+
     try:
-        # add on the cookie to our dlp options for the first try
-        YT_Cookies_File = DVR_Config.get_yt_cookies_file()
-        if YT_Cookies_File and os.path.exists(YT_Cookies_File):
-            ydl_opts["cookiefile"] = YT_Cookies_File
-        LogManager.log_message(
-            f"Starting youtube downloader helper with options {ydl_opts}",
-            log_file_name,
-        )
-        with YoutubeDL(ydl_opts) as ydl:
-            await asyncio.to_thread(ydl.download, url_or_list)
-        LogManager.log_message("finished youtube downloader helper", log_file_name)
+        await download(ydl_opts, url_or_list, log_file_name)
     except Exception as e:
         LogManager.log_message(
             f"Exception in download helper {e}",
             log_file_name,
         )
-        if DLPEvents.is_rate_limit_error(e):
+        if DLPEvents.is_rate_limit_error(e) and orig_had_cookie:
             LogManager.log_message(
                 f"Rate limit detected during download using cookiefile, retrying without cookiefile: {e}",
                 log_file_name,
@@ -447,8 +499,7 @@ async def download_with_retry(ydl_opts, url_or_list, log_file_name=None):
             retry_opts = dict(ydl_opts)
             retry_opts.pop("cookiefile", None)
             try:
-                with YoutubeDL(retry_opts) as ydl_retry:
-                    await asyncio.to_thread(ydl_retry.download, url_or_list)
+                await download(retry_opts, url_or_list, log_file_name)
             except Exception as e2:
                 if DLPEvents.is_rate_limit_error(e2):
                     LogManager.log_message(
@@ -477,42 +528,34 @@ async def getinfo_with_retry(ydl_opts, url_or_list, log_file_name=None):
     """
     # add on the cookie to our dlp options for the first try
     YT_Cookies_File = DVR_Config.get_yt_cookies_file()
+    orig_had_cookie = False
     if YT_Cookies_File and os.path.exists(YT_Cookies_File):
         ydl_opts["cookiefile"] = YT_Cookies_File
-    DLPLogger = DLP_Logger(patterns=DLP_Logger_Patterns)
-    try:
-        # Attach our detection logger to a shallow copy of the options so we don't mutate caller's dict
-        opts = dict(ydl_opts) if ydl_opts is not None else {}
+        orig_had_cookie = True
 
-        opts["logger"] = DLPLogger
-        with YoutubeDL(opts) as ydl:
-            info = await asyncio.to_thread(ydl.extract_info, url_or_list, False)
-            if DLPLogger.detected and DLPLogger.last_match_result == "is_upcoming":
-                # Common stream is not live exception return it as an upcoming stream
-                return {"live_status": "is_upcoming"}
-            else:
-                return info
+    try:
+        LogManager.log_message(
+            f"Starting getinfo helper with options {ydl_opts}",
+            log_file_name,
+        )
+        info = await getinfo(ydl_opts, url_or_list, log_file_name)
+        LogManager.log_message("finished getinfo helper", log_file_name)
+        return info
     except Exception as e:
-        # If our logger observed the "not currently live" message during the failed attempt,
-        # return the synthetic info immediately rather than retrying.
-        with contextlib.suppress(Exception):
-            if DLPLogger.detected and DLPLogger.last_match_result == "is_upcoming":
-                # Common stream is not live exception return it as an upcoming stream
-                return {"live_status": "is_upcoming"}
+        LogManager.log_message(
+            f"Exception in getinfo helper {e}",
+            log_file_name,
+        )
         if DLPEvents.is_rate_limit_error(e) and orig_had_cookie:
             LogManager.log_message(
-                f"Rate limit detected during extract_info using cookiefile, retrying without cookiefile: {e}",
+                f"Rate limit detected during getinfo using cookiefile, retrying without cookiefile: {e}",
                 log_file_name,
             )
             retry_opts = dict(ydl_opts)
             retry_opts.pop("cookiefile", None)
-            retry_opts["logger"] = DLPLogger
             try:
-                with YoutubeDL(retry_opts) as ydl_retry:
-                    info = await asyncio.to_thread(
-                        ydl_retry.extract_info, url_or_list, False
-                    )
-                    return info
+                info = await getinfo(retry_opts, url_or_list, log_file_name)
+                return info
             except Exception as e2:
                 if DLPEvents.is_rate_limit_error(e2):
                     LogManager.log_message(
@@ -526,7 +569,215 @@ async def getinfo_with_retry(ydl_opts, url_or_list, log_file_name=None):
                     )
         else:
             LogManager.log_message(
-                f"getinfo failed for non-rate-limit reason: {e} {DLPLogger.last_match_result}",
+                f"getinfo failed for non-rate-limit reason: {e}",
+                log_file_name,
+            )
+    return None
+
+
+async def getentries(ydl_opts, videos_url=None, shorts_url=None, log_file_name=None):
+    """Fetch entries for provided section URLs (videos/shorts).
+
+    Returns a combined list of entries from the provided section URLs.
+    """
+    # We'll perform an initial flat extraction to cheaply enumerate entries
+    # (faster and avoids deep per-video network requests). Then we'll load
+    # the persistent playlist and only fetch full metadata for videos that
+    # are not present in that persistent list.
+    collected = []
+    # Attach a logger that forwards yt-dlp messages into our LogManager and
+    # still performs detection via DLP_Logger patterns.
+    # opts = dict(ydl_opts) if ydl_opts is not None else {}
+    # opts["logger"] = DLP_Logger(
+    #    patterns=DLP_Logger_Patterns, log_file_name=log_file_name
+    # )
+
+    # Use a flat extractor to list entries quickly
+    flat_opts = dict(ydl_opts)
+    flat_opts["extract_flat"] = True
+    with YoutubeDL(flat_opts) as flat_ydl:
+        for section_url in (videos_url, shorts_url):
+            if not section_url:
+                continue
+            try:
+                info = await asyncio.to_thread(
+                    flat_ydl.extract_info, section_url, False
+                )
+            except Exception as e:
+                # Treat missing shorts tab as a non-fatal warning and continue
+                try:
+                    msg = str(e) or ""
+                except Exception:
+                    msg = ""
+                if "does not have a shorts tab" in msg.lower():
+                    LogManager.log_message(
+                        f"Warning: shorts tab missing for {section_url}: {msg}",
+                        log_file_name,
+                    )
+                    continue
+                # Re-raise other exceptions so callers can decide retry behavior
+                raise
+            entries = info.get("entries") or []
+            collected.extend(entries)
+            LogManager.log_message(
+                f"Processed {len(entries)} flat entries from {section_url}",
+                log_file_name,
+            )
+
+    LogManager.log_message(
+        f"getentries completed flat collection, total flat entries collected: {len(collected)}",
+        log_file_name,
+    )
+
+    # Load persistent playlist to filter out already-known URLs/IDs
+    persistent_playlist_file = DVR_Config.get_posted_persistent_playlist()
+    persistent_urls = set()
+    persistent_ids = set()
+    if persistent_playlist_file and os.path.exists(persistent_playlist_file):
+        try:
+            with open(persistent_playlist_file, "r", encoding="utf-8") as pf:
+                data = json.load(pf) or []
+            for item in data:
+                try:
+                    if isinstance(item, dict):
+                        uid = item.get("UniqueID") or item.get("UniqueId")
+                        if uid is not None:
+                            persistent_ids.add(str(uid))
+                        url = item.get("URL") or item.get("webpage_url")
+                        if url:
+                            persistent_urls.add(str(url))
+                    else:
+                        persistent_urls.add(str(item))
+                except Exception:
+                    continue
+        except Exception as e:
+            LogManager.log_message(
+                f"Failed to read persistent playlist {persistent_playlist_file}: {e}",
+                log_file_name,
+            )
+
+    def _entry_url(e):
+        if not isinstance(e, dict):
+            return None
+        return (
+            e.get("webpage_url")
+            or e.get("url")
+            or e.get("original_url")
+            or e.get("id")
+            or None
+        )
+
+    # Determine which flat entries are new (not in persistent lists)
+    entries_to_fetch = []
+    for ent in collected:
+        try:
+            ent_url = _entry_url(ent)
+            ent_id = None
+            try:
+                ent_id = (
+                    str(ent.get("id"))
+                    if isinstance(ent, dict) and ent.get("id") is not None
+                    else None
+                )
+            except Exception:
+                ent_id = None
+
+            if ent_id and ent_id in persistent_ids:
+                continue
+            if ent_url and ent_url in persistent_urls:
+                continue
+
+            entries_to_fetch.append(ent)
+        except Exception:
+            entries_to_fetch.append(ent)
+
+    LogManager.log_message(
+        f"Fetching full metadata for {len(entries_to_fetch)} new entries (out of {len(collected)})",
+        log_file_name,
+    )
+
+    # Now fetch full entries only for those that are new
+    new_entries = []
+    with YoutubeDL(ydl_opts) as ydl:
+        for ent in entries_to_fetch:
+            try:
+                ent_url = _entry_url(ent)
+                # If we couldn't derive a URL/id from the flat entry, try to
+                # use the entry itself as a fallback (some extractors provide
+                # simple string entries).
+                target = ent_url if ent_url is not None else ent
+                full = await asyncio.to_thread(ydl.extract_info, target, False)
+                new_entries.append(full)
+            except Exception as e:
+                LogManager.log_message(
+                    f"Failed to fetch full metadata for entry {ent}: {e}",
+                    log_file_name,
+                )
+                # Fall back to returning the flat entry when full fetch fails
+                new_entries.append(ent)
+
+    LogManager.log_message(
+        f"getentries returning {len(new_entries)} new entries (filtered from {len(collected)})",
+        log_file_name,
+    )
+
+    return new_entries
+
+
+async def getentries_with_retry(
+    ydl_opts, videos_url=None, shorts_url=None, log_file_name=None
+):
+    """Fetch entries for provided section URLs (videos/shorts).
+
+    Tries once with the configured cookiefile, and if a rate-limit error
+    occurs and a cookie was used, retries once without the cookiefile.
+    Returns a list of entries on success, or None on failure.
+    """
+    YT_Cookies_File = DVR_Config.get_yt_cookies_file()
+    orig_had_cookie = False
+    if YT_Cookies_File and os.path.exists(YT_Cookies_File):
+        # copy into the provided opts dict if possible
+        ydl_opts["cookiefile"] = YT_Cookies_File
+        orig_had_cookie = True
+
+    try:
+        LogManager.log_message(
+            f"Starting getentries helper with options {ydl_opts}",
+            log_file_name,
+        )
+        entries = await getentries(ydl_opts, videos_url, shorts_url, log_file_name)
+        return entries
+    except Exception as e:
+        LogManager.log_message(
+            f"Exception in getentries helper {e}",
+            log_file_name,
+        )
+        if DLPEvents.is_rate_limit_error(e) and orig_had_cookie:
+            LogManager.log_message(
+                f"Rate limit detected during getentries using cookiefile, retrying without cookiefile: {e}",
+                log_file_name,
+            )
+            retry_opts = dict(ydl_opts)
+            retry_opts.pop("cookiefile", None)
+            try:
+                entries = await getentries(
+                    retry_opts, videos_url, shorts_url, log_file_name
+                )
+                return entries
+            except Exception as e2:
+                if DLPEvents.is_rate_limit_error(e2):
+                    LogManager.log_message(
+                        f"Rate limit persists after retry without cookiefile for getentries: {e2}",
+                        log_file_name,
+                    )
+                else:
+                    LogManager.log_message(
+                        f"getentries failed on retry without cookiefile for non-rate-limit reason: {e2}",
+                        log_file_name,
+                    )
+        else:
+            LogManager.log_message(
+                f"getentries failed for non-rate-limit reason: {e}",
                 log_file_name,
             )
     return None

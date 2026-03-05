@@ -27,6 +27,7 @@ class LogManager:
             DVR_Config.get_download_live_recovery_log_file()
         )
         cls.DOWNLOAD_POSTED_LOG_FILE = DVR_Config.get_download_posted_log_file()
+        cls.POSTED_PLAYLIST_LOG_FILE = DVR_Config.get_posted_playlist_log_file()
         cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE = (
             DVR_Config.get_download_posted_notices_log_file()
         )
@@ -43,6 +44,7 @@ class LogManager:
             DVR_Config.download_live_recovery_log_filter()
         )
         cls.DOWNLOAD_POSTED_LOG_FILTER = DVR_Config.download_posted_log_filter()
+        cls.POSTED_PLAYLIST_LOG_FILTER = DVR_Config.posted_playlist_log_filter()
         cls.DOWNLOAD_POSTED_NOTICES_LOG_FILTER = (
             DVR_Config.download_posted_notices_log_filter()
         )
@@ -58,6 +60,7 @@ class LogManager:
             cls.DOWNLOAD_LIVE_LOG_FILTER,
             cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER,
             cls.DOWNLOAD_POSTED_LOG_FILTER,
+            cls.POSTED_PLAYLIST_LOG_FILTER,
             cls.DOWNLOAD_POSTED_NOTICES_LOG_FILTER,
             cls.UPLOAD_LIVE_LOG_FILTER,
             cls.UPLOAD_IA_LOG_FILTER,
@@ -69,6 +72,7 @@ class LogManager:
             cls.DOWNLOAD_LIVE_LOG_FILE,
             cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
             cls.DOWNLOAD_POSTED_LOG_FILE,
+            cls.POSTED_PLAYLIST_LOG_FILE,
             cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE,
             cls.UPLOAD_LIVE_LOG_FILE,
             cls.UPLOAD_IA_LOG_FILE,
@@ -182,6 +186,12 @@ class LogManager:
         """Log a message to the Download YouTube Posted log."""
         cls._initialize_log_paths()
         cls.log_message(message, cls.DOWNLOAD_POSTED_LOG_FILE)
+
+    @classmethod
+    def log_posted_playlist(cls, message):
+        """Log a message to the Posted Playlist log."""
+        cls._initialize_log_paths()
+        cls.log_message(message, cls.POSTED_PLAYLIST_LOG_FILE)
 
     @classmethod
     def log_download_posted_notices(cls, message):

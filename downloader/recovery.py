@@ -70,85 +70,96 @@ class RecoveryDownloader:
     @classmethod
     async def download_recovery_livestream(cls, item):
         async with cls._recovery_lock:
-            LogManager.log_download_live_recovery(
-                f"Starting Recovery Download For {item['url']}"
-            )
-            currenturl = f'{item["url"]}'
+            try:
+                LogManager.log_download_live_recovery(
+                    f"Starting Recovery Download For {item['url']}"
+                )
+                currenturl = f'{item["url"]}'
 
-            # Progress hook callbacks for recovery downloads
-            cls.dlp_events = DLPEvents(
-                item["url"],
-                LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
-                cls.download_started if hasattr(cls, "download_started") else None,
-                cls.download_complete if hasattr(cls, "download_complete") else None,
-                (
-                    cls.download_processing
-                    if hasattr(cls, "download_processing")
-                    else None
-                ),
-            )
+                # Progress hook callbacks for recovery downloads
+                cls.dlp_events = DLPEvents(
+                    item["url"],
+                    LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
+                    cls.download_started if hasattr(cls, "download_started") else None,
+                    (
+                        cls.download_complete
+                        if hasattr(cls, "download_complete")
+                        else None
+                    ),
+                    (
+                        cls.download_processing
+                        if hasattr(cls, "download_processing")
+                        else None
+                    ),
+                )
 
-            # Build yt-dlp options similar to downloader/videos.py
-            download_ydl_opts = {
-                "paths": {"temp": cls.Live_DownloadRecovery_dir},
-                "outtmpl": item["filename"],
-                "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
-                "restrictfilenames": True,
-                "fragment_retries": int(cls.dlp_max_fragment_retry),
-                "retries": int(cls.dlp_max_dlp_download_retries),
-                "progress_hooks": [cls.dlp_events.on_progress],
-            }
-
-            if cls.dlp_keep_fragments == "true":
-                download_ydl_opts["keep_fragments"] = True
-
-            if cls.dlp_verbose == "true":
-                download_ydl_opts["verbose"] = True
-
-            # If no-progress mode is enabled, check live status first and skip download if it's still live/upcoming.
-            if cls.dlp_no_progress == "true":
-                for filt in DVR_Config.get_no_progress_dlp_filters():
-                    if filt not in LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER:
-                        LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER.append(filt)
-
-                mon_ydl_opts = {
-                    "quiet": True,
-                    "skip_download": True,
+                # Build yt-dlp options similar to downloader/videos.py
+                download_ydl_opts = {
+                    "paths": {"temp": cls.Live_DownloadRecovery_dir},
+                    "outtmpl": item["filename"],
+                    "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
+                    "restrictfilenames": True,
+                    "fragment_retries": int(cls.dlp_max_fragment_retry),
+                    "retries": int(cls.dlp_max_dlp_download_retries),
+                    "progress_hooks": [cls.dlp_events.on_progress],
                 }
 
-                info = await getinfo_with_retry(
-                    mon_ydl_opts, currenturl, LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE
-                )
+                if cls.dlp_keep_fragments == "true":
+                    download_ydl_opts["keep_fragments"] = True
 
-                if info.get("live_status") in ("is_live", "is_upcoming"):
-                    LogManager.log_download_posted(
-                        f"Video {currenturl} is a live or upcoming stream, skipping download."
+                if cls.dlp_verbose == "true":
+                    download_ydl_opts["verbose"] = True
+
+                # If no-progress mode is enabled, check live status first and skip download if it's still live/upcoming.
+                if cls.dlp_no_progress == "true":
+                    for filt in DVR_Config.get_no_progress_dlp_filters():
+                        if filt not in LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER:
+                            LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER.append(filt)
+
+                    mon_ydl_opts = {
+                        "quiet": True,
+                        "skip_download": True,
+                    }
+
+                    info = await getinfo_with_retry(
+                        mon_ydl_opts,
+                        currenturl,
+                        LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
                     )
-                    exit_code = None
-                    return
 
-            try:
-                await download_with_retry(
-                    download_ydl_opts,
-                    [currenturl],
-                    LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
-                )
+                    if info and info.get("live_status") in ("is_live", "is_upcoming"):
+                        LogManager.log_download_posted(
+                            f"Video {currenturl} is a live or upcoming stream, skipping download."
+                        )
+                        exit_code = None
+                        return
+
+                try:
+                    await download_with_retry(
+                        download_ydl_opts,
+                        [currenturl],
+                        LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
+                    )
+                except Exception as e:
+                    exit_code = 1
+                    LogManager.log_download_live_recovery(
+                        f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
+                    )
+                    LogManager.log_download_live_recovery(
+                        f"Recovery download for {item['url']} did not complete successfully: {e}"
+                    )
+                    item["download_complete"] = False
+                    item["recovery_attempts"] += 1
+                else:
+                    exit_code = 0
+                    LogManager.log_download_live_recovery(
+                        f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
+                    )
+                    LogManager.log_download_live_recovery(
+                        f"Recovery download for {item['url']} completed successfully."
+                    )
+                    item["download_complete"] = True
             except Exception as e:
-                exit_code = 1
                 LogManager.log_download_live_recovery(
-                    f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
+                    f"Unhandled exception in download_recovery_livestream for {item.get('url')}: {e}\n{traceback.format_exc()}"
                 )
-                LogManager.log_download_live_recovery(
-                    f"Recovery download for {item['url']} did not complete successfully: {e}"
-                )
-                item["download_complete"] = False
-                item["recovery_attempts"] += 1
-            else:
-                exit_code = 0
-                LogManager.log_download_live_recovery(
-                    f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
-                )
-                LogManager.log_download_live_recovery(
-                    f"Recovery download for {item['url']} completed successfully."
-                )
-                item["download_complete"] = True
