@@ -10,6 +10,7 @@ from utils.logging_utils import LogManager
 from config.config_settings import DVR_Config
 from config.config_accounts import Account_Config
 from utils.file_utils import FileManager
+from utils.template_manager import TemplateManager
 from yp_dl.yp_dl import YoutubePosts, get_SOCS_cookie
 
 
@@ -26,10 +27,53 @@ class CommunityDownloader:
     posts_url = f"{Account_Config.get_youtube_handle()}/posts"
     ythandle = Account_Config.get_youtube_handle_name()
     templates_dir = DVR_Config.get_templates_dir()
-    posts_template = os.path.join(templates_dir, "posts.html")
+    posts_template = os.path.join(templates_dir, "posts_page.html")
+    posts_youtube_placeholder_template = os.path.join(
+        templates_dir, "posts_youtube_placeholder.html"
+    )
+    posts_embed_script_template = os.path.join(templates_dir, "posts_embed_script.html")
+    posts_item_template = os.path.join(templates_dir, "posts_item.html")
+
+    # Class variables to cache loaded templates
+    _posts_youtube_placeholder_content = ""
+    _posts_embed_script_content = ""
+    _posts_item_content = ""
+
+    # Template Manager instance for loading and caching templates
+    _template_manager = None
+
+    @classmethod
+    def _get_template_manager(cls):
+        """Get or create the template manager instance."""
+        if cls._template_manager is None:
+            cls._template_manager = TemplateManager(
+                templates={
+                    "_posts_youtube_placeholder_content": cls.posts_youtube_placeholder_template,
+                    "_posts_embed_script_content": cls.posts_embed_script_template,
+                    "_posts_item_content": cls.posts_item_template,
+                },
+                log_func=LogManager.log_download_posted_notices,
+            )
+        return cls._template_manager
+
+    @classmethod
+    async def _load_templates(cls):
+        """Load HTML templates from files asynchronously."""
+        manager = cls._get_template_manager()
+        templates = await manager.load_templates()
+        
+        # Set class attributes from loaded templates
+        cls._posts_youtube_placeholder_content = templates.get(
+            "_posts_youtube_placeholder_content", ""
+        )
+        cls._posts_embed_script_content = templates.get(
+            "_posts_embed_script_content", ""
+        )
+        cls._posts_item_content = templates.get("_posts_item_content", "")
 
     @classmethod
     async def monitor_channel(cls):
+        await cls._load_templates()
         LogManager.log_download_posted_notices(
             f"Monitoring {cls.posts_url} for new Community Posts"
         )
@@ -46,6 +90,7 @@ class CommunityDownloader:
 
     @classmethod
     async def export_json_to_html(cls, json_path: str, output_html_path: str):
+        await cls._load_templates()
         try:
             # Load posts JSON
             try:
@@ -101,24 +146,9 @@ class CommunityDownloader:
                                 vid = video_url.split("youtu.be/")[1].split("?")[0]
                             thumb = f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
                             placeholder = (
-                                f'<div class="yt-placeholder" data-vid="{vid}" '
-                                f'style="position:relative;max-width:560px;margin-top:10px;">'
-                                f'<img src="{thumb}" alt="YouTube thumbnail" '
-                                f'style="width:100%;height:auto;display:block;" />'
-                                f'<div class="yt-play" '
-                                f'style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);'
-                                f"width:72px;height:72px;border-radius:50%;background:rgba(0,0,0,0.6);"
-                                f'display:flex;align-items:center;justify-content:center;">'
-                                f'<svg width="36" height="36" viewBox="0 0 24 24" fill="white">'
-                                f'<path d="M8 5v14l11-7z"/></svg></div>'
-                                f'<div class="yt-spinner" '
-                                f'style="display:none;width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);'
-                                f"border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;"
-                                f'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);"></div>'
-                                f'<div style="text-align:center;margin-top:6px;">'
-                                f'<a href="https://www.youtube.com/watch?v={vid}" target="_blank" '
-                                f'style="color:#90caf9;">Watch on YouTube</a></div>'
-                                f"</div>"
+                                cls._posts_youtube_placeholder_content.replace(
+                                    "{{VID}}", vid
+                                ).replace("{{THUMB}}", thumb)
                             )
                             media_html += placeholder
                         else:
@@ -127,42 +157,19 @@ class CommunityDownloader:
                         media_html += f'<div class="post-video" style="margin-top:10px;"><a href="{video_url}">Video</a></div>'
 
                 normalized_time = cls.parse_friendly_time(time_since)
-                post_html = f"""
-            <div class="post" id="{post_link}">
-                <div class="title"><a href="{post_link}" style="color:#90caf9;">{cls.ythandle} Community Post</a></div>
-                <div class="author">Posted: {normalized_time} | Downloaded: {time_of_download}</div>
-                <div class="content">{text}<br>{media_html}</div>
-                <div class="unique-id" style="display: none;">{unique_id}</div>
-            </div>
-            """
+                post_html = (
+                    cls._posts_item_content.replace("{{POST_LINK}}", post_link)
+                    .replace("{{YTHANDLE}}", cls.ythandle)
+                    .replace("{{NORMALIZED_TIME}}", normalized_time)
+                    .replace("{{TIME_OF_DOWNLOAD}}", time_of_download)
+                    .replace("{{TEXT}}", text)
+                    .replace("{{MEDIA_HTML}}", media_html)
+                    .replace("{{UNIQUE_ID}}", unique_id)
+                )
                 new_posts_html += post_html + "\n"
 
-            # small JS/CSS to handle lazy YouTube placeholders and spinner
-            embed_script = """
-<style>@keyframes spin{to{transform:rotate(360deg);}}</style>
-<script>
-document.addEventListener('click', function(e){
-  var p = e.target.closest && e.target.closest('.yt-placeholder');
-  if(!p) return;
-  if(p.dataset.loaded) return;
-  var vid = p.dataset.vid;
-  var spinner = p.querySelector('.yt-spinner');
-  var img = p.querySelector('img');
-  var play = p.querySelector('.yt-play');
-  if(spinner) spinner.style.display='block';
-  if(play) play.style.display='none';
-  var iframe = document.createElement('iframe');
-  iframe.width='560'; iframe.height='315';
-  iframe.src='https://www.youtube-nocookie.com/embed/'+vid+'?rel=0&autoplay=1';
-  iframe.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-  iframe.allowFullscreen=true; iframe.loading='lazy'; iframe.style.border='0';
-  iframe.addEventListener('load', function(){ if(spinner) spinner.style.display='none'; });
-  p.insertBefore(iframe, img);
-  if(img) img.style.display='none';
-  p.dataset.loaded=1;
-});
-</script>
-"""
+            # Add embed script for lazy YouTube placeholders
+            embed_script = cls._posts_embed_script_content
 
             # Append embed_script so placeholders will work
             new_posts_html += embed_script
@@ -204,12 +211,12 @@ document.addEventListener('click', function(e){
         if not os.path.exists(output_html_path):
             try:
 
-                if not os.path.exists(tpl):
+                if not os.path.exists(cls.posts_template):
                     LogManager.log_download_posted_notices(
-                        f"Community posts template missing: {tpl}. Aborting export to HTML."
+                        f"Community posts template missing: {cls.posts_template}. Aborting export to HTML."
                     )
                     return
-                with open(tpl, "r", encoding="utf-8") as tf:
+                with open(cls.posts_template, "r", encoding="utf-8") as tf:
                     content = tf.read().replace("{{PAGETITLE}}", pagetitle)
                 with open(output_html_path, "w", encoding="utf-8") as f:
                     f.write(content)
@@ -263,26 +270,9 @@ document.addEventListener('click', function(e){
                         else:
                             vid = video_url.split("youtu.be/")[1].split("?")[0]
                         thumb = f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
-                        placeholder = (
-                            f'<div class="yt-placeholder" data-vid="{vid}" '
-                            f'style="position:relative;max-width:560px;margin-top:10px;">'
-                            f'<img src="{thumb}" alt="YouTube thumbnail" '
-                            f'style="width:100%;height:auto;display:block;" />'
-                            f'<div class="yt-play" '
-                            f'style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);'
-                            f"width:72px;height:72px;border-radius:50%;background:rgba(0,0,0,0.6);"
-                            f'display:flex;align-items:center;justify-content:center;">'
-                            f'<svg width="36" height="36" viewBox="0 0 24 24" fill="white">'
-                            f'<path d="M8 5v14l11-7z"/></svg></div>'
-                            f'<div class="yt-spinner" '
-                            f'style="display:none;width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);'
-                            f"border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;"
-                            f'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);"></div>'
-                            f'<div style="text-align:center;margin-top:6px;">'
-                            f'<a href="https://www.youtube.com/watch?v={vid}" target="_blank" '
-                            f'style="color:#90caf9;">Watch on YouTube</a></div>'
-                            f"</div>"
-                        )
+                        placeholder = cls._posts_youtube_placeholder_content.replace(
+                            "{{VID}}", vid
+                        ).replace("{{THUMB}}", thumb)
                         media_html += placeholder
                     else:
                         media_html += f'<div class="post-video" style="margin-top:10px;"><a href="{video_url}">Video</a></div>'
@@ -290,14 +280,15 @@ document.addEventListener('click', function(e){
                     media_html += f'<div class="post-video" style="margin-top:10px;"><a href="{video_url}">Video</a></div>'
 
             normalized_time = cls.parse_friendly_time(time_since)
-            post_html = f"""
-            <div class="post" id="{post_link}">
-                <div class="title"><a href="{post_link}" style="color:#90caf9;">{cls.ythandle} Community Post</a></div>
-                <div class="author">Posted: {normalized_time} | Downloaded: {time_of_download}</div>
-                <div class="content">{text}<br>{media_html}</div>
-                <div class="unique-id" style="display: none;">{unique_id}</div>
-            </div>
-            """
+            post_html = (
+                cls._posts_item_content.replace("{{POST_LINK}}", post_link)
+                .replace("{{YTHANDLE}}", cls.ythandle)
+                .replace("{{NORMALIZED_TIME}}", normalized_time)
+                .replace("{{TIME_OF_DOWNLOAD}}", time_of_download)
+                .replace("{{TEXT}}", text)
+                .replace("{{MEDIA_HTML}}", media_html)
+                .replace("{{UNIQUE_ID}}", unique_id)
+            )
             new_posts_html += post_html
 
         # Insert new posts right after <body>

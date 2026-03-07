@@ -1,0 +1,23 @@
+<style>@keyframes spin{to{transform:rotate(360deg);}}</style>
+<script>
+document.addEventListener('click', function(e){
+    var p = e.target.closest && e.target.closest('.yt-placeholder');
+    if(!p) return;
+    if(p.dataset.loaded) return;
+    var vid = p.dataset.vid;
+    var spinner = p.querySelector('.yt-spinner');
+    var img = p.querySelector('img');
+    var play = p.querySelector('.yt-play');
+    if(spinner) spinner.style.display='block';
+    if(play) play.style.display='none';
+    var iframe = document.createElement('iframe');
+    iframe.width='560'; iframe.height='315';
+    iframe.src='https://www.youtube-nocookie.com/embed/'+vid+'?rel=0&autoplay=1';
+    iframe.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    iframe.allowFullscreen=true; iframe.loading='lazy'; iframe.style.border='0';
+    iframe.addEventListener('load', function(){ if(spinner) spinner.style.display='none'; });
+    p.insertBefore(iframe, img);
+    if(img) img.style.display='none';
+    p.dataset.loaded=1;
+});
+</script>

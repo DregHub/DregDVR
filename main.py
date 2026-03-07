@@ -45,127 +45,132 @@ def create_required_dirs():
     logging.info("Created required directories successfully.")
 
 
+async def handle_dependency_updates():
+    dependency_package_update = DVR_Tasks.get_dependency_package_update()
+
+    if dependency_package_update == "true":
+        if os.name == "nt":
+            # Windows
+            LogManager.log_core("Skipping Dependency Package Update as os = Windows")
+        else:
+            apk_dependencies = DVR_Config.get_required_apk_dependencies()
+            for dependency in apk_dependencies:
+                await DependencyManager.install_apk_dependency(dependency)
+
+            pip_dependencies = DVR_Config.get_required_py_dependencies()
+            for dependency in pip_dependencies:
+                await DependencyManager.install_pip_dependency(dependency)
+
+            await DependencyManager.update_ytdlp()
+
+            LogManager.log_core(
+                "All required dependencies installed/updated successfully."
+            )
+    else:
+        LogManager.log_core(
+            "Skipping Dependency Package Update as dependency_package_update = false in dvr_tasks.ini"
+        )
+
+
+async def handle_container_maintenance():
+    ContainerMaintenance = DVR_Tasks.get_container_maintenance_inf_loop()
+    if ContainerMaintenance.lower() == "true":
+        LogManager.log_core("Container Maintenance Mode is ON")
+        LogManager.log_core("Script Will Loop Forever...")
+        # Infinite loop incase we need to access the containers shell
+        while True:
+            await asyncio.sleep(600000)
+
+
 async def main():
     try:
         logging.info("Starting Dregg DVR")
         # Ensure required project/runtime/data directories exist
         create_required_dirs()
 
-        dependency_package_update = DVR_Tasks.get_dependency_package_update()
+        await handle_dependency_updates()
 
-        if dependency_package_update == "true":
-            if os.name == "nt":
-                # Windows
-                LogManager.log_core(
-                    "Skipping Dependency Package Update as os = Windows"
-                )
+        await handle_container_maintenance()
+
+        LogManager.log_core(
+            "Starting Dregg's DVR... Am i 4k wecording? Yes im 4k wecording!"
+        )
+        livestream_download = DVR_Tasks.get_livestream_download()
+        livestream_recovery_download = DVR_Tasks.get_livestream_recovery_download()
+        captions_download = DVR_Tasks.get_captions_download()
+        comments_republish = DVR_Tasks.get_comments_republish()
+        posted_videos_download = DVR_Tasks.get_posted_videos_download()
+        posted_notices_download = DVR_Tasks.get_posted_notices_download()
+        livestream_upload = DVR_Tasks.get_livestream_upload()
+        posted_videos_upload = DVR_Tasks.get_posted_videos_upload()
+
+        # Import all task modules
+        from downloader.livestreams import LivestreamDownloader
+        from downloader.recovery import RecoveryDownloader
+        from downloader.videos import VideoDownloader
+        from downloader.captions import CaptionsDownloader
+        from downloader.posts import CommunityDownloader
+        from uploader.livestreams import LiveStreamUploader
+        from uploader.videos import VideoUploader
+        from downloader.comments import LiveCommentsDownloader
+
+        def add_task_if_enabled(tasks, enabled, coro_func, disabled_message):
+            if enabled == "true":
+                tasks.append(coro_func())
             else:
-                apk_dependencies = DVR_Config.get_required_apk_dependencies()
-                for dependency in apk_dependencies:
-                    await DependencyManager.install_apk_dependency(dependency)
+                LogManager.log_core(disabled_message)
 
-                pip_dependencies = DVR_Config.get_required_py_dependencies()
-                for dependency in pip_dependencies:
-                    await DependencyManager.install_pip_dependency(dependency)
+        tasks = []
+        task_configs = [
+            (
+                livestream_download,
+                LivestreamDownloader.download_livestreams,
+                "Livestream Download is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                livestream_recovery_download,
+                RecoveryDownloader.monitor_recoveryqueue,
+                "Livestream Recovery Download is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                posted_videos_download,
+                VideoDownloader.download_videos,
+                "Posted Video Download is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                captions_download,
+                CaptionsDownloader.monitor_channel,
+                "Caption Download is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                posted_notices_download,
+                CommunityDownloader.monitor_channel,
+                "Posted Community Message Download is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                livestream_upload,
+                LiveStreamUploader.upload_live_videos,
+                "Livestream Upload is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                posted_videos_upload,
+                VideoUploader.upload_videos,
+                "Posted Video Upload is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                comments_republish,
+                LiveCommentsDownloader.republish_comments,
+                "Comments Republish is disabled in INI Tasks. Skipping...",
+            ),
+        ]
 
-                await DependencyManager.update_ytdlp()
+        for enabled, coro_func, msg in task_configs:
+            add_task_if_enabled(tasks, enabled, coro_func, msg)
 
-                LogManager.log_core(
-                    "All required dependencies installed/updated successfully."
-                )
+        if not tasks:
+            LogManager.log_core("All Tasks are disabled in INI Tasks. Exiting...")
         else:
-            LogManager.log_core(
-                "Skipping Dependency Package Update as dependency_package_update = false in dvr_tasks.ini"
-            )
-
-        ContainerMaintenance = DVR_Tasks.get_container_maintenance_inf_loop()
-        if ContainerMaintenance.lower() == "true":
-            LogManager.log_core("Container Maintenance Mode is ON")
-            LogManager.log_core("Script Will Loop Forever...")
-            # Infinite loop incase we need to access the containers shell
-            while True:
-                await asyncio.sleep(600000)
-
-        else:
-            LogManager.log_core(
-                "Starting Dregg's DVR... Am i 4k wecording? Yes im 4k wecording!"
-            )
-            livestream_download = DVR_Tasks.get_livestream_download()
-            livestream_recovery_download = DVR_Tasks.get_livestream_recovery_download()
-            captions_download = DVR_Tasks.get_captions_download()
-            posted_videos_download = DVR_Tasks.get_posted_videos_download()
-            posted_notices_download = DVR_Tasks.get_posted_notices_download()
-            livestream_upload = DVR_Tasks.get_livestream_upload()
-            posted_videos_upload = DVR_Tasks.get_posted_videos_upload()
-
-            tasks = []
-            if livestream_download == "true":
-                from downloader.livestreams import LivestreamDownloader
-
-                tasks.append(LivestreamDownloader.download_livestreams())
-            else:
-                LogManager.log_core(
-                    "Livestream Download is disabled in INI Tasks. Skipping..."
-                )
-
-            if livestream_recovery_download == "true":
-                from downloader.recovery import RecoveryDownloader
-
-                tasks.append(RecoveryDownloader.monitor_recoveryqueue())
-            else:
-                LogManager.log_core(
-                    "Livestream Recovery Download is disabled in INI Tasks. Skipping..."
-                )
-
-            if posted_videos_download == "true":
-                from downloader.videos import VideoDownloader
-
-                tasks.append(VideoDownloader.download_videos())
-            else:
-                LogManager.log_core(
-                    "Posted Video Download is disabled in INI Tasks. Skipping..."
-                )
-
-            if captions_download == "true":
-                from downloader.captions import CaptionsDownloader
-
-                tasks.append(CaptionsDownloader.monitor_channel())
-            else:
-                LogManager.log_core(
-                    "Caption Download is disabled in INI Tasks. Skipping..."
-                )
-
-            if posted_notices_download == "true":
-                from downloader.posts import CommunityDownloader
-
-                tasks.append(CommunityDownloader.monitor_channel())
-            else:
-                LogManager.log_core(
-                    "Posted Community Message Download is disabled in INI Tasks. Skipping..."
-                )
-
-            if livestream_upload == "true":
-                from uploader.livestreams import LiveStreamUploader
-
-                tasks.append(LiveStreamUploader.upload_live_videos())
-            else:
-                LogManager.log_core(
-                    "Livestream Upload is disabled in INI Tasks. Skipping..."
-                )
-
-            if posted_videos_upload == "true":
-                from uploader.videos import VideoUploader
-
-                tasks.append(VideoUploader.upload_videos())
-            else:
-                LogManager.log_core(
-                    "Posted Video Upload is disabled in INI Tasks. Skipping..."
-                )
-
-            if not tasks:
-                LogManager.log_core("All Tasks are disabled in INI Tasks. Exiting...")
-            else:
-                await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks)
 
     except Exception as e:
         LogManager.log_core(f"Exception in main:  {e}\n{traceback.format_exc()}")

@@ -429,11 +429,11 @@ DLP_Logger_Patterns = [
     {
         "message_source": "[youtube:tab]",
         "message": "not currently live",
-        "result": "is_upcoming",
+        "result": "not_live",
     },
     {
         "message_source": "[youtube]",
-        "message": " This live event will begin in a few moments",
+        "message": "This live event will begin in a few moments",
         "result": "is_upcoming",
     },
 ]
@@ -458,18 +458,34 @@ async def getinfo(ydl_opts, url_or_list, log_file_name=None):
     """Core info helper that invokes YoutubeDL.extract_info with a detection logger.
 
     This function will return a synthetic upcoming status when the
-    detection logger identifies the common "not live" message. It raises
-    exceptions from YoutubeDL for other failures so retry wrappers can
-    decide on retry behavior.
+    detection logger identifies the common "not live" message. It handles
+    specific errors gracefully without raising exceptions.
     """
     DLPLogger = DLP_Logger(patterns=DLP_Logger_Patterns)
     opts = dict(ydl_opts) if ydl_opts is not None else {}
     opts["logger"] = DLPLogger
+    info = None
     with YoutubeDL(opts) as ydl:
-        info = await asyncio.to_thread(ydl.extract_info, url_or_list, False)
-        if DLPLogger.detected and DLPLogger.last_match_result == "is_upcoming":
-            return {"live_status": "is_upcoming"}
-        return info
+        try:
+            info = await asyncio.to_thread(ydl.extract_info, url_or_list, False)
+        except Exception as e:
+            # Only log as exception if it's not a known pattern we're handling
+            if not DLPLogger.detected:
+                LogManager.log_message(
+                    f"Exception in getinfo helper {e}",
+                    log_file_name,
+                )
+
+        if DLPLogger.detected:
+            return {"live_status": DLPLogger.last_match_result}
+        elif info is None:
+            LogManager.log_message(
+                "Failed to determine current live_status for this video returning none ",
+                log_file_name,
+            )
+            return None
+        else:
+            return info
 
 
 async def download_with_retry(ydl_opts, url_or_list, log_file_name=None):
@@ -534,12 +550,9 @@ async def getinfo_with_retry(ydl_opts, url_or_list, log_file_name=None):
         orig_had_cookie = True
 
     try:
-        LogManager.log_message(
-            f"Starting getinfo helper with options {ydl_opts}",
-            log_file_name,
-        )
+        # LogManager.log_message(f"Starting getinfo helper with options {ydl_opts}",log_file_name,)
         info = await getinfo(ydl_opts, url_or_list, log_file_name)
-        LogManager.log_message("finished getinfo helper", log_file_name)
+        # LogManager.log_message("finished getinfo helper", log_file_name)
         return info
     except Exception as e:
         LogManager.log_message(
@@ -612,6 +625,12 @@ async def getentries(ydl_opts, videos_url=None, shorts_url=None, log_file_name=N
                 if "does not have a shorts tab" in msg.lower():
                     LogManager.log_message(
                         f"Warning: shorts tab missing for {section_url}: {msg}",
+                        log_file_name,
+                    )
+                    continue
+                elif "does not have a videos tab" in msg.lower():
+                    LogManager.log_message(
+                        f"Warning: videos tab missing for {section_url}: {msg}",
                         log_file_name,
                     )
                     continue

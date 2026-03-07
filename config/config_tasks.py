@@ -14,7 +14,9 @@ class DVR_Tasks(BaseConfig):
             cls._init_parser()
             return cls.get_value("Tasks", "container_maintenance_inf_loop").lower()
         except Exception as e:
-            print(f"Error in get_container_maintenance_inf_loop: {e}\n{traceback.format_exc()}")
+            print(
+                f"Error in get_container_maintenance_inf_loop: {e}\n{traceback.format_exc()}"
+            )
             raise
 
     @classmethod
@@ -32,7 +34,9 @@ class DVR_Tasks(BaseConfig):
             cls._init_parser()
             return cls.get_value("Tasks", "livestream_recovery_download").lower()
         except Exception as e:
-            print(f"Error in get_livestream_recovery_download: {e}\n{traceback.format_exc()}")
+            print(
+                f"Error in get_livestream_recovery_download: {e}\n{traceback.format_exc()}"
+            )
             raise
 
     @classmethod
@@ -42,6 +46,15 @@ class DVR_Tasks(BaseConfig):
             return cls.get_value("Tasks", "comments_download").lower()
         except Exception as e:
             print(f"Error in get_comments_download: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_comments_republish(cls):
+        try:
+            cls._init_parser()
+            return cls.get_value("Tasks", "comments_republish").lower()
+        except Exception as e:
+            print(f"Error in get_comments_republish: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -68,7 +81,9 @@ class DVR_Tasks(BaseConfig):
             cls._init_parser()
             return cls.get_value("Tasks", "posted_notices_download").lower()
         except Exception as e:
-            print(f"Error in get_posted_notices_download: {e}\n{traceback.format_exc()}")
+            print(
+                f"Error in get_posted_notices_download: {e}\n{traceback.format_exc()}"
+            )
             raise
 
     @classmethod
@@ -95,5 +110,7 @@ class DVR_Tasks(BaseConfig):
             cls._init_parser()
             return cls.get_value("Tasks", "dependency_package_update").lower()
         except Exception as e:
-            print(f"Error in get_dependency_package_update: {e}\n{traceback.format_exc()}")
+            print(
+                f"Error in get_dependency_package_update: {e}\n{traceback.format_exc()}"
+            )
             raise

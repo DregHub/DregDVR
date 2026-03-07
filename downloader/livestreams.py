@@ -31,8 +31,10 @@ class LivestreamDownloader:
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
     comment_download = DVR_Tasks.get_comments_download()
 
+    subtitle_name_template = None
+    subtitle_name_prefix = None
+    current_name_template = None
     current_videourl = None
-    current_videofile = None
 
     # Recovery queue: list of dicts with url, index, download_complete, and download_attempts
     download_queue = []
@@ -46,7 +48,9 @@ class LivestreamDownloader:
                 )
                 scheduled = AsyncScheduler.schedule_nonblocking(
                     LiveCommentsDownloader.download_comments(
-                        cls.current_videourl, cls.current_videofile
+                        cls.current_videourl,
+                        cls.subtitle_name_template,
+                        cls.subtitle_name_prefix,
                     ),
                     getattr(cls, "_main_loop", None),
                 )
@@ -69,7 +73,7 @@ class LivestreamDownloader:
             f"Detected end of livestream {cls.current_videourl}, Adding this to the download recovery queue while we continue proccessing the file for publishing."
         )
         RecoveryDownloader.add_to_recoveryqueue(
-            cls.current_videourl, cls.current_videofile
+            cls.current_videourl, cls.current_name_template
         )
 
     @classmethod
@@ -110,7 +114,7 @@ class LivestreamDownloader:
                         return
                     else:
                         LogManager.log_download_live(
-                            f"Discovered Stream is not live (live_status={LiveStatus}), skipping download."
+                            f"Channel is not live (live_status={LiveStatus}), Skipping download."
                         )
                 except Exception as e:
                     # let the helper have already logged; escalate so caller can handle if desired
@@ -132,13 +136,15 @@ class LivestreamDownloader:
             # Increment attempt count for bookkeeping
             item["download_attempts"] = item.get("download_attempts", 0) + 1
             try:
-                current_nametemplate = f"{CurrentIndex} {cls.DownloadFilePrefix} {cls.DownloadTimeStampFormat}.%(ext)s"
+                cls.current_name_template = f"{CurrentIndex} {cls.DownloadFilePrefix} {cls.DownloadTimeStampFormat}.%(ext)s"
+                cls.subtitle_name_template = f"{CurrentIndex} {cls.DownloadFilePrefix} {cls.DownloadTimeStampFormat}"
+                cls.subtitle_name_prefix = f"{CurrentIndex} {cls.DownloadFilePrefix}"
                 dlp_download_opts = {
                     "paths": {
                         "temp": cls.Live_DownloadQueue_Dir,
                         "home": cls.Live_UploadQueue_Dir,
                     },
-                    "outtmpl": current_nametemplate,
+                    "outtmpl": cls.current_name_template,
                     "live_from_start": True,
                     "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
                     "ignore_no_formats_error": True,  # ← prevents livestream errors from crashing
@@ -162,30 +168,9 @@ class LivestreamDownloader:
                 )
 
                 if info.get("live_status") in ("is_live"):
-                    # Derive a safe publish filename from the info title (fallback to index+prefix)
-                    raw_title = (
-                        info.get("title") or f"{CurrentIndex} {cls.DownloadFilePrefix}"
-                    )
-                    # Truncate to configured max chars if set and ensure it's a string
-                    try:
-                        max_chars = (
-                            int(cls.dlp_max_title_chars)
-                            if cls.dlp_max_title_chars
-                            else None
-                        )
-                    except Exception:
-                        max_chars = None
-                    if max_chars and isinstance(raw_title, str):
-                        safe_title = raw_title[:max_chars].strip()
-                    else:
-                        safe_title = raw_title.strip()
-                    cls.current_videofile = safe_title
                     cls.current_videourl = info.get("webpage_url")
                     LogManager.log_download_live(
                         f"Resolved video url to: {cls.current_videourl}"
-                    )
-                    LogManager.log_download_live(
-                        f"Publish video file name will be: {cls.current_videofile}"
                     )
 
                     # Now attach the progress hooks and download the actual livestream using a new YoutubeDL instance

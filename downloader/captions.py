@@ -39,6 +39,8 @@ class CaptionsDownloader:
     video_playlist = f"{Account_Config.get_caption_handle()}/videos"
     shorts_playlist = f"{Account_Config.get_caption_handle()}/shorts"
 
+    YT_Cookies_File = DVR_Config.get_yt_cookies_file()  # Added missing class variable
+
     @classmethod
     async def monitor_channel(cls):
         try:
@@ -153,18 +155,17 @@ class CaptionsDownloader:
         # await asyncio.sleep(60)
         while True:
             async with cls._download_execution_lock:
-                try:
-                    if cls._monitor_execution_lock.locked():
-                        await asyncio.sleep(300)
-                        continue
+                if cls._monitor_execution_lock.locked():
+                    await asyncio.sleep(300)
+                    continue
 
-                    if not os.path.exists(cls.caption_index_file):
-                        # If the caption index file doesn't exist yet, wait and retry
-                        await asyncio.sleep(300)
-                        continue
+                if not os.path.exists(cls.caption_index_file):
+                    # If the caption index file doesn't exist yet, wait and retry
+                    await asyncio.sleep(300)
+                    continue
 
-                    LogManager.log_download_captions("Starting caption download cycle...")
-                    index_data = await JSONUtils.read_json(cls.caption_index_file)
+                LogManager.log_download_captions("Starting caption download cycle...")
+                index_data = await JSONUtils.read_json(cls.caption_index_file)
 
                 # Build list of items to process
                 items = list(index_data.items())

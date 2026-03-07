@@ -31,8 +31,9 @@
         color: #aaaaaa;
         margin-bottom: 20px;
         text-shadow: 0 0 3px #555;
+        text-align: center;
     }
-    .post {
+    .comment {
         border: 1px solid #333;
         border-radius: 8px;
         padding: 15px;
@@ -42,21 +43,30 @@
         margin-bottom: 20px;
         background-color: #1e1e1e;
     }
-    .title {
-        font-size: 2.4em;
-        color: #789abc;
-        text-shadow: 0 0 2px #444;
-    }
-    .author {
+    .comment .author {
         font-size: 1.3em;
+        color: #90caf9;
+        text-shadow: 0 0 2px #444;
+        margin-bottom: 5px;
+    }
+    .comment .time {
+        font-size: 0.9em;
         color: #888888;
         text-shadow: 0 0 2px #333;
+        margin-bottom: 10px;
     }
-    .content {
+    .comment .content {
         margin-top: 10px;
-        font-size: 1.5em;
+        font-size: 1.1em;
         color: #999999;
         text-shadow: 0 0 2px #444;
+    }
+    .comment .media {
+        margin-top: 10px;
+    }
+    .comment .media.images img {
+        max-width: 80%;
+        margin-top: 10px;
     }
     .badge {
         background: #333;
@@ -69,7 +79,7 @@
     </style>
 </head>
 <body>
-<div><span class="title">{{TITLE}}</span></div>
-</br>
+<h1>{{TITLE}}</h1>
+{{COMMENTS}}
 </body>
 </html>
