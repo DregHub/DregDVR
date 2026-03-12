@@ -1,7 +1,5 @@
 import asyncio
-import os
 import traceback
-import yt_dlp
 from utils.async_scheduler import AsyncScheduler
 from utils.index_utils import IndexManager
 from utils.logging_utils import LogManager
@@ -9,9 +7,8 @@ from downloader.recovery import RecoveryDownloader
 from config.config_settings import DVR_Config
 from config.config_accounts import Account_Config
 from config.config_tasks import DVR_Tasks
-from utils.dlp_utils import DLPEvents
-from utils.dlp_utils import download_with_retry, getinfo_with_retry
-from downloader.comments import LiveCommentsDownloader
+from dlp.events import DLPEvents
+from dlp.helpers import DLPHelpers
 
 
 class LivestreamDownloader:
@@ -23,7 +20,6 @@ class LivestreamDownloader:
     Live_CompletedUploads_Dir = DVR_Config.get_live_completeduploads_dir()
     DownloadFilePrefix = Account_Config.get_live_downloadprefix()
     DownloadTimeStampFormat = DVR_Config.get_download_timestamp_format()
-    dlp_verbose = DVR_Config.get_verbose_dlp_mode()
     dlp_keep_fragments = DVR_Config.get_keep_fragments_dlp_downloads()
     dlp_no_progress = DVR_Config.no_progress_dlp_downloads()
     dlp_max_fragment_retries = DVR_Config.get_max_dlp_fragment_retries()
@@ -41,13 +37,13 @@ class LivestreamDownloader:
 
     @classmethod
     def download_started(cls):
-        if cls.comment_download == "true":
+        if cls.comment_download:
             try:
                 LogManager.log_download_live(
                     f"Scheduling Live Comments Downloader for livestream {cls.current_videourl}"
                 )
                 scheduled = AsyncScheduler.schedule_nonblocking(
-                    LiveCommentsDownloader.download_comments(
+                    cls.download_comments(
                         cls.current_videourl,
                         cls.subtitle_name_template,
                         cls.subtitle_name_prefix,
@@ -68,17 +64,34 @@ class LivestreamDownloader:
             )
 
     @classmethod
+    def add_to_recovery_downloader(cls):
+        # Check if the livestream is already in the recovery queue
+        if all(
+            item["url"] != cls.current_videourl
+            for item in RecoveryDownloader.recoveryqueue
+        ):
+            LogManager.log_download_live(
+                f"Detected end of livestream {cls.current_videourl}, Adding this to the download recovery queue."
+            )
+            RecoveryDownloader.add_to_recoveryqueue(
+                cls.current_videourl, cls.current_name_template
+            )
+        else:
+            LogManager.log_download_live(
+                f"livestream {cls.current_videourl} is already in the recovery queue skipping..."
+            )
+
+    @classmethod
     def download_processing(cls):
         LogManager.log_download_live(
             f"Detected end of livestream {cls.current_videourl}, Adding this to the download recovery queue while we continue proccessing the file for publishing."
         )
-        RecoveryDownloader.add_to_recoveryqueue(
-            cls.current_videourl, cls.current_name_template
-        )
+        cls.add_to_recovery_downloader()
 
     @classmethod
     def download_complete(cls):
         LogManager.log_download_live(f"{cls.youtube_source} Has finished proccessing")
+        cls.add_to_recovery_downloader()
 
     @classmethod
     async def check_livestream(cls):
@@ -93,7 +106,7 @@ class LivestreamDownloader:
                 }
 
                 try:
-                    info = await getinfo_with_retry(
+                    info = await DLPHelpers.getinfo_with_retry(
                         mon_ydl_opts,
                         cls.youtube_source,
                         LogManager.DOWNLOAD_LIVE_LOG_FILE,
@@ -156,12 +169,9 @@ class LivestreamDownloader:
                     "noprogress": True,
                 }
 
-                if cls.dlp_verbose == "true":
-                    dlp_download_opts["verbose"] = True
-
                 # Convert the /@channel/live into an actual video url and get the publish file name
                 # Use helper to extract info with retry behavior
-                info = await getinfo_with_retry(
+                info = await DLPHelpers.getinfo_with_retry(
                     dlp_download_opts,
                     cls.youtube_source,
                     LogManager.DOWNLOAD_LIVE_LOG_FILE,
@@ -182,7 +192,7 @@ class LivestreamDownloader:
                         cls.download_processing,
                     )
                     dlp_download_opts["progress_hooks"] = [cls.dlp_events.on_progress]
-                    await download_with_retry(
+                    await DLPHelpers.download_with_retry(
                         dlp_download_opts,
                         cls.current_videourl,
                         LogManager.DOWNLOAD_LIVE_LOG_FILE,
@@ -201,9 +211,17 @@ class LivestreamDownloader:
                     )
 
             except Exception as e:
-                LogManager.log_download_live(
-                    f"Exception while downloading livestream {item.get('url')}: {e}\n{traceback.format_exc()}"
-                )
+                error_str = str(e)
+                # Detect "No video formats found!" error and flag for continuous retry
+                if "No video formats found!" in error_str:
+                    item["is_format_error"] = True
+                    LogManager.log_download_live(
+                        f"Detected 'No video formats found!' for {item.get('url')}: {e}\n{traceback.format_exc()}\nThis item will be retried continuously."
+                    )
+                else:
+                    LogManager.log_download_live(
+                        f"Exception while downloading livestream {item.get('url')}: {e}\n{traceback.format_exc()}"
+                    )
                 # Do not re-raise; monitor loop will retry based on download_attempts.
                 return
 
@@ -222,17 +240,28 @@ class LivestreamDownloader:
     async def monitor_downloadqueue(cls):
         while True:
             for item in cls.download_queue:
-                if not item["download_complete"] and item["download_attempts"] <= 10:
-                    try:
-                        LogManager.log_download_live(
-                            f"Detected a new live stream in the download queue, starting download task. {item['url']}"
-                        )
-                        await cls.download_livestream(item)
-                    except Exception as e:
-                        LogManager.log_download_live(
-                            f"Error downloading {item['url']}: {e} (attempt {item['download_attempts']})"
-                        )
-                        traceback.print_exc()
+                # Check if download is still pending
+                if not item["download_complete"]:
+                    # For "No video formats found!" errors, retry indefinitely with longer delays
+                    # For other errors, limit to 10 attempts
+                    is_format_error = item.get("is_format_error", False)
+                    attempt_limit = float("inf") if is_format_error else 10
+
+                    if item["download_attempts"] <= attempt_limit:
+                        try:
+                            LogManager.log_download_live(
+                                f"Detected a new live stream in the download queue, starting download task. {item['url']} (attempt {item['download_attempts'] + 1})"
+                            )
+                            await cls.download_livestream(item)
+                        except Exception as e:
+                            LogManager.log_download_live(
+                                f"Error downloading {item['url']}: {e} (attempt {item['download_attempts']})"
+                            )
+                            traceback.print_exc()
+
+                        # Add longer delay for format errors to allow video to become available
+                        if item.get("is_format_error", False):
+                            await asyncio.sleep(300)  # 5 minute delay for format errors
             await asyncio.sleep(30)
 
     @classmethod

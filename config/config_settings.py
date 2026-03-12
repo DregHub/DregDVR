@@ -350,7 +350,7 @@ class DVR_Config(BaseConfig):
     def get_download_live_log_file(cls):
         try:
             cls._init_parser()
-            return os.path.join(cls.get_log_dir(), "Download_YouTube_LiveStreams.log")
+            return os.path.join(cls.get_log_dir(), "Download_YouTube_Live.log")
         except Exception as e:
             print(f"Error in get_download_live_log_file: {e}\n{traceback.format_exc()}")
             raise
@@ -359,7 +359,7 @@ class DVR_Config(BaseConfig):
     def get_download_live_recovery_log_file(cls):
         try:
             cls._init_parser()
-            return os.path.join(cls.get_log_dir(), "Download_YouTube_Recovery.log")
+            return os.path.join(cls.get_log_dir(), "Download_YouTube_Live_Recovery.log")
         except Exception as e:
             print(
                 f"Error in get_download_live_recovery_log_file: {e}\n{traceback.format_exc()}"
@@ -561,7 +561,7 @@ class DVR_Config(BaseConfig):
     @classmethod
     def get_log_archiving(cls):
         try:
-            return cls.get_value("Logging", "log_archiving").lower()
+            return cls.get_value_as_bool("Logging", "log_archiving")
         except Exception as e:
             print(f"Error in get_log_archiving: {e}\n{traceback.format_exc()}")
             raise
@@ -611,7 +611,7 @@ class DVR_Config(BaseConfig):
     @classmethod
     def get_verbose_dlp_mode(cls):
         try:
-            return cls.get_value("YT_DownloadSettings", "dlp_verbose_downloads")
+            return cls.get_value_as_bool("YT_DownloadSettings", "dlp_verbose_downloads")
         except Exception as e:
             print(f"Error in get_verbose_dlp_mode: {e}\n{traceback.format_exc()}")
             raise
@@ -619,7 +619,9 @@ class DVR_Config(BaseConfig):
     @classmethod
     def no_progress_dlp_downloads(cls):
         try:
-            return cls.get_value("YT_DownloadSettings", "dlp_no_progress_downloads")
+            return cls.get_value_as_bool(
+                "YT_DownloadSettings", "dlp_no_progress_downloads"
+            )
         except Exception as e:
             print(f"Error in no_progress_dlp_downloads: {e}\n{traceback.format_exc()}")
             raise
@@ -627,23 +629,12 @@ class DVR_Config(BaseConfig):
     @classmethod
     def get_keep_fragments_dlp_downloads(cls):
         try:
-            return cls.get_value("YT_DownloadSettings", "dlp_keep_fragments_downloads")
+            return cls.get_value_as_bool(
+                "YT_DownloadSettings", "dlp_keep_fragments_downloads"
+            )
         except Exception as e:
             print(
                 f"Error in get_keep_fragments_dlp_downloads: {e}\n{traceback.format_exc()}"
-            )
-            raise
-
-    @classmethod
-    def get_no_progress_dlp_filters(cls):
-        try:
-            file_extensions = json.loads(
-                cls.get_value("YT_DownloadSettings", "dlp_no_progress_filters")
-            )
-            return tuple(file_extensions)
-        except Exception as e:
-            print(
-                f"Error in get_no_progress_dlp_filters: {e}\n{traceback.format_exc()}"
             )
             raise
 
@@ -711,9 +702,9 @@ class DVR_Config(BaseConfig):
     @classmethod
     def get_dlp_subtitle_use_srtfix(cls):
         try:
-            return cls.get_value(
+            return cls.get_value_as_bool(
                 "YT_DownloadSettings", "dlp_subtitle_use_srtfix"
-            ).lower()
+            )
         except Exception as e:
             print(
                 f"Error in get_dlp_subtitle_use_srtfix: {e}\n{traceback.format_exc()}"

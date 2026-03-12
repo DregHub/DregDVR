@@ -10,13 +10,10 @@ from utils.file_utils import FileManager
 from config.config_settings import DVR_Config
 from config.config_accounts import Account_Config
 from yt_dlp import YoutubeDL
-from yt_dlp.utils import ExtractorError
-from utils.dlp_utils import DLPEvents
+from dlp.helpers import DLPHelpers
+from dlp.events import DLPEvents
+from utils.async_scheduler import AsyncScheduler
 from yt_dlp_plugins.postprocessor import srt_fix as srt_fix_module
-
-
-class RateLimitError(Exception):
-    """Raised when yt-dlp indicates the account is rate-limited by YouTube."""
 
 
 class CaptionsDownloader:
@@ -74,15 +71,19 @@ class CaptionsDownloader:
                 cls.download_processing,
             )
             LogManager.log_download_captions(f"Monitoring channel {channel_url}")
-            # tasks = [cls.manage_caption_index_file()]
+
             tasks = [cls.download_captions()]
-            # tasks.append(cls.download_captions())
 
         except Exception as e:
             LogManager.log_download_captions(
-                f"Failed to schedule caption tasks:{e} \n{traceback.format_exc()}"
+                f"Failed to schedule caption tasks: {e}\n{traceback.format_exc()}"
             )
-        await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        except Exception as e:
+            LogManager.log_download_captions(
+                f"Unhandled exception in monitor_channel: {e}\n{traceback.format_exc()}"
+            )
 
     @classmethod
     async def fix_srt_async(cls, input_path, output_path=None):
@@ -111,7 +112,7 @@ class CaptionsDownloader:
                         await asyncio.sleep(300)
                     else:
                         LogManager.log_download_captions(
-                            f"Started Update Captions Index Proccess for {cls.caption_index_file}"
+                            f"Started Update Captions Index Process for {cls.caption_index_file}"
                         )
                         await cls.get_flat_playlist_async(
                             cls.video_playlist, cls.video_json
@@ -120,7 +121,6 @@ class CaptionsDownloader:
                             cls.shorts_playlist, cls.shorts_json
                         )
 
-                        # Update caption index with new entries from shorts and videos playlists
                         video_contents = await JSONUtils.read_json(cls.video_json)
                         await cls.populate_captions_index(
                             video_contents, cls.caption_index_file
@@ -143,148 +143,146 @@ class CaptionsDownloader:
                         f"Unhandled exception in manage_caption_index_file: {e}\n{traceback.format_exc()}"
                     )
 
-            # --- Waiting section ---
             LogManager.log_download_captions(
-                "Caption Index Proccess completed. Sleeping for 1 hour."
+                "Caption Index Process completed. Sleeping for 1 hour."
             )
-            await asyncio.sleep(3600)
+            try:
+                await asyncio.sleep(3600)
+            except Exception as e:
+                LogManager.log_download_captions(
+                    f"Sleep interrupted in manage_caption_index_file: {e}\n{traceback.format_exc()}"
+                )
 
     @classmethod
     async def download_captions(cls):
-        # Wait for 1 min on device startup to allow the index file to populate first
-        # await asyncio.sleep(60)
         while True:
             async with cls._download_execution_lock:
-                if cls._monitor_execution_lock.locked():
-                    await asyncio.sleep(300)
-                    continue
+                try:
+                    if cls._monitor_execution_lock.locked():
+                        await asyncio.sleep(300)
+                        continue
 
-                if not os.path.exists(cls.caption_index_file):
-                    # If the caption index file doesn't exist yet, wait and retry
-                    await asyncio.sleep(300)
-                    continue
+                    if not os.path.exists(cls.caption_index_file):
+                        await asyncio.sleep(300)
+                        continue
 
-                LogManager.log_download_captions("Starting caption download cycle...")
-                index_data = await JSONUtils.read_json(cls.caption_index_file)
-
-                # Build list of items to process
-                items = list(index_data.items())
-                if not items:
                     LogManager.log_download_captions(
-                        "No caption entries found in index."
+                        "Starting caption download cycle..."
                     )
-                else:
-                    workers = []
-                    rate_limit_event = asyncio.Event()
+                    index_data = await JSONUtils.read_json(cls.caption_index_file)
 
-                    # If sequential mode is enabled, process items one-by-one asynchronously.
-                    if cls.use_sequential_downloads:
+                    items = list(index_data.items())
+                    if not items:
                         LogManager.log_download_captions(
-                            "Sequential download mode enabled - processing items one at a time."
+                            "No caption entries found in index."
                         )
-                        rate_limited = False
-                        for video_id, entry in items:
-                            try:
-                                await cls.process_video_entry(
-                                    video_id,
-                                    entry,
-                                    semaphore=None,
-                                    index_data=index_data,
-                                )
-                            except RateLimitError:
-                                LogManager.log_download_captions(
-                                    "Detected YouTube rate limit - aborting current cycle and sleeping for 2 hours."
-                                )
-                                rate_limited = True
-                                break
-
-                        # Save any updates to the index file after processing
-                        await JSONUtils.save_json(index_data, cls.caption_index_file)
-
-                        if rate_limited:
-                            await asyncio.sleep(2 * 3600)
-                            # continue outer loop after sleeping
-                            continue
                     else:
-                        # Use a queue + worker tasks limited by maximum_threads to control concurrency
-                        queue = asyncio.Queue()
-                        for it in items:
-                            await queue.put(it)
+                        workers = []
+                        rate_limit_event = asyncio.Event()
 
-                        num_workers = min(max(1, cls.maximum_threads), len(items))
-
-                        # add sentinel values to stop workers
-                        for _ in range(num_workers):
-                            await queue.put(None)
-
-                        async def worker():
-                            while True:
-                                item = await queue.get()
+                        if cls.use_sequential_downloads:
+                            LogManager.log_download_captions(
+                                "Sequential download mode enabled - processing items one at a time."
+                            )
+                            for video_id, entry in items:
                                 try:
-                                    if item is None:
-                                        break
-                                    video_id, entry = item
+                                    await cls.process_video_entry(
+                                        video_id,
+                                        entry,
+                                        semaphore=None,
+                                        index_data=index_data,
+                                    )
+                                except Exception as e:
+                                    LogManager.log_download_captions(
+                                        f"Error processing video entry {video_id}: {e}\n{traceback.format_exc()}"
+                                    )
+
+                            await JSONUtils.save_json(
+                                index_data, cls.caption_index_file
+                            )
+
+                        else:
+                            queue = asyncio.Queue()
+                            for it in items:
+                                await queue.put(it)
+
+                            num_workers = min(max(1, cls.maximum_threads), len(items))
+
+                            for _ in range(num_workers):
+                                await queue.put(None)
+
+                            async def worker():
+                                while True:
+                                    item = await queue.get()
                                     try:
+                                        if item is None:
+                                            break
+                                        video_id, entry = item
                                         await cls.process_video_entry(
                                             video_id,
                                             entry,
                                             semaphore=None,
                                             index_data=index_data,
                                         )
-                                    except RateLimitError:
-                                        # signal the rate limit and stop processing
-                                        rate_limit_event.set()
-                                        break
-                                finally:
-                                    queue.task_done()
+                                    except Exception as e:
+                                        LogManager.log_download_captions(
+                                            f"Error in worker processing item {item}: {e}\n{traceback.format_exc()}"
+                                        )
+                                    finally:
+                                        queue.task_done()
 
-                        workers = [
-                            asyncio.create_task(worker()) for _ in range(num_workers)
-                        ]
+                            workers = [
+                                asyncio.create_task(worker())
+                                for _ in range(num_workers)
+                            ]
 
-                        # wait for either queue.join() or rate limit event
-                        join_task = asyncio.create_task(queue.join())
-                        waiter = asyncio.create_task(rate_limit_event.wait())
-                        done, pending = await asyncio.wait(
-                            {join_task, waiter}, return_when=asyncio.FIRST_COMPLETED
-                        )
-
-                        if rate_limit_event.is_set():
-                            # Drain remaining items so queue.join() won't hang
-                            with contextlib.suppress(asyncio.QueueEmpty):
-                                while True:
-                                    item = queue.get_nowait()
-                                    queue.task_done()
-                        # cancel any pending tasks
-                        for t in pending:
-                            t.cancel()
-
-                        for w in workers:
-                            w.cancel()
-                        await asyncio.gather(*workers, return_exceptions=True)
-
-                        # Save any updates to the index file after processing
-                        await JSONUtils.save_json(index_data, cls.caption_index_file)
-
-                        if rate_limit_event.is_set():
-                            LogManager.log_download_captions(
-                                "Rate limit detected during parallel processing - sleeping for 2 hours."
+                            join_task = asyncio.create_task(queue.join())
+                            waiter = asyncio.create_task(rate_limit_event.wait())
+                            done, pending = await asyncio.wait(
+                                {join_task, waiter}, return_when=asyncio.FIRST_COMPLETED
                             )
-                            await asyncio.sleep(2 * 3600)
-                            continue
 
-            # --- Waiting section ---
+                            if rate_limit_event.is_set():
+                                with contextlib.suppress(asyncio.QueueEmpty):
+                                    while True:
+                                        item = queue.get_nowait()
+                                        queue.task_done()
+                            for t in pending:
+                                t.cancel()
+
+                            for w in workers:
+                                w.cancel()
+                            await asyncio.gather(*workers, return_exceptions=True)
+
+                            await JSONUtils.save_json(
+                                index_data, cls.caption_index_file
+                            )
+
+                            if rate_limit_event.is_set():
+                                LogManager.log_download_captions(
+                                    "Rate limit detected during parallel processing - sleeping for 2 hours."
+                                )
+                                await asyncio.sleep(2 * 3600)
+                                continue
+                except Exception as e:
+                    LogManager.log_download_captions(
+                        f"Unhandled exception in download_captions: {e}\n{traceback.format_exc()}"
+                    )
+
             try:
                 await asyncio.sleep(300)
-            except Exception:
-                # Sleep interrupted; log and continue
+            except Exception as e:
                 LogManager.log_download_captions(
-                    "Sleep interrupted in download_captions loop"
+                    f"Sleep interrupted in download_captions loop: {e}\n{traceback.format_exc()}"
                 )
-            # Save any updates to the index file after processing (defensive save)
-            await JSONUtils.save_json(index_data, cls.caption_index_file)
 
-            # --- Waiting section ---
+            try:
+                await JSONUtils.save_json(index_data, cls.caption_index_file)
+            except Exception as e:
+                LogManager.log_download_captions(
+                    f"Error saving index data in download_captions: {e}\n{traceback.format_exc()}"
+                )
+
             await asyncio.sleep(300)
 
     @classmethod
@@ -299,11 +297,9 @@ class CaptionsDownloader:
 
             if has_subtitles and not downloaded and download_attempts < 10:
                 LogManager.log_download_captions(f"Attempting to download {video_id}")
-                try:
-                    success = await cls.download_caption_for_video(video_id, title)
-                except RateLimitError:
-                    # propagate to caller to allow higher-level handling (break cycle / sleep)
-                    raise
+
+                success = await cls.download_caption_for_video(video_id, title)
+
                 LogManager.log_download_captions(
                     f"Finished attempting to download {video_id}"
                 )
@@ -330,9 +326,9 @@ class CaptionsDownloader:
         try:
             if semaphore:
                 async with semaphore:
-                    await _run()
+                    await AsyncScheduler.schedule_nonblocking(_run())
             else:
-                await _run()
+                await AsyncScheduler.schedule_nonblocking(_run())
         except Exception as e:
             LogManager.log_download_captions(
                 f"Unhandled exception processing video entry {video_id}: {e}\n{traceback.format_exc()}"
@@ -352,31 +348,27 @@ class CaptionsDownloader:
 
     @classmethod
     async def get_flat_playlist_async(cls, playlist_url: str, output_path: str):
-        def run_ytdlp():
-            try:
-                ydl_opts = {
-                    "extract_flat": True,  # --flat-playlist
-                    "skip_download": True,
-                    "quiet": False,
-                    "progress_hooks": [cls.dlp_events.on_progress],
-                }
+        try:
+            ydl_opts = {
+                "extract_flat": True,  # --flat-playlist
+                "skip_download": True,
+                "quiet": False,
+                "progress_hooks": [cls.dlp_events.on_progress],
+            }
 
-                LogManager.log_download_captions(
-                    f"Saving JSON from {playlist_url} to {output_path}"
-                )
-                with YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(playlist_url, download=False)
+            LogManager.log_download_captions(
+                f"Saving JSON from {playlist_url} to {output_path}"
+            )
+            info = await DLPHelpers.getinfo_with_retry(ydl_opts, playlist_url)
 
-                # Save JSON to file
-                with open(output_path, "w", encoding="utf-8") as f:
-                    json.dump(info, f, indent=2, ensure_ascii=False)
-            except Exception as e:
-                LogManager.log_download_captions(
-                    f"Failed to extract flat playlist {playlist_url}: {e}\n{traceback.format_exc()}"
-                )
-                raise
-
-        return await asyncio.to_thread(run_ytdlp)
+            # Save JSON to file
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(info, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            LogManager.log_download_captions(
+                f"Failed to extract flat playlist {playlist_url}: {e}\n{traceback.format_exc()}"
+            )
+            raise
 
     @classmethod
     async def populate_captions_index(cls, index_data: dict, captions_index_path: str):
@@ -449,11 +441,10 @@ class CaptionsDownloader:
             }
             if cls.YT_Cookies_File and os.path.exists(cls.YT_Cookies_File):
                 ydl_opts["cookiefile"] = cls.YT_Cookies_File
-            with YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(
-                    f"https://www.youtube.com/watch?v={video_id}", download=False
-                )
 
+            info = await DLPHelpers.getinfo_with_retry(
+                ydl_opts, f"https://www.youtube.com/watch?v={video_id}"
+            )
             has_captions = bool(info.get("automatic_captions") or info.get("subtitles"))
             LogManager.log_download_captions(
                 f"Video id: {video_id} caption status = {has_captions}"
@@ -467,14 +458,13 @@ class CaptionsDownloader:
 
     @classmethod
     async def download_caption_for_video(cls, video_id: str, title: str) -> bool:
-        def run_ytdlp():
+        try:
             suburl = f"https://www.youtube.com/watch?v={video_id}"
             safename = FileManager.gen_safe_filename(title)
             ydl_subtitle_opts = {
                 "paths": {
                     "home": cls.temp_caption_dir,
                 },
-                "verbose": True,
                 "quiet": False,
                 "subtitlesformat": "srt",
                 "writeautomaticsub": True,
@@ -485,44 +475,14 @@ class CaptionsDownloader:
             if cls.YT_Cookies_File and os.path.exists(cls.YT_Cookies_File):
                 ydl_subtitle_opts["cookiefile"] = cls.YT_Cookies_File
 
-            with YoutubeDL(ydl_subtitle_opts) as ydl:
-                try:
-                    info = ydl.extract_info(suburl, download=True)
-                except ExtractorError as ex:
-                    msg = str(ex).lower()
-                    if (
-                        "rate-limited" in msg
-                        or "rate limited" in msg
-                        or "rate-limited by youtube" in msg
-                        or "your account has been rate-limited" in msg
-                    ):
-                        # signal rate limit to caller
-                        raise RateLimitError(str(ex)) from ex
-                    # re-raise other ExtractorError to be handled by outer logic
-                    raise
-            LogManager.log_download_captions(
-                "Successfully downloaded captions for video"
-            )
-
-            try:
-                lang = "en"
-                sub_path = info["requested_subtitles"][lang]["filepath"]
-            except Exception as e:
-                LogManager.log_download_captions(f"Subtitle path not found: {e}")
-                return None
-            fixed_path = os.path.join(cls.publish_caption_dir, f"{safename}.srt")
-
-            # Return paths for async processing of srt_fix
-            return sub_path, fixed_path
-
-        try:
-            result = await asyncio.wait_for(asyncio.to_thread(run_ytdlp), timeout=60)
+            result = await DLPHelpers.download_with_retry(ydl_subtitle_opts, suburl)
             if not result:
                 return False
+
             temp_sub_path, fixed_path = result
 
             try:
-                if cls.dlp_subtitle_use_srtfix == "true":
+                if cls.dlp_subtitle_use_srtfix:
                     await cls.fix_srt_async(temp_sub_path, fixed_path)
                     FileManager.delete_file(
                         temp_sub_path, LogManager.DOWNLOAD_CAPTIONS_LOG_FILE
@@ -531,7 +491,6 @@ class CaptionsDownloader:
                         f"srtfix completed: Published SRT to: {fixed_path}"
                     )
                 else:
-                    # If srtfix is disabled, just move the file to the publish directory
                     FileManager.move_file(
                         temp_sub_path, fixed_path, LogManager.DOWNLOAD_CAPTIONS_LOG_FILE
                     )
@@ -551,9 +510,6 @@ class CaptionsDownloader:
                 "Timeout while downloading captions for video"
             )
             return False
-        except RateLimitError:
-            # propagate rate-limit to allow caller to abort processing and sleep
-            raise
         except Exception as e:
             LogManager.log_download_captions(
                 f"Error downloading captions for video: {e}\n{traceback.format_exc()}"

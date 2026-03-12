@@ -48,7 +48,7 @@ def create_required_dirs():
 async def handle_dependency_updates():
     dependency_package_update = DVR_Tasks.get_dependency_package_update()
 
-    if dependency_package_update == "true":
+    if dependency_package_update:
         if os.name == "nt":
             # Windows
             LogManager.log_core("Skipping Dependency Package Update as os = Windows")
@@ -115,7 +115,7 @@ async def main():
         from downloader.comments import LiveCommentsDownloader
 
         def add_task_if_enabled(tasks, enabled, coro_func, disabled_message):
-            if enabled == "true":
+            if enabled:
                 tasks.append(coro_func())
             else:
                 LogManager.log_core(disabled_message)
@@ -148,6 +148,11 @@ async def main():
                 "Posted Community Message Download is disabled in INI Tasks. Skipping...",
             ),
             (
+                comments_republish,
+                LiveCommentsDownloader.republish_comments,
+                "Comments Republish is disabled in INI Tasks. Skipping...",
+            ),
+            (
                 livestream_upload,
                 LiveStreamUploader.upload_live_videos,
                 "Livestream Upload is disabled in INI Tasks. Skipping...",
@@ -156,11 +161,6 @@ async def main():
                 posted_videos_upload,
                 VideoUploader.upload_videos,
                 "Posted Video Upload is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                comments_republish,
-                LiveCommentsDownloader.republish_comments,
-                "Comments Republish is disabled in INI Tasks. Skipping...",
             ),
         ]
 

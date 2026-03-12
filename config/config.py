@@ -84,11 +84,36 @@ class BaseConfig:
                 "Config parser is not initialized. Check if the config file exists and is readable."
             )
         try:
-            return parser.get(section, key)
+            value = parser.get(section, key)
+            # Convert string representations of booleans to actual boolean values
+            if isinstance(value, str):
+                stripped_value = value.strip().lower()
+                if stripped_value == "true":
+                    return True
+                elif stripped_value == "false":
+                    return False
+            return value
         except (NoSectionError, NoOptionError) as e:
             # Use print instead of log_core to avoid circular import
             print(f"Config error: {e}\n{traceback.format_exc()}")
             raise
+
+    @classmethod
+    def get_value_as_bool(cls, section, key):
+        """Get a value from the configuration and ensure it returns a boolean."""
+        value = cls.get_value(section, key)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            stripped_value = value.strip().lower()
+            if stripped_value == "true":
+                return True
+            elif stripped_value == "false":
+                return False
+            raise ValueError(f"Cannot convert '{value}' to boolean for {section}.{key}")
+        raise ValueError(
+            f"Expected boolean or string value for {section}.{key}, got {type(value).__name__}"
+        )
 
     @staticmethod
     def parse_string_list(str_list):

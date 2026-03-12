@@ -61,7 +61,7 @@ class CommunityDownloader:
         """Load HTML templates from files asynchronously."""
         manager = cls._get_template_manager()
         templates = await manager.load_templates()
-        
+
         # Set class attributes from loaded templates
         cls._posts_youtube_placeholder_content = templates.get(
             "_posts_youtube_placeholder_content", ""
@@ -245,9 +245,6 @@ class CommunityDownloader:
             )
 
             if id_present_inhtml:
-                LogManager.log_download_posted_notices(
-                    f"Skipping post with unique id {unique_id} as its present in the html"
-                )
                 continue
 
             time_since = post.get("time_since", "")

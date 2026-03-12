@@ -8,7 +8,7 @@ from downloader.playlist import PlaylistManager
 from utils.index_utils import IndexManager
 from config.config_settings import DVR_Config
 from config.config_accounts import Account_Config
-from utils.dlp_utils import download_with_retry, getinfo_with_retry
+from dlp.helpers import DLPHelpers
 
 
 class VideoDownloader:
@@ -19,10 +19,6 @@ class VideoDownloader:
     Posted_DownloadQueue_Dir = DVR_Config.get_posted_downloadqueue_dir()
     Posted_UploadQueue_Dir = DVR_Config.get_posted_uploadqueue_dir()
     persistent_playlist = DVR_Config.get_posted_persistent_playlist()
-    dlp_verbose = DVR_Config.get_verbose_dlp_mode()
-    dlp_no_progress = DVR_Config.no_progress_dlp_downloads()
-    dlp_keep_fragments = DVR_Config.get_keep_fragments_dlp_downloads()
-    dlp_max_fragment_retries = DVR_Config.get_max_dlp_fragment_retries()
     dlp_max_dlp_download_retries = DVR_Config.get_max_dlp_download_retries()
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
 
@@ -68,11 +64,6 @@ class VideoDownloader:
             "ignore_no_formats_error": True,
         }
 
-        if cls.dlp_keep_fragments == "true":
-            ydl_opts["keep_fragments"] = True
-        if cls.dlp_verbose == "true":
-            ydl_opts["verbose"] = True
-
         return ydl_opts
 
     @classmethod
@@ -84,7 +75,7 @@ class VideoDownloader:
         ydl_opts = cls._build_ydl_opts(CurrentDownloadFile)
 
         try:
-            info = await getinfo_with_retry(
+            info = await DLPHelpers.getinfo_with_retry(
                 ydl_opts, url, LogManager.DOWNLOAD_POSTED_LOG_FILE
             )
             live_status = info.get("live_status")
@@ -101,7 +92,7 @@ class VideoDownloader:
                 LogManager.log_download_posted(
                     f"{url} is a published video live_status = {live_status} , Proceding to download."
                 )
-                await download_with_retry(
+                await DLPHelpers.download_with_retry(
                     ydl_opts, [url], LogManager.DOWNLOAD_POSTED_LOG_FILE
                 )
                 LogManager.log_download_posted(

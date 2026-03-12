@@ -3,7 +3,16 @@ import datetime
 import os
 import traceback
 import asyncio
-from utils.dlp_utils import download_with_retry
+from dlp.helpers import DLPHelpers
+
+# optional emoji library used to convert colon-style names to unicode
+try:
+    import emoji  # type: ignore
+
+    _emoji_lib_available = True
+except ImportError:
+    _emoji_lib_available = False
+
 from config.config_settings import DVR_Config
 from utils.logging_utils import LogManager
 from utils.template_manager import TemplateManager
@@ -24,11 +33,19 @@ class LiveCommentsDownloader:
         templates_dir, "comments_embed_script.html"
     )
     comments_item_template = os.path.join(templates_dir, "comments_item.html")
+    comments_user_banned_banner_template = os.path.join(
+        templates_dir, "comments_user_banned_banner.html"
+    )
+    comments_removed_post_banner_template = os.path.join(
+        templates_dir, "comments_removed_post_banner.html"
+    )
 
     # Class variables to cache loaded templates
     _comments_youtube_placeholder_content = None
     _comments_embed_script_content = None
     _comments_item_content = None
+    _comments_user_banned_banner_content = None
+    _comments_removed_post_banner_content = None
 
     # Template Manager instance for loading and caching templates
     _template_manager = None
@@ -42,6 +59,8 @@ class LiveCommentsDownloader:
                     "_comments_youtube_placeholder_content": cls.comments_youtube_placeholder_template,
                     "_comments_embed_script_content": cls.comments_embed_script_template,
                     "_comments_item_content": cls.comments_item_template,
+                    "_comments_user_banned_banner_content": cls.comments_user_banned_banner_template,
+                    "_comments_removed_post_banner_content": cls.comments_removed_post_banner_template,
                 },
                 log_func=LogManager.log_download_comments,
             )
@@ -61,6 +80,12 @@ class LiveCommentsDownloader:
             "_comments_embed_script_content", ""
         )
         cls._comments_item_content = templates.get("_comments_item_content", "")
+        cls._comments_user_banned_banner_content = templates.get(
+            "_comments_user_banned_banner_content", ""
+        )
+        cls._comments_removed_post_banner_content = templates.get(
+            "_comments_removed_post_banner_content", ""
+        )
 
     @classmethod
     async def download_comments(cls, yturl, name_template, name_prefix):
@@ -74,7 +99,7 @@ class LiveCommentsDownloader:
 
                 options = cls._get_download_options(name_template)
                 try:
-                    await download_with_retry(
+                    await DLPHelpers.download_with_retry(
                         options, yturl, LogManager.DOWNLOAD_COMMENTS_LOG_FILE
                     )
                 except Exception as e:
@@ -95,8 +120,9 @@ class LiveCommentsDownloader:
                             json_path = new_file_path
                         else:
                             LogManager.log_download_comments(
-                                f"Found existing JSON file: {json_path}"
+                                f"Found existing JSON file: {file_path}"
                             )
+                            json_path = file_path
 
                 if json_path is not None:
                     await cls.publish_comments(json_path)
@@ -251,9 +277,39 @@ class LiveCommentsDownloader:
             return None
 
     @classmethod
+    def check_user_banned(cls, author_id, mod_items):
+        if not author_id:
+            LogManager.log_download_comments("Empty author_id, skipping ban check")
+            return False
+        return author_id in mod_items
+
+    @classmethod
+    def check_post_removed(cls, offset_time, mod_items):
+        if not offset_time:
+            LogManager.log_download_comments(
+                "Empty offset_time, skipping removal check"
+            )
+            return False
+        return offset_time in mod_items
+
+    @classmethod
     async def _publish_from_json_path(cls, sourcejson_path):
         await cls._load_templates()
         try:
+            # Helper function
+            def _contains_key(obj, key_name):
+                if isinstance(obj, dict):
+                    if key_name in obj:
+                        return True
+                    for v in obj.values():
+                        if _contains_key(v, key_name):
+                            return True
+                elif isinstance(obj, list):
+                    for v in obj:
+                        if _contains_key(v, key_name):
+                            return True
+                return False
+
             # Determine filenames
             filename = os.path.basename(sourcejson_path)
             base, ext = os.path.splitext(filename)
@@ -272,17 +328,77 @@ class LiveCommentsDownloader:
 
             # Read the file and try to parse as JSON. Support single JSON value,
             # newline-delimited JSON (NDJSON), or concatenated JSON objects.
-            items = cls._parse_json_file(sourcejson_path)
+            chat_items = cls._parse_json_file(sourcejson_path)
+            # Filter out engagement messages to avoid errors
+            chat_items = [
+                item
+                for item in chat_items
+                if not _contains_key(item, "liveChatViewerEngagementMessageRenderer")
+            ]
+            # Filter out specific chat items based on actions and add them to removed_posts and banned_users
+            removed_post_items = []
+            banned_user_items = []
+            filtered_items = []
+            for item in chat_items:
+                if isinstance(item, dict):
+                    # Check for "removeChatItemAction" or "removeChatItemByAuthorAction"
+                    if "replayChatItemAction" in item and isinstance(
+                        item["replayChatItemAction"], dict
+                    ):
+                        actions = item["replayChatItemAction"].get("actions", [])
+                        if any("removeChatItemAction" in action for action in actions):
+                            removed_post_items.append(item)
+                        if any(
+                            "removeChatItemByAuthorAction" in action
+                            for action in actions
+                        ):
+                            banned_user_items.append(item)
+                        if any(
+                            "removeChatItemAction" in action
+                            or "removeChatItemByAuthorAction" in action
+                            for action in actions
+                        ):
+                            continue
+                filtered_items.append(item)
+            chat_items = filtered_items
 
+            removed_posts = []
+            banned_users = []
             html_parts = []
             txt_lines = []
 
-            for it in items:
+            # Create de-duplicated lists
+            removed_offsets = list(
+                set(
+                    str(item.get("videoOffsetTimeMsec"))
+                    for item in removed_post_items
+                    if item.get("videoOffsetTimeMsec") is not None
+                )
+            )
+            removed_posts = "\n".join(removed_offsets)
+            banned_ids = set()
+            for item in banned_user_items:
+                rca = item.get("replayChatItemAction")
+                if isinstance(rca, dict):
+                    for a in rca.get("actions", []):
+                        ban = a.get("removeChatItemByAuthorAction")
+                        if isinstance(ban, dict):
+                            id_ = ban.get("externalChannelId")
+                            if id_:
+                                banned_ids.add(id_)
+            banned_users = "\n".join(banned_ids)
+
+            for it in chat_items:
                 time_str = ""
                 author = ""
                 text = ""
                 channel_url = ""
                 mod_action = ""
+                post_id = ""
+                author_id = ""
+                offset_time = ""
+                author_banned = False
+                post_removed = False
 
                 # Unwrap common YouTube replay/live chat wrappers so we can
                 # extract `authorName` and `message.runs` when present.
@@ -295,15 +411,7 @@ class LiveCommentsDownloader:
                         rc = obj["replayChatItemAction"]
                         if "actions" in rc and isinstance(rc["actions"], list):
                             for a in rc["actions"]:
-                                if (
-                                    isinstance(a, dict)
-                                    and "addChatItemAction" in a
-                                    and isinstance(a["addChatItemAction"], dict)
-                                ):
-                                    inner = a["addChatItemAction"].get(
-                                        "item", a["addChatItemAction"]
-                                    )
-                                    return _unwrap(inner)
+                                return _unwrap(a)
                         return _unwrap(rc)
                     if "actions" in obj and isinstance(obj["actions"], list):
                         for a in obj["actions"]:
@@ -312,10 +420,7 @@ class LiveCommentsDownloader:
                                 and "addChatItemAction" in a
                                 and isinstance(a["addChatItemAction"], dict)
                             ):
-                                inner = a["addChatItemAction"].get(
-                                    "item", a["addChatItemAction"]
-                                )
-                                return _unwrap(inner)
+                                return _unwrap(a["addChatItemAction"])
                     if "addChatItemAction" in obj and isinstance(
                         obj["addChatItemAction"], dict
                     ):
@@ -329,52 +434,49 @@ class LiveCommentsDownloader:
                         obj["liveChatTextMessageRenderer"], dict
                     ):
                         return obj["liveChatTextMessageRenderer"]
+                    if "removeChatItemByAuthorAction" in obj and isinstance(
+                        obj["removeChatItemByAuthorAction"], dict
+                    ):
+                        return obj["removeChatItemByAuthorAction"]
+                    if "removeChatItemAction" in obj and isinstance(
+                        obj["removeChatItemAction"], dict
+                    ):
+                        return obj["removeChatItemAction"]
                     return obj
+
+                # preserve offset_time present on the raw item (before unwrapping)
+                if isinstance(it, dict):
+                    ot_val = it.get("videoOffsetTimeMsec")
+                    if ot_val is not None:
+                        offset_time = str(ot_val)
 
                 it = _unwrap(it)
 
-                # Helper: recursively check if any dict key exists anywhere
-                def _contains_key(obj, key_name):
-                    if isinstance(obj, dict):
-                        if key_name in obj:
-                            return True
-                        for v in obj.values():
-                            if _contains_key(v, key_name):
-                                return True
-                    elif isinstance(obj, list):
-                        for v in obj:
-                            if _contains_key(v, key_name):
-                                return True
-                    return False
+                # Extract post_id and author_id
+                post_id = it.get("id", "")
+                author_id = it.get(
+                    "authorExternalChannelId", it.get("externalChannelId", "")
+                )
 
-                # Helper: detect emoji-only messages
-                def _is_emoji_only_message(obj):
-                    msg = None
-                    if isinstance(obj, dict):
-                        msg = (
-                            obj.get("message")
-                            or obj.get("text")
-                            or obj.get("message_text")
-                        )
-                    if isinstance(msg, dict) and isinstance(msg.get("runs"), list):
-                        runs = msg.get("runs")
-                        if not runs:
-                            return False
-                        for r in runs:
-                            if not isinstance(r, dict):
-                                return False
-                            # emoji-only run typically has an 'emoji' key and no 'text'
-                            if "emoji" not in r or r.get("text"):
-                                return False
-                        return True
-                    return False
+                if not author_id:
+                    LogManager.log_download_comments(
+                        f"Warning: No author ID found for item {it}"
+                    )
+
+                # also check unwrapped object for a more specific offset_time
+                if isinstance(it, dict) and not offset_time:
+                    offset_time_val = it.get("videoOffsetTimeMsec")
+                    if offset_time_val is not None:
+                        offset_time = str(offset_time_val)
+
+                # Check if author is banned or post is removed based on moderation data
+                author_banned = cls.check_user_banned(author_id, banned_users)
+                post_removed = cls.check_post_removed(offset_time, removed_posts)
 
                 # Filter out moderation/remove events and engagement messages
                 if _contains_key(it, "removeChatItemByAuthorAction"):
                     continue
                 if _contains_key(it, "removeChatItemAction"):
-                    continue
-                if _contains_key(it, "liveChatViewerEngagementMessageRenderer"):
                     continue
                 if isinstance(it, dict):
                     # common time keys
@@ -401,20 +503,15 @@ class LiveCommentsDownloader:
                             secs_val = parsed_number
                             # Interpret very large values as epoch in microseconds
                             if secs_val > 1_000_000_000_000:
-                                dt = datetime.datetime.utcfromtimestamp(
+                                time_str = datetime.datetime.fromtimestamp(
                                     secs_val / 1_000_000
-                                )
-                                time_str = dt.strftime("%H:%M:%S")
-                            # Interpret large values as milliseconds since epoch
+                                ).strftime("%Y-%m-%d %H:%M:%S")
                             elif secs_val > 1_000_000_000:
-                                dt = datetime.datetime.utcfromtimestamp(secs_val / 1000)
-                                time_str = dt.strftime("%H:%M:%S")
+                                time_str = datetime.datetime.fromtimestamp(
+                                    secs_val
+                                ).strftime("%Y-%m-%d %H:%M:%S")
                             else:
-                                # treat as seconds or offset; format as H:MM:SS
-                                total_seconds = int(secs_val)
-                                hours, rem = divmod(total_seconds, 3600)
-                                minutes, seconds = divmod(rem, 60)
-                                time_str = f"{hours}:{minutes:02d}:{seconds:02d}"
+                                time_str = str(secs_val)
                         except Exception:
                             time_str = str(time_val)
                     elif isinstance(time_val, str):
@@ -437,7 +534,78 @@ class LiveCommentsDownloader:
                     if "authorChannelId" in it and not channel_url:
                         channel_id = it["authorChannelId"]
                         channel_url = f"https://www.youtube.com/channel/{channel_id}"
+
                     # Extract text: support nested `message.runs` used by YouTube
+                    def _extract_run_text(run):
+                        # When processing `runs` from YouTube chat items, extract a
+                        # human-readable representation. We try to return an
+                        # actual emoji character for standard emojis (via the
+                        # `emoji` package) and fall back to a shortcut/search term
+                        # or accessibility label. Custom emojis usually have no
+                        # unicode equivalent so we don't emit the internal ID.
+                        #
+                        # Returns a plain string; higher-level code will escape
+                        # HTML characters, so this should not contain markup.
+                        if isinstance(run, dict):
+                            if "text" in run:
+                                return run["text"]
+                            elif "emoji" in run and isinstance(run["emoji"], dict):
+                                e = run["emoji"]
+                                # gather candidate label
+                                label = ""
+                                if "shortcuts" in e and e["shortcuts"]:
+                                    label = e["shortcuts"][0]
+                                if (
+                                    not label
+                                    and "searchTerms" in e
+                                    and e["searchTerms"]
+                                ):
+                                    label = e["searchTerms"][0]
+                                if not label:
+                                    img = e.get("image", {})
+                                    label = (
+                                        img.get("accessibility", {})
+                                        .get("accessibilityData", {})
+                                        .get("label", "")
+                                    )
+                                # convert colon-style name to unicode if possible
+                                if label:
+                                    # ensure it is surrounded by colons for emoji lib
+                                    if not label.startswith(":"):
+                                        label = f":{label}:"
+                                    if _emoji_lib_available:
+                                        try:
+                                            uni = emoji.emojize(label, language="alias")
+                                            # if emojize didn't know this alias it'll
+                                            # return the input verbatim; we detect that
+                                            if uni != label:
+                                                return uni
+                                        except Exception:
+                                            pass
+                                    # fall back to image representation for custom
+                                    thumbs = e.get("image", {}).get("thumbnails", [])
+                                    if thumbs:
+                                        # choose the largest thumbnail available
+                                        url = thumbs[-1].get("url")
+                                        if url:
+                                            # produce inline HTML with styling so the
+                                            # emoji is the same size as surrounding text
+                                            # and aligns vertically. `display:inline-block`
+                                            # prevents stacking.
+                                            style = (
+                                                "display:inline-block;"
+                                                "width:1em;"
+                                                "height:1em;"
+                                                "vertical-align:middle;"
+                                            )
+                                            return (
+                                                f'<img src="{url}" alt="{label}" '
+                                                f'class="emoji" style="{style}">'
+                                            )
+                                    # no image, just return label text
+                                    return label
+                        return str(run)
+
                     msg_val = (
                         it.get("message") or it.get("text") or it.get("message_text")
                     )
@@ -446,12 +614,7 @@ class LiveCommentsDownloader:
                         and "runs" in msg_val
                         and isinstance(msg_val["runs"], list)
                     ):
-                        text = "".join(
-                            [
-                                (r.get("text", "") if isinstance(r, dict) else str(r))
-                                for r in msg_val["runs"]
-                            ]
-                        )
+                        text = "".join(_extract_run_text(r) for r in msg_val["runs"])
                     elif isinstance(msg_val, str):
                         text = msg_val
                     else:
@@ -459,24 +622,9 @@ class LiveCommentsDownloader:
 
                     if not text:
                         if "runs" in it and isinstance(it["runs"], list):
-                            text = "".join(
-                                [
-                                    (
-                                        r.get("text", "")
-                                        if isinstance(r, dict)
-                                        else str(r)
-                                    )
-                                    for r in it["runs"]
-                                ]
-                            )
+                            text = "".join(_extract_run_text(r) for r in it["runs"])
                         elif "snippet" in it and isinstance(it["snippet"], dict):
-                            text = (
-                                it["snippet"].get("textMessageDetails")
-                                or it["snippet"].get("text")
-                                or ""
-                            )
-                            if isinstance(text, dict):
-                                text = text.get("messageText") or ""
+                            text = it["snippet"].get("text", "")
                 else:
                     text = str(it)
 
@@ -486,21 +634,15 @@ class LiveCommentsDownloader:
                     except Exception:
                         text = str(it)
 
-                safe_text = (
-                    text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                )
-                safe_author = (
-                    (author or "")
-                    .replace("&", "&amp;")
-                    .replace("<", "&lt;")
-                    .replace(">", "&gt;")
-                )
-                author_html = (
-                    f'<a href="{channel_url}">{safe_author}</a>'
-                    if channel_url
-                    else safe_author
-                )
-
+                # keep `<img>` tags intact so custom emojis render as images
+                if "<img" in text:
+                    safe_text = text
+                else:
+                    safe_text = (
+                        text.replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                    )
                 # Embed any media (video/images) if present in the item
                 media_html = ""
                 video_url = None
@@ -512,17 +654,7 @@ class LiveCommentsDownloader:
                 if video_url:
                     try:
                         if "watch?v=" in video_url or "youtu.be/" in video_url:
-                            if "watch?v=" in video_url:
-                                vid = video_url.split("watch?v=")[1].split("&")[0]
-                            else:
-                                vid = video_url.split("youtu.be/")[1].split("?")[0]
-                            thumb = f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
-                            placeholder = (
-                                cls._comments_youtube_placeholder_content.replace(
-                                    "{{VID}}", vid
-                                ).replace("{{THUMB}}", thumb)
-                            )
-                            media_html += placeholder
+                            media_html += f'<div class="media video"><a href="{video_url}">Video</a></div>'
                         else:
                             media_html += f'<div class="media video"><a href="{video_url}">Video</a></div>'
                     except Exception:
@@ -531,26 +663,33 @@ class LiveCommentsDownloader:
                 if images_val:
                     try:
                         if isinstance(images_val, str):
-                            media_html += (
-                                f'<div class="media images"><img src="{images_val}" alt="image" '
-                                f'style="max-width:100%;height:auto;"></div>'
-                            )
+                            media_html += f'<div class="media image"><img src="{images_val}" alt="Image"></div>'
                         elif isinstance(images_val, list):
                             for img in images_val:
-                                media_html += (
-                                    f'<div class="media images"><img src="{img}" alt="image" '
-                                    f'style="max-width:100%;height:auto;"></div>'
-                                )
+                                media_html += f'<div class="media image"><img src="{img}" alt="Image"></div>'
                     except Exception:
                         pass
 
+                # determine CSS/value classes for banned/removed flags
+                user_banned_banner = (
+                    cls._comments_user_banned_banner_content if author_banned else ""
+                )
+                removed_post_banner = (
+                    cls._comments_removed_post_banner_content if post_removed else ""
+                )
+
                 comment_html = (
-                    cls._comments_item_content.replace("{{AUTHOR_HTML}}", author_html)
+                    cls._comments_item_content.replace("{{AUTHOR_NAME}}", author)
                     .replace("{{TIME_STR}}", time_str)
                     .replace("{{SAFE_TEXT}}", safe_text)
                     .replace("{{MEDIA_HTML}}", media_html)
                     .replace("{{MOD_ACTION}}", mod_action)
+                    .replace("{{POST_ID}}", post_id)
+                    .replace("{{AUTHOR_ID}}", author_id)
+                    .replace("{{USER_BANNED_BANNER}}", user_banned_banner)
+                    .replace("{{REMOVED_POST_BANNER}}", removed_post_banner)
                 )
+
                 html_parts.append(comment_html)
 
                 # Add metadata about media to TXT output as well

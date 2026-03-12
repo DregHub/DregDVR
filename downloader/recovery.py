@@ -1,9 +1,7 @@
 import asyncio
 import traceback
-import os
 from utils.logging_utils import LogManager
-from utils.dlp_utils import DLPEvents
-from utils.dlp_utils import download_with_retry, getinfo_with_retry
+from dlp.helpers import DLPHelpers
 from config.config_settings import DVR_Config
 from config.config_accounts import Account_Config
 
@@ -14,33 +12,12 @@ class RecoveryDownloader:
     Live_DownloadRecovery_dir = DVR_Config.get_live_downloadrecovery_dir()
     DownloadFilePrefix = Account_Config.get_live_downloadprefix()
     DownloadTimeStampFormat = DVR_Config.get_download_timestamp_format()
-    dlp_verbose = DVR_Config.get_verbose_dlp_mode()
-    dlp_keep_fragments = DVR_Config.get_keep_fragments_dlp_downloads()
-    dlp_no_progress = DVR_Config.no_progress_dlp_downloads()
     dlp_max_fragment_retry = DVR_Config.get_max_dlp_fragment_retries()
     dlp_max_dlp_download_retries = DVR_Config.get_max_dlp_download_retries()
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
 
     # Recovery queue: list of dicts with url, filename, download_complete, and recovery_attempts
     recoveryqueue = []
-
-    @classmethod
-    def download_started(cls):
-        LogManager.log_download_live_recovery(
-            f"RECOVERY DOWNLOAD START EVENT {cls.youtube_source}"
-        )
-
-    @classmethod
-    def download_processing(cls):
-        LogManager.log_download_live_recovery(
-            f"RECOVERY DOWNLOAD PROCESSING EVENT {cls.youtube_source}"
-        )
-
-    @classmethod
-    def download_complete(cls):
-        LogManager.log_download_live_recovery(
-            f"RECOVERY DOWNLOAD COMPLETE EVENT {cls.youtube_source}"
-        )
 
     @classmethod
     async def add_to_recoveryqueue(cls, url, filename):
@@ -54,112 +31,132 @@ class RecoveryDownloader:
         )
 
     @classmethod
+    def _get_items_to_process(cls):
+        """Get items from queue that should be processed (not complete, under retry limit)."""
+        return [
+            item
+            for item in cls.recoveryqueue
+            if not item["download_complete"] and item["recovery_attempts"] < 10
+        ]
+
+    @classmethod
+    def _cleanup_queue(cls):
+        """Remove completed or exhausted items from queue to prevent memory bloat."""
+        cls.recoveryqueue = [
+            item
+            for item in cls.recoveryqueue
+            if not item["download_complete"] and item["recovery_attempts"] < 10
+        ]
+
+    @classmethod
+    async def _process_recovery_item(cls, item):
+        """Process a single recovery queue item with error handling."""
+        try:
+            async with cls._recovery_lock:
+                # Check if stream is still live
+                is_still_live = await cls.check_recovery_livestream(item)
+
+                if not is_still_live:
+                    # Stream is ready, proceed with download
+                    await cls.download_recovery_livestream_content(item)
+        except Exception as e:
+            LogManager.log_download_live_recovery(
+                f"Error downloading {item['url']}: {e} (attempt {item['recovery_attempts']})"
+            )
+            traceback.print_exc()
+
+    @classmethod
     async def monitor_recoveryqueue(cls):
+        """Monitor recovery queue and process items in a continuous loop."""
+        LogManager.log_download_live_recovery(
+            f"Starting Live Recovery Downloader for {cls.youtube_source}"
+        )
         while True:
-            for item in cls.recoveryqueue:
-                if not item["download_complete"] and item["recovery_attempts"] < 10:
-                    try:
-                        await cls.download_recovery_livestream(item)
-                    except Exception as e:
-                        LogManager.log_download_live_recovery(
-                            f"Error downloading {item['url']}: {e} (attempt {item['recovery_attempts']})"
-                        )
-                        traceback.print_exc()
+            items_to_process = cls._get_items_to_process()
+
+            for item in items_to_process:
+                await cls._process_recovery_item(item)
+
+            cls._cleanup_queue()
             await asyncio.sleep(60)
 
     @classmethod
-    async def download_recovery_livestream(cls, item):
-        async with cls._recovery_lock:
-            try:
+    async def check_recovery_livestream(cls, item):
+        """Check if stream is live. Returns True if live status prohibits download, False if ready to download."""
+        try:
+            currenturl = f'{item["url"]}'
+
+            # Get info to check live status
+            info_ydl_opts = {
+                "quiet": False,
+                "no_warnings": False,
+            }
+
+            info = await DLPHelpers.getinfo_with_retry(
+                info_ydl_opts,
+                currenturl,
+                LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
+            )
+
+            if info is None:
                 LogManager.log_download_live_recovery(
-                    f"Starting Recovery Download For {item['url']}"
+                    f"Failed to get info for {currenturl}, will retry later"
                 )
-                currenturl = f'{item["url"]}'
+                item["recovery_attempts"] += 1
+                return True  # Treat as still live, will retry
 
-                # Progress hook callbacks for recovery downloads
-                cls.dlp_events = DLPEvents(
-                    item["url"],
-                    LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
-                    cls.download_started if hasattr(cls, "download_started") else None,
-                    (
-                        cls.download_complete
-                        if hasattr(cls, "download_complete")
-                        else None
-                    ),
-                    (
-                        cls.download_processing
-                        if hasattr(cls, "download_processing")
-                        else None
-                    ),
-                )
+            live_status = info.get("live_status")
 
-                # Build yt-dlp options similar to downloader/videos.py
-                download_ydl_opts = {
-                    "paths": {"temp": cls.Live_DownloadRecovery_dir},
-                    "outtmpl": item["filename"],
-                    "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
-                    "restrictfilenames": True,
-                    "fragment_retries": int(cls.dlp_max_fragment_retry),
-                    "retries": int(cls.dlp_max_dlp_download_retries),
-                    "progress_hooks": [cls.dlp_events.on_progress],
-                }
-
-                if cls.dlp_keep_fragments == "true":
-                    download_ydl_opts["keep_fragments"] = True
-
-                if cls.dlp_verbose == "true":
-                    download_ydl_opts["verbose"] = True
-
-                # If no-progress mode is enabled, check live status first and skip download if it's still live/upcoming.
-                if cls.dlp_no_progress == "true":
-                    for filt in DVR_Config.get_no_progress_dlp_filters():
-                        if filt not in LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER:
-                            LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER.append(filt)
-
-                    mon_ydl_opts = {
-                        "quiet": True,
-                        "skip_download": True,
-                    }
-
-                    info = await getinfo_with_retry(
-                        mon_ydl_opts,
-                        currenturl,
-                        LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
-                    )
-
-                    if info and info.get("live_status") in ("is_live", "is_upcoming"):
-                        LogManager.log_download_posted(
-                            f"Video {currenturl} is a live or upcoming stream, skipping download."
-                        )
-                        exit_code = None
-                        return
-
-                try:
-                    await download_with_retry(
-                        download_ydl_opts,
-                        [currenturl],
-                        LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
-                    )
-                except Exception as e:
-                    exit_code = 1
-                    LogManager.log_download_live_recovery(
-                        f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
-                    )
-                    LogManager.log_download_live_recovery(
-                        f"Recovery download for {item['url']} did not complete successfully: {e}"
-                    )
-                    item["download_complete"] = False
-                    item["recovery_attempts"] += 1
-                else:
-                    exit_code = 0
-                    LogManager.log_download_live_recovery(
-                        f"Detected the exit of yt-dlp process for: {item['url']} with exit code {exit_code}"
-                    )
-                    LogManager.log_download_live_recovery(
-                        f"Recovery download for {item['url']} completed successfully."
-                    )
-                    item["download_complete"] = True
-            except Exception as e:
+            if live_status == "is_live":
                 LogManager.log_download_live_recovery(
-                    f"Unhandled exception in download_recovery_livestream for {item.get('url')}: {e}\n{traceback.format_exc()}"
+                    f"Skipping recovery download for {currenturl}: stream is still live (will retry later)"
                 )
+                item["recovery_attempts"] += 1
+                return True  # Stream is live
+
+            return False  # Stream is ready for download
+
+        except Exception as e:
+            LogManager.log_download_live_recovery(
+                f"Exception in check_recovery_livestream for {item.get('url')}: {e}\n{traceback.format_exc()}"
+            )
+            item["recovery_attempts"] += 1
+            return True  # Treat as error, will retry
+
+    @classmethod
+    async def download_recovery_livestream_content(cls, item):
+        """Download the recovery livestream content."""
+        try:
+            currenturl = f'{item["url"]}'
+
+            LogManager.log_download_live_recovery(
+                f"Starting Recovery Download For {currenturl}"
+            )
+
+            # Build yt-dlp options similar to downloader/videos.py
+            download_ydl_opts = {
+                "paths": {"home": cls.Live_DownloadRecovery_dir},
+                "outtmpl": item["filename"],
+                "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
+                "restrictfilenames": True,
+                "fragment_retries": int(cls.dlp_max_fragment_retry),
+                "retries": int(cls.dlp_max_dlp_download_retries),
+                "progress_hooks": [cls.dlp_events.on_progress],
+            }
+
+            await DLPHelpers.download_with_retry(
+                download_ydl_opts,
+                currenturl,
+                LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
+            )
+
+            item["download_complete"] = True
+            LogManager.log_download_live_recovery(
+                f"Recovery download completed for {currenturl}"
+            )
+
+        except Exception as e:
+            LogManager.log_download_live_recovery(
+                f"Exception in download_recovery_livestream_content for {item.get('url')}: {e}\n{traceback.format_exc()}"
+            )
+            item["recovery_attempts"] += 1
