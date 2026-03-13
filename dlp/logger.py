@@ -89,7 +89,7 @@ class DLP_Logger:
     def debug(self, msg):
         # forward debug messages to centralized LogManager when available
         with contextlib.suppress(Exception):
-            if self.dlp_verbose:
+            if self.dlp_verbose == True:
                 LogManager.log_message(str(f"DLP Debug: {msg}"), self.log_file_name)
             else:
                 return None
@@ -98,7 +98,7 @@ class DLP_Logger:
     def info(self, msg):
         # forward debug messages to centralized LogManager when available
         with contextlib.suppress(Exception):
-            if self.dlp_verbose:
+            if self.dlp_verbose == True:
                 LogManager.log_message(str(f"DLP Info: {msg}"), self.log_file_name)
             else:
                 return None

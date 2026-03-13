@@ -1,5 +1,9 @@
 import traceback
+import logging
 from utils.logging_utils import LogManager
+
+# Configure logger for this module
+logger = logging.getLogger(__name__)
 
 
 class DLPEvents:
@@ -291,7 +295,7 @@ class DLPEvents:
         try:
             LogManager.log_message(message, self.log_file_name)
         except Exception as e:
-            print(f"Failed to forward log message: {e}")
+            logger.error(f"Failed to forward log message: {e}")
 
     RATE_LIMIT_STRINGS = [
         "429",
@@ -308,7 +312,17 @@ class DLPEvents:
         "the channel is not currently live",
     ]
 
+    SIGNIN_REQUIRED_STRINGS = [
+        "sign in to confirm your age",
+        "this video may be inappropriate for some users",
+    ]
+
     @classmethod
     def is_rate_limit_error(cls, err: Exception) -> bool:
         msg = str(err).lower()
         return any(s in msg for s in cls.RATE_LIMIT_STRINGS)
+
+    @classmethod
+    def is_signin_required_error(cls, err: Exception) -> bool:
+        msg = str(err).lower()
+        return any(s in msg for s in cls.SIGNIN_REQUIRED_STRINGS)

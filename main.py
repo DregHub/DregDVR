@@ -46,9 +46,9 @@ def create_required_dirs():
 
 
 async def handle_dependency_updates():
-    dependency_package_update = DVR_Tasks.get_dependency_package_update()
+    dependency_package_update_enabled = DVR_Tasks.get_dependency_package_update()
 
-    if dependency_package_update:
+    if dependency_package_update_enabled == True:
         if os.name == "nt":
             # Windows
             LogManager.log_core("Skipping Dependency Package Update as os = Windows")
@@ -74,12 +74,19 @@ async def handle_dependency_updates():
 
 async def handle_container_maintenance():
     ContainerMaintenance = DVR_Tasks.get_container_maintenance_inf_loop()
-    if ContainerMaintenance.lower() == "true":
+    if ContainerMaintenance == True:
         LogManager.log_core("Container Maintenance Mode is ON")
         LogManager.log_core("Script Will Loop Forever...")
         # Infinite loop incase we need to access the containers shell
         while True:
             await asyncio.sleep(600000)
+
+
+def add_task_if_enabled(tasks, enabled, coro_func, disabled_message):
+    if enabled == True:
+        tasks.append(coro_func())
+    else:
+        LogManager.log_core(disabled_message)
 
 
 async def main():
@@ -92,17 +99,16 @@ async def main():
 
         await handle_container_maintenance()
 
-        LogManager.log_core(
-            "Starting Dregg's DVR... Am i 4k wecording? Yes im 4k wecording!"
-        )
-        livestream_download = DVR_Tasks.get_livestream_download()
-        livestream_recovery_download = DVR_Tasks.get_livestream_recovery_download()
-        captions_download = DVR_Tasks.get_captions_download()
-        comments_republish = DVR_Tasks.get_comments_republish()
-        posted_videos_download = DVR_Tasks.get_posted_videos_download()
-        posted_notices_download = DVR_Tasks.get_posted_notices_download()
-        livestream_upload = DVR_Tasks.get_livestream_upload()
-        posted_videos_upload = DVR_Tasks.get_posted_videos_upload()
+        livestream_download_enabled = DVR_Tasks.get_livestream_download()
+        livestream_recovery_download_enabled = DVR_Tasks.get_livestream_recovery_download()
+        captions_download_enabled = DVR_Tasks.get_captions_download()
+        #currently download comments is scheduled by the live download dlp events
+        #comments_download_enabled = DVR_Tasks.get_comments_download()
+        comments_republish_enabled = DVR_Tasks.get_comments_republish()
+        posted_videos_download_enabled = DVR_Tasks.get_posted_videos_download()
+        posted_notices_download_enabled = DVR_Tasks.get_posted_notices_download()
+        livestream_upload_enabled = DVR_Tasks.get_livestream_upload()
+        posted_videos_upload_enabled = DVR_Tasks.get_posted_videos_upload()
 
         # Import all task modules
         from downloader.livestreams import LivestreamDownloader
@@ -114,51 +120,45 @@ async def main():
         from uploader.videos import VideoUploader
         from downloader.comments import LiveCommentsDownloader
 
-        def add_task_if_enabled(tasks, enabled, coro_func, disabled_message):
-            if enabled:
-                tasks.append(coro_func())
-            else:
-                LogManager.log_core(disabled_message)
-
         tasks = []
         task_configs = [
             (
-                livestream_download,
+                livestream_download_enabled,
                 LivestreamDownloader.download_livestreams,
                 "Livestream Download is disabled in INI Tasks. Skipping...",
             ),
             (
-                livestream_recovery_download,
+                livestream_recovery_download_enabled,
                 RecoveryDownloader.monitor_recoveryqueue,
                 "Livestream Recovery Download is disabled in INI Tasks. Skipping...",
             ),
             (
-                posted_videos_download,
-                VideoDownloader.download_videos,
-                "Posted Video Download is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                captions_download,
-                CaptionsDownloader.monitor_channel,
-                "Caption Download is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                posted_notices_download,
-                CommunityDownloader.monitor_channel,
-                "Posted Community Message Download is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                comments_republish,
+                comments_republish_enabled,
                 LiveCommentsDownloader.republish_comments,
                 "Comments Republish is disabled in INI Tasks. Skipping...",
             ),
             (
-                livestream_upload,
+                posted_videos_download_enabled,
+                VideoDownloader.download_videos,
+                "Posted Video Download is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                captions_download_enabled,
+                CaptionsDownloader.monitor_channel,
+                "Caption Download is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                posted_notices_download_enabled,
+                CommunityDownloader.monitor_channel,
+                "Posted Community Message Download is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                livestream_upload_enabled,
                 LiveStreamUploader.upload_live_videos,
                 "Livestream Upload is disabled in INI Tasks. Skipping...",
             ),
             (
-                posted_videos_upload,
+                posted_videos_upload_enabled,
                 VideoUploader.upload_videos,
                 "Posted Video Upload is disabled in INI Tasks. Skipping...",
             ),
@@ -170,11 +170,13 @@ async def main():
         if not tasks:
             LogManager.log_core("All Tasks are disabled in INI Tasks. Exiting...")
         else:
+            LogManager.log_core(
+                "Starting Dregg's DVR... Am i 4k wecording? Yes im 4k wecording!"
+            )
             await asyncio.gather(*tasks)
 
     except Exception as e:
         LogManager.log_core(f"Exception in main:  {e}\n{traceback.format_exc()}")
-
 
 if __name__ == "__main__":
     asyncio.run(main())

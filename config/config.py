@@ -1,7 +1,11 @@
 import os
 import traceback
 import json
+import logging
 from configparser import ConfigParser, NoSectionError, NoOptionError
+
+# Configure logger for this module
+logger = logging.getLogger(__name__)
 
 
 class ReadOnlyConfigParser(ConfigParser):
@@ -71,7 +75,7 @@ class BaseConfig:
                 parser.read(config_path)
                 setattr(cls, cls.parser_attr_name, parser)
         except Exception as e:
-            print(f"Config initialization error: {e}\n{traceback.format_exc()}")
+            logger.error(f"Config initialization error: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -94,8 +98,8 @@ class BaseConfig:
                     return False
             return value
         except (NoSectionError, NoOptionError) as e:
-            # Use print instead of log_core to avoid circular import
-            print(f"Config error: {e}\n{traceback.format_exc()}")
+            # Use logger instead of print to avoid circular import
+            logger.error(f"Config error: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod

@@ -6,6 +6,9 @@ import logging
 import re
 from config.config_settings import DVR_Config
 
+# Configure logger for this module
+logger = logging.getLogger(__name__)
+
 
 class LogManager:
     _initialized = False
@@ -131,7 +134,7 @@ class LogManager:
                     lines[-1] = new_line + "\n"
                     with open(log_file_name, "w", encoding="utf-8") as log_file:
                         log_file.writelines(lines)
-                    print(f"{log_file_name}   :   {new_line}")
+                    logger.info(f"{log_file_name}   :   {new_line}")
                     return
                 elif normal_match and normal_match[2] == message:
                     # Convert to aggregated line
@@ -140,16 +143,16 @@ class LogManager:
                     lines[-1] = new_line + "\n"
                     with open(log_file_name, "w", encoding="utf-8") as log_file:
                         log_file.writelines(lines)
-                    print(f"{log_file_name}   :   {new_line}")
+                    logger.info(f"{log_file_name}   :   {new_line}")
                     return
 
             # Otherwise, just append as normal
             with open(log_file_name, "a", encoding="utf-8") as log_file:
                 log_file.write(f"{timestamp} - {message}\n")
-            print(f"{log_file_name}   :   {message}")
+            logger.info(f"{log_file_name}   :   {message}")
 
         except Exception as e:
-            print(f"Failed to log message: {e}\n{traceback.format_exc()}")
+            logger.error(f"Failed to log message: {e}\n{traceback.format_exc()}")
 
     @classmethod
     def log_core(cls, message):
@@ -221,8 +224,8 @@ class LogManager:
     def log_upload_yt(cls, message):
         """Log a message to the Upload YouTube log."""
         cls._initialize_log_paths()
-        print(f"Logging to YouTube Upload Log: {message}")
-        print(f"cls.UPLOAD_YT_LOG_FILE: {cls.UPLOAD_YT_LOG_FILE}")
+        logger.info(f"Logging to YouTube Upload Log: {message}")
+        logger.info(f"cls.UPLOAD_YT_LOG_FILE: {cls.UPLOAD_YT_LOG_FILE}")
         cls.log_message(message, cls.UPLOAD_YT_LOG_FILE)
 
     @classmethod

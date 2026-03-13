@@ -26,12 +26,15 @@ class DLPHelpers:
         by `download_with_retry`.
         """
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
-        ydl_opts["keep_fragments"] = cls.dlp_keep_fragments
+        ydl_opts["keep_fragments"] = cls.dlp_keep_fragments == True
         ydl_opts["fragment_retries"] = cls.dlp_max_fragment_retries
-        LogManager.log_message(
-            f"Starting youtube downloader helper with options {ydl_opts}",
-            log_file_name,
-        )
+        
+        if cls.dlp_verbose == True:
+            LogManager.log_message(
+                f"Starting youtube getinfo helper with options {ydl_opts}",
+                log_file_name,
+            )
+        
         with YoutubeDL(ydl_opts) as ydl:
             await asyncio.to_thread(ydl.download, url_or_list)
         LogManager.log_message("finished youtube downloader helper", log_file_name)
@@ -45,13 +48,19 @@ class DLPHelpers:
         specific errors gracefully without raising exceptions.
         """
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
-        ydl_opts["keep_fragments"] = cls.dlp_keep_fragments
+        ydl_opts["keep_fragments"] = cls.dlp_keep_fragments == True
         ydl_opts["fragment_retries"] = cls.dlp_max_fragment_retries
         if "logger" in ydl_opts:
             DLPLogger = ydl_opts["logger"]
         else:
             DLPLogger = DLP_Logger(patterns=DLP_Logger_Patterns)
             ydl_opts["logger"] = DLPLogger
+
+        if cls.dlp_verbose == True:
+            LogManager.log_message(
+                f"Starting youtube getinfo helper with options {ydl_opts}",
+                log_file_name,
+            )
         info = None
         with YoutubeDL(ydl_opts) as ydl:
             try:
@@ -83,7 +92,7 @@ class DLPHelpers:
         Returns a combined list of entries from the provided section URLs.
         """
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
-        ydl_opts["keep_fragments"] = cls.dlp_keep_fragments
+        ydl_opts["keep_fragments"] = cls.dlp_keep_fragments == True
         ydl_opts["fragment_retries"] = cls.dlp_max_fragment_retries
         collected = []
 
@@ -98,6 +107,12 @@ class DLPHelpers:
         flat_opts["extract_flat"] = True
         if "logger" not in flat_opts:
             flat_opts["logger"] = dlp_logger
+
+        if cls.dlp_verbose == True:
+            LogManager.log_message(
+                f"Starting youtube getentries helper with options {ydl_opts}",
+                log_file_name,
+            )
         with YoutubeDL(flat_opts) as flat_ydl:
             for section_url in (videos_url, shorts_url):
                 if not section_url:
@@ -212,10 +227,10 @@ class DLPHelpers:
 
     @classmethod
     async def download_with_retry(cls, ydl_opts, url_or_list, log_file_name=None):
-        """Download using YoutubeDL; retry once without cookiefile on rate-limit.
+        """Download using YoutubeDL; retry once with cookiefile on signin-required error.
 
         Detects rate limits from both exception messages and logger warnings.
-        Raises the final exception if retry also fails with rate-limit or other errors.
+        Logs an error and continues if a rate-limit error persists after retries.
         """
         dlp_logger = DLP_Logger(
             patterns=DLP_Logger_Patterns, log_file_name=log_file_name
@@ -223,77 +238,66 @@ class DLPHelpers:
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
         ydl_opts["logger"] = dlp_logger
 
-        orig_had_cookie = False
-        if cls.dlp_cookies_present:
-            ydl_opts["cookiefile"] = cls.dlp_cookies_file
-            orig_had_cookie = True
-
+        # First attempt without cookiefile
         try:
             await cls.download(ydl_opts, url_or_list, log_file_name)
+            return
         except Exception as e:
             LogManager.log_message(
                 f"Exception in download helper {e}",
                 log_file_name,
             )
-            is_rate_limit_by_exception = DLPEvents.is_rate_limit_error(e)
-            is_rate_limit_by_logger = dlp_logger.detected
-
-            if (
-                is_rate_limit_by_exception or is_rate_limit_by_logger
-            ) and orig_had_cookie:
+            if DLPEvents.is_signin_required_error(e):
                 LogManager.log_message(
-                    f"Rate limit detected during download using cookiefile (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}), retrying without cookiefile: {e}",
+                    f"Signin required detected, retrying with cookiefile: {e}",
                     log_file_name,
                 )
-                retry_logger = DLP_Logger(
-                    patterns=DLP_Logger_Patterns, log_file_name=log_file_name
-                )
-                retry_opts = dict(ydl_opts)
-                retry_opts.pop("cookiefile", None)
-                retry_opts["logger"] = retry_logger
-                try:
-                    await cls.download(retry_opts, url_or_list, log_file_name)
-                except Exception as e2:
-                    is_rate_limit_by_exception_2 = DLPEvents.is_rate_limit_error(e2)
-                    is_rate_limit_by_logger_2 = retry_logger.detected
-                    if is_rate_limit_by_exception_2 or is_rate_limit_by_logger_2:
-                        LogManager.log_message(
-                            f"Rate limit persists after retry without cookiefile for download (exception: {is_rate_limit_by_exception_2}, logger: {is_rate_limit_by_logger_2}): {e2}",
-                            log_file_name,
-                        )
-                    else:
-                        LogManager.log_message(
-                            f"Download failed on retry without cookiefile for non-rate-limit reason: {e2}",
-                            log_file_name,
-                        )
+                if cls.dlp_cookies_present:
+                    ydl_opts["cookiefile"] = cls.dlp_cookies_file
+                    try:
+                        await cls.download(ydl_opts, url_or_list, log_file_name)
+                        return
+                    except Exception as e2:
+                        is_rate_limit_by_exception = DLPEvents.is_rate_limit_error(e2)
+                        is_rate_limit_by_logger = dlp_logger.detected
+                        if is_rate_limit_by_exception or is_rate_limit_by_logger:
+                            LogManager.log_message(
+                                f"Rate limit persists after retry with cookiefile for download (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}): {e2}",
+                                log_file_name,
+                            )
+                        else:
+                            LogManager.log_message(
+                                f"Download failed on retry with cookiefile for non-rate-limit reason: {e2}",
+                                log_file_name,
+                            )
             else:
-                LogManager.log_message(
-                    f"Download failed for non-rate-limit reason (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}): {e}",
-                    log_file_name,
-                )
+                is_rate_limit_by_exception = DLPEvents.is_rate_limit_error(e)
+                is_rate_limit_by_logger = dlp_logger.detected
+                if is_rate_limit_by_exception or is_rate_limit_by_logger:
+                    LogManager.log_message(
+                        f"Rate limit detected during download without cookiefile (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}), logging and continuing: {e}",
+                        log_file_name,
+                    )
 
     @classmethod
     async def getinfo_with_retry(cls, ydl_opts, url_or_list, log_file_name=None):
         """Retrieve info using YoutubeDL.extract_info without downloading.
 
-        Mirrors the retry behavior of `download_with_retry`: if a rate-limit
-        error occurs and the original options contained a `cookiefile`, retry
-        once without the cookiefile. Detects rate limits from both exception
-        messages and logger warnings. Returns the extracted info on success or
-        `None` on failure (errors are logged to `LogManager`).
+        Mirrors the retry behavior of `download_with_retry`: if a signin-required
+        error occurs, retries with the cookiefile. Logs an error and continues
+        if a rate-limit error persists after retries.
         """
+
+        LogManager.log_message("Started getinfo_with_retry",log_file_name,
+        )
+
         dlp_logger = DLP_Logger(
             patterns=DLP_Logger_Patterns, log_file_name=log_file_name
         )
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
         ydl_opts["logger"] = dlp_logger
 
-        YT_Cookies_File = DVR_Config.get_yt_cookies_file()
-        orig_had_cookie = False
-        if cls.dlp_cookies_present:
-            ydl_opts["cookiefile"] = cls.dlp_cookies_file
-            orig_had_cookie = True
-
+        # First attempt without cookiefile
         try:
             return await cls.getinfo(ydl_opts, url_or_list, log_file_name)
         except Exception as e:
@@ -301,42 +305,36 @@ class DLPHelpers:
                 f"Exception in getinfo helper {e}",
                 log_file_name,
             )
-            is_rate_limit_by_exception = DLPEvents.is_rate_limit_error(e)
-            is_rate_limit_by_logger = dlp_logger.detected
-
-            if (
-                is_rate_limit_by_exception or is_rate_limit_by_logger
-            ) and orig_had_cookie:
+            if DLPEvents.is_signin_required_error(e):
                 LogManager.log_message(
-                    f"Rate limit detected during getinfo using cookiefile (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}), retrying without cookiefile: {e}",
+                    f"Signin required detected, retrying with cookiefile: {e}",
                     log_file_name,
                 )
-                retry_logger = DLP_Logger(
-                    patterns=DLP_Logger_Patterns, log_file_name=log_file_name
-                )
-                retry_opts = dict(ydl_opts)
-                retry_opts.pop("cookiefile", None)
-                retry_opts["logger"] = retry_logger
-                try:
-                    return await cls.getinfo(retry_opts, url_or_list, log_file_name)
-                except Exception as e2:
-                    is_rate_limit_by_exception_2 = DLPEvents.is_rate_limit_error(e2)
-                    is_rate_limit_by_logger_2 = retry_logger.detected
-                    if is_rate_limit_by_exception_2 or is_rate_limit_by_logger_2:
-                        LogManager.log_message(
-                            f"Rate limit persists after retry without cookiefile for getinfo (exception: {is_rate_limit_by_exception_2}, logger: {is_rate_limit_by_logger_2}): {e2}",
-                            log_file_name,
-                        )
-                    else:
-                        LogManager.log_message(
-                            f"getinfo failed on retry without cookiefile for non-rate-limit reason: {e2}",
-                            log_file_name,
-                        )
+                if cls.dlp_cookies_present:
+                    ydl_opts["cookiefile"] = cls.dlp_cookies_file
+                    try:
+                        return await cls.getinfo(ydl_opts, url_or_list, log_file_name)
+                    except Exception as e2:
+                        is_rate_limit_by_exception = DLPEvents.is_rate_limit_error(e2)
+                        is_rate_limit_by_logger = dlp_logger.detected
+                        if is_rate_limit_by_exception or is_rate_limit_by_logger:
+                            LogManager.log_message(
+                                f"Rate limit persists after retry with cookiefile for getinfo (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}): {e2}",
+                                log_file_name,
+                            )
+                        else:
+                            LogManager.log_message(
+                                f"getinfo failed on retry with cookiefile for non-rate-limit reason: {e2}",
+                                log_file_name,
+                            )
             else:
-                LogManager.log_message(
-                    f"getinfo failed for non-rate-limit reason (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}): {e}",
-                    log_file_name,
-                )
+                is_rate_limit_by_exception = DLPEvents.is_rate_limit_error(e)
+                is_rate_limit_by_logger = dlp_logger.detected
+                if is_rate_limit_by_exception or is_rate_limit_by_logger:
+                    LogManager.log_message(
+                        f"Rate limit detected during getinfo without cookiefile (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}), logging and continuing: {e}",
+                        log_file_name,
+                    )
         return None
 
     @classmethod
@@ -345,10 +343,9 @@ class DLPHelpers:
     ):
         """Fetch entries for provided section URLs (videos/shorts).
 
-        Tries once with the configured cookiefile, and if a rate-limit error
-        occurs and a cookie was used, retries once without the cookiefile.
-        Detects rate limits from both exception messages and logger warnings.
-        Returns a list of entries on success, or None on failure.
+        Tries once without the cookiefile, and if a signin-required error
+        occurs, retries with the cookiefile. Logs an error and continues
+        if a rate-limit error persists after retries.
         """
         dlp_logger = DLP_Logger(
             patterns=DLP_Logger_Patterns, log_file_name=log_file_name
@@ -356,12 +353,7 @@ class DLPHelpers:
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
         ydl_opts["logger"] = dlp_logger
 
-        YT_Cookies_File = DVR_Config.get_yt_cookies_file()
-        orig_had_cookie = False
-        if cls.dlp_cookies_present:
-            ydl_opts["cookiefile"] = cls.dlp_cookies_file
-            orig_had_cookie = True
-
+        # First attempt without cookiefile
         try:
             return await cls.getentries(ydl_opts, videos_url, shorts_url, log_file_name)
         except Exception as e:
@@ -369,42 +361,36 @@ class DLPHelpers:
                 f"Exception in getentries helper {e}",
                 log_file_name,
             )
-            is_rate_limit_by_exception = DLPEvents.is_rate_limit_error(e)
-            is_rate_limit_by_logger = dlp_logger.detected
-
-            if (
-                is_rate_limit_by_exception or is_rate_limit_by_logger
-            ) and orig_had_cookie:
+            if DLPEvents.is_signin_required_error(e):
                 LogManager.log_message(
-                    f"Rate limit detected during getentries using cookiefile (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}), retrying without cookiefile: {e}",
+                    f"Signin required detected, retrying with cookiefile: {e}",
                     log_file_name,
                 )
-                retry_logger = DLP_Logger(
-                    patterns=DLP_Logger_Patterns, log_file_name=log_file_name
-                )
-                retry_opts = dict(ydl_opts)
-                retry_opts.pop("cookiefile", None)
-                retry_opts["logger"] = retry_logger
-                try:
-                    return await cls.getentries(
-                        retry_opts, videos_url, shorts_url, log_file_name
-                    )
-                except Exception as e2:
-                    is_rate_limit_by_exception_2 = DLPEvents.is_rate_limit_error(e2)
-                    is_rate_limit_by_logger_2 = retry_logger.detected
-                    if is_rate_limit_by_exception_2 or is_rate_limit_by_logger_2:
-                        LogManager.log_message(
-                            f"Rate limit persists after retry without cookiefile for getentries (exception: {is_rate_limit_by_exception_2}, logger: {is_rate_limit_by_logger_2}): {e2}",
-                            log_file_name,
+                if cls.dlp_cookies_present:
+                    ydl_opts["cookiefile"] = cls.dlp_cookies_file
+                    try:
+                        return await cls.getentries(
+                            ydl_opts, videos_url, shorts_url, log_file_name
                         )
-                    else:
-                        LogManager.log_message(
-                            f"getentries failed on retry without cookiefile for non-rate-limit reason: {e2}",
-                            log_file_name,
-                        )
+                    except Exception as e2:
+                        is_rate_limit_by_exception = DLPEvents.is_rate_limit_error(e2)
+                        is_rate_limit_by_logger = dlp_logger.detected
+                        if is_rate_limit_by_exception or is_rate_limit_by_logger:
+                            LogManager.log_message(
+                                f"Rate limit persists after retry with cookiefile for getentries (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}): {e2}",
+                                log_file_name,
+                            )
+                        else:
+                            LogManager.log_message(
+                                f"getentries failed on retry with cookiefile for non-rate-limit reason: {e2}",
+                                log_file_name,
+                            )
             else:
-                LogManager.log_message(
-                    f"getentries failed for non-rate-limit reason (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}): {e}",
-                    log_file_name,
-                )
+                is_rate_limit_by_exception = DLPEvents.is_rate_limit_error(e)
+                is_rate_limit_by_logger = dlp_logger.detected
+                if is_rate_limit_by_exception or is_rate_limit_by_logger:
+                    LogManager.log_message(
+                        f"Rate limit detected during getentries without cookiefile (exception: {is_rate_limit_by_exception}, logger: {is_rate_limit_by_logger}), logging and continuing: {e}",
+                        log_file_name,
+                    )
         return None

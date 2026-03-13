@@ -18,7 +18,8 @@ class AsyncScheduler:
 
     @classmethod
     def _start_bg_loop(cls):
-        if getattr(cls, "_bg_loop", None) is not None and cls._bg_loop.is_running():
+        bg_loop = getattr(cls, "_bg_loop", None)
+        if bg_loop is not None and bg_loop.is_running():
             return
 
         def _run_loop():
@@ -32,7 +33,8 @@ class AsyncScheduler:
 
         # wait briefly for the loop to be ready
         for _ in range(100):
-            if getattr(cls, "_bg_loop", None) is not None and cls._bg_loop.is_running():
+            bg_loop = getattr(cls, "_bg_loop", None)
+            if bg_loop is not None and bg_loop.is_running():
                 break
             time.sleep(0.01)
 
@@ -58,11 +60,13 @@ class AsyncScheduler:
                 asyncio.run_coroutine_threadsafe(coro, main_loop)
                 return True
         with cls._bg_loop_lock:
-            if getattr(cls, "_bg_loop", None) is None or not cls._bg_loop.is_running():
+            bg_loop = getattr(cls, "_bg_loop", None)
+            if bg_loop is None or not bg_loop.is_running():
                 cls._start_bg_loop()
 
-        if getattr(cls, "_bg_loop", None) is not None:
+        bg_loop = getattr(cls, "_bg_loop", None)
+        if bg_loop is not None:
             with contextlib.suppress(Exception):
-                asyncio.run_coroutine_threadsafe(coro, cls._bg_loop)
+                asyncio.run_coroutine_threadsafe(coro, bg_loop)
                 return True
         return False

@@ -1,0 +1,9 @@
+services:
+  DreggDVR-Beta:
+    image: python:alpine
+    container_name: DreggDVR-Beta
+    command: python /_Dregg_DVR/main.py
+    volumes:
+      - D:\GitHub\DregDVR:/_Dregg_DVR:ro
+      - D:\Containers\Mounts\Dreggs\Beta\_DVR_Runtime:/_DVR_Runtime
+      - D:\Containers\Mounts\Dreggs\Beta\_DVR_Data:/_DVR_Data

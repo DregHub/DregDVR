@@ -1,6 +1,10 @@
 import re
 import traceback
+import logging
 from .config import BaseConfig
+
+# Configure logger for this module
+logger = logging.getLogger(__name__)
 
 
 class Account_Config(BaseConfig):
@@ -15,7 +19,7 @@ class Account_Config(BaseConfig):
             cls._init_parser()
             return cls.get_value("YT_Sources", "source").strip('"')
         except Exception as e:
-            print(f"Error in get_youtube_source: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_youtube_source: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -30,7 +34,7 @@ class Account_Config(BaseConfig):
                 else youtube_source
             )
         except Exception as e:
-            print(f"Error in get_youtube_handle: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_youtube_handle: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -44,7 +48,7 @@ class Account_Config(BaseConfig):
                 return f"@{handle}"
             return "Unknown_Handle"
         except Exception as e:
-            print(f"Error in get_youtube_handle_name: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_youtube_handle_name: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -53,7 +57,7 @@ class Account_Config(BaseConfig):
             cls._init_parser()
             return cls.get_value("YT_Sources", "caption_source")
         except Exception as e:
-            print(f"Error in get_caption_source: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_caption_source: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -68,7 +72,7 @@ class Account_Config(BaseConfig):
                 else youtube_source
             )
         except Exception as e:
-            print(f"Error in get_caption_handle: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_caption_handle: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -82,7 +86,7 @@ class Account_Config(BaseConfig):
                 return f"@{handle}"
             return "Unknown_Handle"
         except Exception as e:
-            print(f"Error in get_caption_handle_name: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_caption_handle_name: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -91,7 +95,7 @@ class Account_Config(BaseConfig):
             cls._init_parser()
             return cls.get_value("File_Naming", "live_downloadprefix").strip('"')
         except Exception as e:
-            print(f"Error in get_live_downloadprefix: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_live_downloadprefix: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -100,7 +104,7 @@ class Account_Config(BaseConfig):
             cls._init_parser()
             return cls.get_value("File_Naming", "posted_downloadprefix").strip('"')
         except Exception as e:
-            print(f"Error in get_posted_downloadprefix: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_posted_downloadprefix: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -109,7 +113,7 @@ class Account_Config(BaseConfig):
             cls._init_parser()
             return cls.get_value("IA_Settings", "itemid").strip('"')
         except Exception as e:
-            print(f"Error in get_ia_itemid: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_ia_itemid: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -118,7 +122,7 @@ class Account_Config(BaseConfig):
             cls._init_parser()
             return cls.get_value("IA_Settings", "user_agent").strip('"')
         except Exception as e:
-            print(f"Error in get_ia_user_agent: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_ia_user_agent: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -127,7 +131,7 @@ class Account_Config(BaseConfig):
             cls._init_parser()
             return cls.get_value("IA_Credentials", "email").strip('"')
         except Exception as e:
-            print(f"Error in get_ia_email: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_ia_email: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -136,5 +140,5 @@ class Account_Config(BaseConfig):
             cls._init_parser()
             return cls.get_value("IA_Credentials", "password").strip('"')
         except Exception as e:
-            print(f"Error in get_ia_password: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_ia_password: {e}\n{traceback.format_exc()}")
             raise
