@@ -59,7 +59,7 @@ Using fuck all resources with no video transcoding . Can run on a potato
 | _DVR/_Posted_CommunityMessages | Contains Community_Archive.html which is a complete archive of the community posts including deleted posts                                            |
 | _DVR/_Posted_CompletedUploads  | Shorts & Videos end up here after they are uploaded to YouTube & IA                                                                                   |
 | _DVR/_Posted_DownloadQueue     | Shorts & Videos are downloaded here when complete they automatically move to _Posted_UploadQueue                                                      |
-| _DVR/_Posted_Playlists         | You can ignore this one, Just 2 csv files for keeping track of what's a new video and what's been uploaded before.                                    |
+| _DVR/_channel_playlists         | You can ignore this one, Just 2 csv files for keeping track of what's a new video and what's been uploaded before.                                    |
 | _DVR/_Posted_UploadQueue       | Any video files placed in here that match the download_timestamp_format get uploaded to YouTube and IA automatically                                  |
 
 # I WANT DIS! HOW I GET....
@@ -141,7 +141,7 @@ Here is a quick breakdown of the config files
 | Directories         | posted_uploadqueue_dir             | The name of the directory is customizable for reasons                                                            |
 | Directories         | posted_downloadqueue_dir           | The name of the directory is customizable for reasons                                                            |
 | Directories         | posted_completeduploads_dir        | The name of the directory is customizable for reasons                                                            |
-| Directories         | posted_playlists_dir               | The name of the directory is customizable for reasons                                                            |
+| Directories         | channel_playlists_dir               | The name of the directory is customizable for reasons                                                            |
 | Directories         | posted_notices_dir                 | The name of the directory is customizable for reasons                                                            |
 | Directories         | metadata_dir                       | The name of the directory is customizable for reasons                                                            |
 | Directories         | log_dir                            | The name of the directory is customizable for reasons                                                            |

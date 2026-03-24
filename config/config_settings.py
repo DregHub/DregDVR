@@ -4,11 +4,9 @@ import json
 import traceback
 import logging
 from .config import BaseConfig
-
 # Configure logger for this module
+
 logger = logging.getLogger(__name__)
-
-
 class DVR_Config(BaseConfig):
     parser = None
     parser_attr_name = "parser"
@@ -20,7 +18,7 @@ class DVR_Config(BaseConfig):
     def _init_parser(cls):
         """Initialize the configuration parser and set Data_Root_Dir."""
         try:
-            # Only initialize parent parser, do NOT call other DVR_Config methods here
+            # Call parent's _init_parser to initialize the parser attribute
             super()._init_parser()
 
             # Set Data_Root_Dir only if parser is ready and not already set
@@ -31,8 +29,8 @@ class DVR_Config(BaseConfig):
         except Exception as e:
             logger.error(f"Error in DVR_Config._init_parser: {e}\n{traceback.format_exc()}")
             raise
-
     # Live Directories
+
     @classmethod
     def get_live_downloadqueue_dir(cls):
         try:
@@ -53,6 +51,7 @@ class DVR_Config(BaseConfig):
                 cls.Data_Root_Dir,
                 cls.get_value("Directories", "live_downloadrecovery_dir").strip('"'),
             )
+
         except Exception as e:
             logger.error(
                 f"Error in get_live_downloadrecovery_dir: {e}\n{traceback.format_exc()}"
@@ -67,6 +66,7 @@ class DVR_Config(BaseConfig):
                 cls.Data_Root_Dir,
                 cls.get_value("Directories", "live_completeduploads_dir").strip('"'),
             )
+
         except Exception as e:
             logger.error(
                 f"Error in get_live_completeduploads_dir: {e}\n{traceback.format_exc()}"
@@ -81,6 +81,7 @@ class DVR_Config(BaseConfig):
                 cls.Data_Root_Dir,
                 cls.get_value("Directories", "live_uploadqueue_dir").strip('"'),
             )
+
         except Exception as e:
             logger.error(f"Error in get_live_uploadqueue_dir: {e}\n{traceback.format_exc()}")
             raise
@@ -93,6 +94,7 @@ class DVR_Config(BaseConfig):
                 cls.Data_Root_Dir,
                 cls.get_value("Directories", "live_comments_dir").strip('"'),
             )
+
         except Exception as e:
             logger.error(f"Error in get_live_comments_dir: {e}\n{traceback.format_exc()}")
             raise
@@ -105,20 +107,9 @@ class DVR_Config(BaseConfig):
                 cls.Data_Root_Dir,
                 cls.get_value("Directories", "captions_dir").strip('"'),
             )
+
         except Exception as e:
             logger.error(f"Error in get_live_captions_dir: {e}\n{traceback.format_exc()}")
-            raise
-
-    @classmethod
-    def get_caption_index_dir(cls):
-        try:
-            cls._init_parser()
-            return os.path.join(
-                cls.get_live_captions_dir(),
-                cls.get_value("Directories", "caption_index_dir").strip('"'),
-            )
-        except Exception as e:
-            logger.error(f"Error in get_caption_index_dir: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -129,23 +120,42 @@ class DVR_Config(BaseConfig):
                 cls.get_live_captions_dir(),
                 cls.get_value("Directories", "temp_captions_dir").strip('"'),
             )
+
         except Exception as e:
             logger.error(f"Error in get_temp_captions_dir: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
-    def get_published_captions_dir(cls):
+    def get_captions_upload_queue_dir(cls):
         try:
             cls._init_parser()
             return os.path.join(
                 cls.get_live_captions_dir(),
-                cls.get_value("Directories", "published_captions_dir").strip('"'),
+                cls.get_value("Directories", "captions_upload_queue_dir").strip('"'),
             )
+
         except Exception as e:
-            logger.error(f"Error in get_published_captions_dir: {e}\n{traceback.format_exc()}")
+
+            logger.error(f"Error in get_captions_upload_queue_dir: {e}\n{traceback.format_exc()}")
             raise
 
+    @classmethod
+    def get_captions_completed_uploads_dir(cls):
+        try:
+            cls._init_parser()
+            return os.path.join(
+                cls.get_live_captions_dir(),
+                cls.get_value("Directories", "captions_completed_uploads_dir").strip('"'),
+            )
+
+        except Exception as e:
+
+            logger.error(f"Error in get_captions_completed_uploads_dir: {e}\n{traceback.format_exc()}")
+            raise
+
+
     # Posted Directories
+
     @classmethod
     def get_posted_downloadqueue_dir(cls):
         try:
@@ -175,15 +185,15 @@ class DVR_Config(BaseConfig):
             raise
 
     @classmethod
-    def get_posted_playlists_dir(cls):
+    def get_channel_playlists_dir(cls):
         try:
             cls._init_parser()
             return os.path.join(
                 cls.Runtime_Profile_Dir,
-                cls.get_value("Directories", "posted_playlists_dir").strip('"'),
+                cls.get_value("Directories", "channel_playlists_dir").strip('"'),
             )
         except Exception as e:
-            logger.error(f"Error in get_posted_playlists_dir: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in get_channel_playlists_dir: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -211,6 +221,7 @@ class DVR_Config(BaseConfig):
             raise
 
     # Misc Directories
+
     @classmethod
     def get_auth_dir(cls):
         try:
@@ -277,18 +288,23 @@ class DVR_Config(BaseConfig):
             raise
 
     # File References
-
     # Posted Files
 
     @classmethod
-    def get_posted_persistent_playlist(cls):
+    def get_channel_playlist(cls, channel_name=None):
         try:
             cls._init_parser()
-            playlist_dir = cls.get_posted_playlists_dir()
-            return os.path.join(playlist_dir, "Combined_Playlist.json")
+            playlist_dir = cls.get_channel_playlists_dir()
+            if channel_name:
+                # Strip the @ prefix from the channel name if present
+                clean_channel_name = channel_name.lstrip("@").strip('"').strip()
+                filename = f"{clean_channel_name}_Playlist.json"
+            else:
+                filename = "Playlist.json"
+            return os.path.join(playlist_dir, filename)
         except Exception as e:
             logger.error(
-                f"Error in get_posted_persistent_playlist: {e}\n{traceback.format_exc()}"
+                f"Error in get_channel_playlist: {e}\n{traceback.format_exc()}"
             )
             raise
 
@@ -321,6 +337,7 @@ class DVR_Config(BaseConfig):
             raise
 
     # Log File References
+
     @classmethod
     def get_core_log_file(cls):
         try:
@@ -382,15 +399,19 @@ class DVR_Config(BaseConfig):
             raise
 
     @classmethod
-    def get_posted_playlist_log_file(cls):
+    def get_channel_playlist_log_file(cls, channel_name=None):
         try:
             cls._init_parser()
-            return os.path.join(
-                cls.get_log_dir(), "Download_YouTube_Posted_Playlist.log"
-            )
+            if channel_name:
+                # Strip the @ prefix from the channel name if present
+                clean_channel_name = channel_name.lstrip("@").strip('"').strip()
+                filename = f"Download_YouTube_Channel_Playlist_{clean_channel_name}.log"
+            else:
+                filename = "Download_YouTube_Channel_Playlist.log"
+            return os.path.join(cls.get_log_dir(), filename)
         except Exception as e:
             logger.error(
-                f"Error in get_posted_playlist_log_file: {e}\n{traceback.format_exc()}"
+                f"Error in get_channel_playlist_log_file: {e}\n{traceback.format_exc()}"
             )
             raise
 
@@ -445,7 +466,17 @@ class DVR_Config(BaseConfig):
             logger.error(f"Error in get_upload_yt_log_file: {e}\n{traceback.format_exc()}")
             raise
 
+    @classmethod
+    def get_upload_captions_log_file(cls):
+        try:
+            cls._init_parser()
+            return os.path.join(cls.get_log_dir(), "Upload_Manager_Captions.log")
+        except Exception as e:
+            logger.error(f"Error in get_upload_captions_log_file: {e}\n{traceback.format_exc()}")
+            raise
+
     # Log Filters
+
     @classmethod
     def core_log_filter(cls):
         try:
@@ -499,13 +530,13 @@ class DVR_Config(BaseConfig):
             raise
 
     @classmethod
-    def posted_playlist_log_filter(cls):
+    def channel_playlist_log_filter(cls):
         try:
             return cls.parse_string_list(
-                cls.get_value("Log_Filters", "posted_playlist_log_filter")
+                cls.get_value("Log_Filters", "channel_playlist_log_filter")
             )
         except Exception as e:
-            logger.error(f"Error in posted_playlist_log_filter: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in channel_playlist_log_filter: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod
@@ -558,6 +589,16 @@ class DVR_Config(BaseConfig):
             )
         except Exception as e:
             logger.error(f"Error in upload_yt_log_filter: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def upload_captions_log_filter(cls):
+        try:
+            return cls.parse_string_list(
+                cls.get_value("Log_Filters", "upload_captions_log_filter")
+            )
+        except Exception as e:
+            logger.error(f"Error in upload_captions_log_filter: {e}\n{traceback.format_exc()}")
             raise
 
     # Strings

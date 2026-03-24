@@ -317,6 +317,30 @@ class DLPEvents:
         "this video may be inappropriate for some users",
     ]
 
+    AGE_CONFIRMATION_STRINGS = [
+        "sign in to confirm your age",
+        "this video may be inappropriate for some users",
+    ]
+
+    TLS_SSL_ERROR_STRINGS = [
+        "tls",
+        "ssl",
+        "certificate",
+        "handshake",
+        "wrong_version",
+        "connection reset",
+        "connection refused",
+        "curl: (35)",
+        "curl: (52)",
+        "tmp_download_archive",
+    ]
+
+    @classmethod
+    def is_tls_ssl_error(cls, err: Exception) -> bool:
+        """Detect TLS/SSL connection errors that are transient and retryable."""
+        msg = str(err).lower()
+        return any(s in msg for s in cls.TLS_SSL_ERROR_STRINGS)
+
     @classmethod
     def is_rate_limit_error(cls, err: Exception) -> bool:
         msg = str(err).lower()
@@ -326,3 +350,8 @@ class DLPEvents:
     def is_signin_required_error(cls, err: Exception) -> bool:
         msg = str(err).lower()
         return any(s in msg for s in cls.SIGNIN_REQUIRED_STRINGS)
+
+    @classmethod
+    def is_age_confirmation_error(cls, err: Exception) -> bool:
+        msg = str(err).lower()
+        return any(s in msg for s in cls.AGE_CONFIRMATION_STRINGS)

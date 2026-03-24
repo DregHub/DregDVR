@@ -146,7 +146,7 @@ class RecoveryDownloader:
 
             await DLPHelpers.download_with_retry(
                 download_ydl_opts,
-                currenturl,
+                [currenturl],
                 LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
             )
 

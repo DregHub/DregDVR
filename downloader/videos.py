@@ -11,25 +11,42 @@ from config.config_accounts import Account_Config
 from dlp.helpers import DLPHelpers
 
 
+class VideosPlaylistManager(PlaylistManager):
+    """Videos-specific version of PlaylistManager with independent channel configuration."""
+    
+    # Initialize with youtube source instead of caption source
+    _youtube_source = Account_Config.get_youtube_source()
+    playlist_dir = DVR_Config.get_channel_playlists_dir()
+    Posted_DownloadQueue_Dir = DVR_Config.get_posted_downloadqueue_dir()
+    channel_playlist = DVR_Config.get_channel_playlist(_youtube_source)
+    channel = Account_Config.build_youtube_url(_youtube_source)
+    videos_url = channel.rstrip("/") + "/videos"
+    shorts_url = channel.rstrip("/") + "/shorts"
+    channel_playlist_log_file = DVR_Config.get_channel_playlist_log_file(_youtube_source)
+    
+    _update_playlist_lock = asyncio.Lock()
+
+
 class VideoDownloader:
-    playlist = PlaylistManager()
+    # Use the independent VideosPlaylistManager
+    playlist = VideosPlaylistManager()
     DownloadTimeStampFormat = DVR_Config.get_download_timestamp_format()
     posted_downloadprefix = Account_Config.get_posted_downloadprefix()
-    playlist_dir = DVR_Config.get_posted_playlists_dir()
+    playlist_dir = DVR_Config.get_channel_playlists_dir()
     Posted_DownloadQueue_Dir = DVR_Config.get_posted_downloadqueue_dir()
     Posted_UploadQueue_Dir = DVR_Config.get_posted_uploadqueue_dir()
-    persistent_playlist = DVR_Config.get_posted_persistent_playlist()
+    channel_playlist = VideosPlaylistManager.channel_playlist
     dlp_max_dlp_download_retries = DVR_Config.get_max_dlp_download_retries()
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
 
-    youtube_channel = Account_Config.get_youtube_handle()
+    youtube_channel = VideosPlaylistManager.channel
 
     @classmethod
     async def _load_urls(cls):
         # Otherwise load persistent JSON playlist and return not-yet-downloaded URLs
         try:
             playlist_data = await asyncio.to_thread(
-                lambda: json.load(open(cls.persistent_playlist, "r", encoding="utf-8"))
+                lambda: json.load(open(cls.channel_playlist, "r", encoding="utf-8"))
             )
         except Exception:
             playlist_data = []
@@ -37,7 +54,7 @@ class VideoDownloader:
         urls = [
             item.get("URL")
             for item in playlist_data
-            if item.get("URL") and not item.get("Downloaded", False)
+            if item.get("URL") and not item.get("Downloaded_Video", False)
         ]
 
         if len(urls) > 1:
@@ -51,7 +68,7 @@ class VideoDownloader:
 
     @classmethod
     def _build_ydl_opts(cls, out_template: str):
-        ydl_opts = {
+        return {
             "paths": {
                 "temp": cls.Posted_DownloadQueue_Dir,
                 "home": cls.Posted_UploadQueue_Dir,
@@ -59,12 +76,9 @@ class VideoDownloader:
             "outtmpl": out_template,
             "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
             "restrictfilenames": True,
-            "fragment_retries": int(cls.dlp_max_fragment_retries),
             "retries": int(cls.dlp_max_dlp_download_retries),
             "ignore_no_formats_error": True,
         }
-
-        return ydl_opts
 
     @classmethod
     async def _process_url(cls, url: str):
@@ -75,10 +89,21 @@ class VideoDownloader:
         ydl_opts = cls._build_ydl_opts(CurrentDownloadFile)
 
         try:
+            LogManager.log_download_posted(
+                    f"Launching getinfo_with_retry for URL: {url} to determine live status before downloading."
+            )
             info = await DLPHelpers.getinfo_with_retry(
                 ydl_opts, url, LogManager.DOWNLOAD_POSTED_LOG_FILE
             )
-            live_status = info.get("live_status")
+            
+            # Handle case where info is None
+            if info is None:
+                LogManager.log_download_posted(
+                    f"{url} - Failed to retrieve video info, skipping download"
+                )
+                return
+            
+            live_status = info.get("live_status") if isinstance(info, dict) else None
 
             if live_status in ["is_live", "is_upcoming"]:
                 LogManager.log_download_posted(
@@ -91,6 +116,9 @@ class VideoDownloader:
             elif live_status == "not_live":
                 LogManager.log_download_posted(
                     f"{url} is a published video live_status = {live_status} , Proceding to download."
+                )
+                LogManager.log_download_posted(
+                    f"Launching download_with_retry for URL: {url} with ydl_opts: {ydl_opts}"
                 )
                 await DLPHelpers.download_with_retry(
                     ydl_opts, [url], LogManager.DOWNLOAD_POSTED_LOG_FILE
@@ -143,3 +171,5 @@ class VideoDownloader:
                     LogManager.log_download_posted(
                         "Sleep interrupted in download_videos loop"
                     )
+
+

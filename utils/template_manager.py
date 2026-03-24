@@ -68,7 +68,6 @@ class TemplateManager:
             Template content as string, or empty string if loading fails.
         """
         try:
-            await asyncio.to_thread(self._read_file_sync, file_path)
             with open(file_path, "r", encoding="utf-8") as f:
                 content = await asyncio.to_thread(f.read)
             return content

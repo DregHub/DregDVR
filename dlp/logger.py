@@ -133,6 +133,11 @@ DLP_Logger_Patterns = [
     },
     {
         "message_source": "[youtube]",
+        "message": "Sign in to confirm your age",
+        "result": "is_age_confirmation_required",
+    },
+    {
+        "message_source": "[youtube]",
         "message": "rate limit",
         "result": "is_rate_limited",
     },
@@ -150,5 +155,10 @@ DLP_Logger_Patterns = [
         "message_source": "[youtube]",
         "message": "not available",
         "result": "is_rate_limited",
+    },
+    {
+        "message_source": "[youtube]",
+        "message": "confirm you're not a bot",
+        "result": "is_signin_required",
     },
 ]

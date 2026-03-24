@@ -18,15 +18,17 @@ class VideoUploader:
         LogManager.log_upload_posted(
             f"Monitoring {cls.Posted_UploadQueue_Dir} For Published Videos & Shorts"
         )
-        # Try to acquire the lock without waiting
-        if cls._upload_videos_lock.locked():
-            LogManager.log_upload_posted(
-                "Youtube upload_videos is already running, skipping this call."
-            )
-            return
 
-        async with cls._upload_videos_lock:
-            while True:
+        while True:
+            # Try to acquire the lock without waiting
+            if cls._upload_videos_lock.locked():
+                LogManager.log_upload_posted(
+                    "Youtube upload_videos is already running, skipping this call."
+                )
+                await asyncio.sleep(30)
+                continue
+
+            async with cls._upload_videos_lock:
                 try:
                     for file in os.listdir(cls.Posted_UploadQueue_Dir):
                         filepath = os.path.join(cls.Posted_UploadQueue_Dir, file)
@@ -81,5 +83,5 @@ class VideoUploader:
                     LogManager.log_upload_posted(
                         f"Exception in upload_videos: {e}\n{traceback.format_exc()}"
                     )
-                finally:
-                    await asyncio.sleep(30)
+
+            await asyncio.sleep(30)

@@ -10,7 +10,6 @@ class DVR_Tasks(BaseConfig):
     tasks_parser = None
     parser_attr_name = "tasks_parser"
     config_filename = "dvr_tasks.cfg"
- 
     # Strings
     @classmethod
     def get_container_maintenance_inf_loop(cls):
@@ -106,6 +105,15 @@ class DVR_Tasks(BaseConfig):
             return cls.get_value_as_bool("Tasks", "posted_videos_upload")
         except Exception as e:
             logger.error(f"Error in get_posted_videos_upload: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_captions_upload(cls):
+        try:
+            cls._init_parser()
+            return cls.get_value_as_bool("Tasks", "captions_upload")
+        except Exception as e:
+            logger.error(f"Error in get_captions_upload: {e}\n{traceback.format_exc()}")
             raise
 
     @classmethod

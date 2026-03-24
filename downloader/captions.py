@@ -4,6 +4,7 @@ import os
 import asyncio
 import traceback
 from typing import Tuple
+from datetime import datetime, timezone
 from utils.json_utils import JSONUtils
 from utils.logging_utils import LogManager
 from utils.file_utils import FileManager
@@ -13,6 +14,23 @@ from yt_dlp import YoutubeDL
 from dlp.helpers import DLPHelpers
 from dlp.events import DLPEvents
 from yt_dlp_plugins.postprocessor import srt_fix as srt_fix_module
+from downloader.playlist import PlaylistManager
+
+
+class CaptionsPlaylistManager(PlaylistManager):
+    """Caption-specific version of PlaylistManager with independent channel configuration."""
+    
+    # Initialize with caption source instead of youtube source
+    _caption_source = Account_Config.get_caption_source()
+    playlist_dir = DVR_Config.get_channel_playlists_dir()
+    Posted_DownloadQueue_Dir = DVR_Config.get_posted_downloadqueue_dir()
+    channel_playlist = DVR_Config.get_channel_playlist(_caption_source)
+    channel = Account_Config.build_youtube_url(_caption_source)
+    videos_url = channel.rstrip("/") + "/videos"
+    shorts_url = channel.rstrip("/") + "/shorts"
+    channel_playlist_log_file = DVR_Config.get_channel_playlist_log_file(_caption_source)
+    
+    _update_playlist_lock = asyncio.Lock()
 
 
 class CaptionsDownloader:
@@ -22,71 +40,15 @@ class CaptionsDownloader:
     dlp_subtitle_use_srtfix = DVR_Config.get_dlp_subtitle_use_srtfix()
     caption_dir = DVR_Config.get_live_captions_dir()
     temp_caption_dir = DVR_Config.get_temp_captions_dir()
-    publish_caption_dir = DVR_Config.get_published_captions_dir()
-    index_dir = DVR_Config.get_caption_index_dir()
+    get_captions_upload_queue_dir = DVR_Config.get_captions_upload_queue_dir()
+    get_captions_completed_uploads_dir = DVR_Config.get_captions_completed_uploads_dir()
 
-    video_json = os.path.join(index_dir, "_Channel_Videos.json")
-    shorts_json = os.path.join(index_dir, "_Channel_Shorts.json")
-    caption_index_file = os.path.join(index_dir, "_Caption_Index.json")
+    
+    # Use the independent CaptionsPlaylistManager
+    caption_channel_playlist = CaptionsPlaylistManager.channel_playlist
 
     _download_execution_lock = asyncio.Lock()
-    _monitor_execution_lock = asyncio.Lock()
-
-    video_playlist = f"{Account_Config.get_caption_handle()}/videos"
-    shorts_playlist = f"{Account_Config.get_caption_handle()}/shorts"
-
-    YT_Cookies_File = DVR_Config.get_yt_cookies_file()  # Added missing class variable
-
-    @classmethod
-    async def monitor_channel(cls):
-        tasks = []
-        try:
-            LogManager.log_download_captions(
-                f"Starting Channel Monitor for {Account_Config.get_caption_handle()}"
-            )
-
-            LogManager.log_download_captions(
-                f"Using caption directory: {cls.caption_dir}\n"
-                f"Using temp caption directory: {cls.temp_caption_dir}\n"
-                f"Using index directory: {cls.index_dir}"
-            )
-
-            os.makedirs(cls.caption_dir, exist_ok=True)
-            os.makedirs(cls.publish_caption_dir, exist_ok=True)
-            os.makedirs(cls.temp_caption_dir, exist_ok=True)
-            os.makedirs(cls.index_dir, exist_ok=True)
-
-            # Use configured handle; if it's not a full URL, prefix with YouTube base
-            handle = Account_Config.get_caption_handle()
-            if handle.startswith("http://") or handle.startswith("https://"):
-                channel_url = handle
-            else:
-                # ensure leading slash is correct
-                channel_url = f"https://www.youtube.com/{handle.lstrip('/')}"
-            cls.dlp_events = DLPEvents(
-                channel_url,
-                LogManager.log_download_captions,
-                cls.download_started,
-                cls.download_complete,
-                cls.download_processing,
-            )
-            LogManager.log_download_captions(f"Monitoring channel {channel_url}")
-            #tasks = [cls.download_captions(), cls.manage_caption_index_file()]
-            tasks = [cls.manage_caption_index_file()]
-
-
-            
-        except Exception as e:
-            LogManager.log_download_captions(
-                f"Failed to schedule caption tasks: {e}\n{traceback.format_exc()}"
-            )
-        try:
-            await asyncio.gather(*tasks, return_exceptions=True)
-        except Exception as e:
-            LogManager.log_download_captions(
-                f"Unhandled exception in monitor_channel: {e}\n{traceback.format_exc()}"
-            )
-
+    
     @classmethod
     async def fix_srt_async(cls, input_path, output_path=None):
         if output_path is None:
@@ -105,84 +67,38 @@ class CaptionsDownloader:
             )
             raise
 
-    @classmethod
-    async def manage_caption_index_file(cls):
-        while True:
-            if cls._monitor_execution_lock.locked():
-                LogManager.log_download_captions(
-                    "manage_caption_index_file is already running. Skipping this attempt."
-                )
-                await asyncio.sleep(60)  # Wait a minute before next check
-                continue
-            async with cls._monitor_execution_lock:
-                try:
-                    LogManager.log_download_captions(
-                        f"Started Update Captions Index Process for {cls.caption_index_file}"
-                    )
-                    await cls.get_flat_playlist_async(
-                        cls.video_playlist, cls.video_json
-                    )
-                    await cls.get_flat_playlist_async(
-                        cls.shorts_playlist, cls.shorts_json
-                    )
-
-                    video_contents = await JSONUtils.read_json(cls.video_json)
-                    await cls.populate_captions_index(
-                        video_contents, cls.caption_index_file
-                    )
-                    shorts_contents = await JSONUtils.read_json(cls.shorts_json)
-                    await cls.populate_captions_index(
-                        shorts_contents, cls.caption_index_file
-                    )
-
-                    LogManager.log_download_captions(
-                        "The Captions Index File has been updated with new videos & shorts"
-                    )
-
-                    await cls.populate_hascaptions_field()
-                    LogManager.log_download_captions(
-                        f'Finished Updating "has_captions" field in {cls.caption_index_file}'
-                    )
-                except Exception as e:
-                    LogManager.log_download_captions(
-                        f"Unhandled exception in manage_caption_index_file: {e}\n{traceback.format_exc()}"
-                    )
-
-            LogManager.log_download_captions(
-                "Caption Index Process completed. Sleeping for 1 hour."
-            )
-            try:
-                await asyncio.sleep(3600)
-            except Exception as e:
-                LogManager.log_download_captions(
-                    f"Sleep interrupted in manage_caption_index_file: {e}\n{traceback.format_exc()}"
-                )
 
     @classmethod
     async def download_captions(cls):
+        LogManager.log_download_captions(
+                f"Starting caption download for {Account_Config.extract_channel_handle(Account_Config.get_caption_source())}"
+        )
+        os.makedirs(cls.caption_dir, exist_ok=True)
+        os.makedirs(cls.get_captions_completed_uploads_dir, exist_ok=True)
+        os.makedirs(cls.get_captions_upload_queue_dir, exist_ok=True)
+        os.makedirs(cls.temp_caption_dir, exist_ok=True)
+
+        # Build full URL from channel source
+        caption_source = Account_Config.get_caption_source()
+        channel_url = Account_Config.build_youtube_url(caption_source)
+        cls.dlp_events = DLPEvents(
+                channel_url,
+                LogManager.log_download_captions,
+        )
+
         while True:
             async with cls._download_execution_lock:
-                try:
-                    if cls._monitor_execution_lock.locked():
-                        LogManager.log_download_captions(
-                            "Monitor Task is currently updating the index file - delaying caption download cycle to avoid conflicts."
-                        )
-                        await asyncio.sleep(300)
-                        continue
-
-                    if not os.path.exists(cls.caption_index_file):
-                        await asyncio.sleep(300)
-                        continue
-
+                try: 
                     LogManager.log_download_captions(
                         "Starting caption download cycle..."
                     )
-                    index_data = await JSONUtils.read_json(cls.caption_index_file)
+                    await CaptionsPlaylistManager.update_channel_playlist()
+                    playlist_data = await JSONUtils.read_json(cls.caption_channel_playlist)
 
-                    items = list(index_data.items())
+                    items = playlist_data if isinstance(playlist_data, list) else []
                     if not items:
                         LogManager.log_download_captions(
-                            "No caption entries found in index."
+                            "No caption entries found in playlist."
                         )
                     else:
                         workers = []
@@ -192,21 +108,21 @@ class CaptionsDownloader:
                             LogManager.log_download_captions(
                                 "Sequential download mode enabled - processing items one at a time."
                             )
-                            for video_id, entry in items:
+                            for entry in items:
                                 try:
                                     await cls.process_video_entry(
-                                        video_id,
                                         entry,
                                         semaphore=None,
-                                        index_data=index_data,
+                                        playlist_data=playlist_data,
                                     )
                                 except Exception as e:
+                                    video_id = entry.get("UniqueID", "unknown")
                                     LogManager.log_download_captions(
                                         f"Error processing video entry {video_id}: {e}\n{traceback.format_exc()}"
                                     )
 
                             await JSONUtils.save_json(
-                                index_data, cls.caption_index_file
+                                playlist_data, cls.caption_channel_playlist
                             )
 
                         else:
@@ -225,16 +141,15 @@ class CaptionsDownloader:
                                     try:
                                         if item is None:
                                             break
-                                        video_id, entry = item
                                         await cls.process_video_entry(
-                                            video_id,
-                                            entry,
+                                            item,
                                             semaphore=None,
-                                            index_data=index_data,
+                                            playlist_data=playlist_data,
                                         )
                                     except Exception as e:
+                                        video_id = item.get("UniqueID", "unknown") if item else "unknown"
                                         LogManager.log_download_captions(
-                                            f"Error in worker processing item {item}: {e}\n{traceback.format_exc()}"
+                                            f"Error in worker processing item {video_id}: {e}\n{traceback.format_exc()}"
                                         )
                                     finally:
                                         queue.task_done()
@@ -263,7 +178,7 @@ class CaptionsDownloader:
                             await asyncio.gather(*workers, return_exceptions=True)
 
                             await JSONUtils.save_json(
-                                index_data, cls.caption_index_file
+                                playlist_data, cls.caption_channel_playlist
                             )
 
                             if rate_limit_event.is_set():
@@ -285,25 +200,26 @@ class CaptionsDownloader:
                 )
 
             try:
-                await JSONUtils.save_json(index_data, cls.caption_index_file)
+                await JSONUtils.save_json(playlist_data, cls.caption_channel_playlist)
             except Exception as e:
                 LogManager.log_download_captions(
-                    f"Error saving index data in download_captions: {e}\n{traceback.format_exc()}"
+                    f"Error saving playlist data in download_captions: {e}\n{traceback.format_exc()}"
                 )
 
             await asyncio.sleep(300)
 
     @classmethod
     async def process_video_entry(
-        cls, video_id, entry, semaphore=None, index_data=None
+        cls, entry, semaphore=None, playlist_data=None
     ):
         async def _run():
-            title = entry.get("title", "unknown_title")
-            has_subtitles = bool(entry.get("has_captions"))
-            downloaded = bool(entry.get("downloaded"))
-            download_attempts = int(entry.get("download_attempts") or 0)
+            video_id = entry.get("UniqueID", "unknown")
+            title = entry.get("Title", "unknown_title")
+            has_subtitles = bool(entry.get("Has_Captions"))
+            downloaded_caption = bool(entry.get("Downloaded_Caption"))
+            caption_download_attempts = int(entry.get("Caption_Download_Attempts") or 0)
 
-            if has_subtitles and not downloaded and download_attempts < 10:
+            if has_subtitles and not downloaded_caption and caption_download_attempts < 10:
                 LogManager.log_download_captions(f"Attempting to download captions for {video_id}")
 
                 success = await cls.download_caption_for_video(video_id, title)
@@ -320,16 +236,12 @@ class CaptionsDownloader:
                         f"Caption download failed for video ID {video_id}"
                     )
 
-                entry["downloaded"] = success
-                entry["download_attempts"] = download_attempts + 1
+                entry["Downloaded_Caption"] = success
+                entry["Caption_Download_Attempts"] = caption_download_attempts + 1
 
-                # if caller passed the in-memory index, save it
-                if index_data is not None:
-                    await JSONUtils.save_json(index_data, cls.caption_index_file)
-            else:
-                LogManager.log_download_captions(
-                    f"Skipping video ID {video_id} - has_captions: {has_subtitles}, downloaded: {downloaded}, attempts: {download_attempts}"
-                )
+                # if caller passed the in-memory playlist, save it
+                if playlist_data is not None:
+                    await JSONUtils.save_json(playlist_data, cls.caption_channel_playlist)
 
         try:
             if semaphore:
@@ -338,139 +250,10 @@ class CaptionsDownloader:
             else:
                 await _run()
         except Exception as e:
+            video_id = entry.get("UniqueID", "unknown")
             LogManager.log_download_captions(
                 f"Unhandled exception processing video entry {video_id}: {e}\n{traceback.format_exc()}"
             )
-
-    @classmethod
-    def download_started(cls):
-        LogManager.log_download_captions("Download operation has started processing")
-
-    @classmethod
-    def download_processing(cls):
-        LogManager.log_download_captions("Download operation is in progress.")
-
-    @classmethod
-    def download_complete(cls):
-        LogManager.log_download_captions("Download operation has finished processing")
-
-    @classmethod
-    async def get_flat_playlist_async(cls, playlist_url: str, output_path: str):
-        try:
-            ydl_opts = {
-                "extract_flat": True,  # --flat-playlist
-                "skip_download": True,
-                "quiet": False, 
-            }
-
-            LogManager.log_download_captions(
-                f"Saving JSON from {playlist_url} to {output_path}"
-            )
-            info = await DLPHelpers.getinfo_with_retry(ydl_opts, playlist_url, LogManager.DOWNLOAD_CAPTIONS_LOG_FILE)
-
-            # Save JSON to file
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(info, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            LogManager.log_download_captions(
-                f"Failed to extract flat playlist {playlist_url}: {e}\n{traceback.format_exc()}"
-            )
-            raise
-
-    @classmethod
-    async def populate_captions_index(cls, index_data: dict, captions_index_path: str):
-        # Load the existing captions index from file
-        captions_index = await JSONUtils.read_json(captions_index_path)
-
-        # Iterate through entries in index_data
-        for entry in index_data.get("entries", []):
-            entry_id = entry.get("id")
-            entry_title = entry.get("title")
-            filename = (
-                entry_title.split(" (")[0] if " (" in entry_title else entry_title
-            )
-            if entry_id and entry_id not in captions_index:
-                captions_index[entry_id] = {
-                    "id": entry_id,
-                    "title": filename,
-                    "has_captions": None,
-                    "download_attempts": 0,
-                    "downloaded": False,
-                }
-
-        # Save updated captions index back to file
-        await JSONUtils.save_json(captions_index, captions_index_path)
-
-    @classmethod
-    async def populate_hascaptions_field(cls):
-        caption_index = await JSONUtils.read_json(cls.caption_index_file)
-        
-        # Lock for serializing JSON saves to avoid concurrent write issues
-        save_lock = asyncio.Lock()
-
-        # Filter video IDs based on the specified conditions
-        video_ids = [
-            vid
-            for vid, data in caption_index.items()
-            if data.get("has_captions") not in [True, False]
-            and data.get("downloaded") is False
-            and data.get("download_attempts", 0) < 10
-        ]
-        if video_ids:
-            LogManager.log_download_captions(
-                f"Checking {len(video_ids)} videos for captions.."
-            )
-            LogManager.log_download_captions(
-                "This make quite some time for large channels.."
-            )
-
-            semaphore = asyncio.Semaphore(cls.maximum_threads)
-
-            async def limited_check_and_save(video_id):
-                async with semaphore:
-                    vid, has_captions = await cls.check_captions(video_id)
-                    async with save_lock:
-                        caption_index[vid]["has_captions"] = has_captions
-                        await JSONUtils.save_json(caption_index, cls.caption_index_file)
-
-            tasks = [limited_check_and_save(vid) for vid in video_ids]
-            await asyncio.gather(*tasks)
-
-            LogManager.log_download_captions(
-                "Filtered parallel update of 'has_captions' completed."
-            )
-
-    @classmethod
-    async def check_captions(cls, video_id: str) -> Tuple[str, bool]:
-        try:
-            ydl_opts = {
-                "skip_download": True,
-            }
-
-            info = await DLPHelpers.getinfo_with_retry(
-                ydl_opts, f"https://www.youtube.com/watch?v={video_id}", LogManager.DOWNLOAD_CAPTIONS_LOG_FILE
-            )
-
-            if not info:
-                LogManager.log_download_captions(
-                    f"No metadata retrieved for video {video_id}"
-                )
-                has_captions = False
-            else:
-                subtitles = info.get("subtitles", {})
-                automatic_captions = info.get("automatic_captions", {})
-                has_captions = bool(subtitles or automatic_captions)
-                LogManager.log_download_captions(
-                    f"Video {video_id} has_captions: {has_captions}"
-                )
-            
-            return video_id, has_captions
-        except Exception as e:
-            LogManager.log_download_captions(
-                f"Failed to retrieve metadata for video {video_id}: {e}"
-            )
-            return video_id, False
-
     @classmethod
     async def download_caption_for_video(cls, video_id: str, title: str) -> bool:
         try:
@@ -486,47 +269,94 @@ class CaptionsDownloader:
                 "subtitleslangs": ["en"],
                 "skip_download": True,
                 "outtmpl": f"{safename}",
-            }
-            if cls.YT_Cookies_File and os.path.exists(cls.YT_Cookies_File):
-                ydl_subtitle_opts["cookiefile"] = cls.YT_Cookies_File
+            } 
 
-            result = await DLPHelpers.download_with_retry(ydl_subtitle_opts, suburl, LogManager.DOWNLOAD_CAPTIONS_LOG_FILE)
-            if not isinstance(result, tuple) or len(result) != 2:
+            LogManager.log_download_captions(
+                f"Downloading captions for video {video_id} (title: {title}) with safename: {safename}"
+            )
+            
+            # Call download_with_retry to download subtitles
+            await DLPHelpers.download_with_retry(ydl_subtitle_opts, suburl, LogManager.DOWNLOAD_CAPTIONS_LOG_FILE)
+            
+            # For caption downloads with skip_download=True, construct the expected file path
+            # yt-dlp appends the language code to the output template
+            temp_sub_path = os.path.join(cls.temp_caption_dir, f"{safename}.en.srt")
+            
+            # Verify the file actually exists
+            if not os.path.exists(temp_sub_path):
+                LogManager.log_download_captions(
+                    f"Downloaded subtitle file not found at expected path: {temp_sub_path}"
+                )
                 return False
-
-            temp_sub_path, fixed_path = result
+            
+            LogManager.log_download_captions(
+                f"Caption file located at: {temp_sub_path} (size: {os.path.getsize(temp_sub_path)} bytes)"
+            )
+            
+            processed_path = temp_sub_path
 
             try:
                 if cls.dlp_subtitle_use_srtfix:
+                    # Create a fixed path in temp directory for srtfix processing
+                    fixed_path = os.path.join(cls.temp_caption_dir, f"{safename}.srt")
+                    LogManager.log_download_captions(
+                        f"Running srtfix: {temp_sub_path} -> {fixed_path}"
+                    )
                     await cls.fix_srt_async(temp_sub_path, fixed_path)
+                    
+                    if not os.path.exists(fixed_path):
+                        LogManager.log_download_captions(
+                            f"srtfix failed to create output file: {fixed_path}"
+                        )
+                        return False
+                    
                     FileManager.delete_file(
                         temp_sub_path, LogManager.DOWNLOAD_CAPTIONS_LOG_FILE
                     )
+                    processed_path = fixed_path
                     LogManager.log_download_captions(
-                        f"srtfix completed: Published SRT to: {fixed_path}"
+                        f"srtfix completed successfully: {processed_path} (size: {os.path.getsize(processed_path)} bytes)"
                     )
                 else:
-                    FileManager.move_file(
-                        temp_sub_path, fixed_path, LogManager.DOWNLOAD_CAPTIONS_LOG_FILE
-                    )
                     LogManager.log_download_captions(
-                        f"srtfix disabled - moved subtitle to publish directory: {fixed_path}"
+                        f"srtfix disabled - using downloaded subtitle: {processed_path}"
                     )
+                
+                # Move to upload queue directory regardless of srtfix setting
+                upload_queue_path = os.path.join(cls.get_captions_upload_queue_dir, os.path.basename(processed_path))
+                LogManager.log_download_captions(
+                    f"Moving caption from {processed_path} to upload queue: {upload_queue_path}"
+                )
+                FileManager.move_file(
+                    processed_path, upload_queue_path, LogManager.DOWNLOAD_CAPTIONS_LOG_FILE
+                )
+                
+                if not os.path.exists(upload_queue_path):
+                    LogManager.log_download_captions(
+                        f"File move verification failed - file not found at destination: {upload_queue_path}"
+                    )
+                    return False
+                
+                LogManager.log_download_captions(
+                    f"Successfully moved caption to upload queue: {upload_queue_path} (size: {os.path.getsize(upload_queue_path)} bytes)"
+                )
             except Exception as e:
-                LogManager.log_download_captions(f"srtfix failed: {e}")
+                LogManager.log_download_captions(
+                    f"Caption processing failed during file operations: {e}\n{traceback.format_exc()}"
+                )
                 return False
 
             LogManager.log_download_captions(
-                "Successfully downloaded and fixed captions"
+                f"Successfully downloaded and processed captions for video {video_id}"
             )
             return True
         except asyncio.TimeoutError:
             LogManager.log_download_captions(
-                "Timeout while downloading captions for video"
+                f"Timeout while downloading captions for video {video_id}"
             )
             return False
         except Exception as e:
             LogManager.log_download_captions(
-                f"Error downloading captions for video: {e}\n{traceback.format_exc()}"
+                f"Error downloading captions for video {video_id}: {e}\n{traceback.format_exc()}"
             )
             return False

@@ -30,7 +30,7 @@ class LogManager:
             DVR_Config.get_download_live_recovery_log_file()
         )
         cls.DOWNLOAD_POSTED_LOG_FILE = DVR_Config.get_download_posted_log_file()
-        cls.POSTED_PLAYLIST_LOG_FILE = DVR_Config.get_posted_playlist_log_file()
+        cls.channel_playlist_LOG_FILE = DVR_Config.get_channel_playlist_log_file()
         cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE = (
             DVR_Config.get_download_posted_notices_log_file()
         )
@@ -38,6 +38,7 @@ class LogManager:
         cls.UPLOAD_LIVE_LOG_FILE = DVR_Config.get_upload_live_log_file()
         cls.UPLOAD_IA_LOG_FILE = DVR_Config.get_upload_ia_log_file()
         cls.UPLOAD_YT_LOG_FILE = DVR_Config.get_upload_yt_log_file()
+        cls.UPLOAD_CAPTIONS_LOG_FILE = DVR_Config.get_upload_captions_log_file()
         cls.ArchivedLogs_Dir = DVR_Config.get_archived_logs_dir()
 
         cls.CORE_LOG_FILTER = DVR_Config.core_log_filter()
@@ -47,7 +48,7 @@ class LogManager:
             DVR_Config.download_live_recovery_log_filter()
         )
         cls.DOWNLOAD_POSTED_LOG_FILTER = DVR_Config.download_posted_log_filter()
-        cls.POSTED_PLAYLIST_LOG_FILTER = DVR_Config.posted_playlist_log_filter()
+        cls.channel_playlist_LOG_FILTER = DVR_Config.channel_playlist_log_filter()
         cls.DOWNLOAD_POSTED_NOTICES_LOG_FILTER = (
             DVR_Config.download_posted_notices_log_filter()
         )
@@ -55,6 +56,7 @@ class LogManager:
         cls.UPLOAD_LIVE_LOG_FILTER = DVR_Config.upload_live_log_filter()
         cls.UPLOAD_IA_LOG_FILTER = DVR_Config.upload_ia_log_filter()
         cls.UPLOAD_YT_LOG_FILTER = DVR_Config.upload_yt_log_filter()
+        cls.UPLOAD_CAPTIONS_LOG_FILTER = DVR_Config.upload_captions_log_filter()
         cls.log_archiving = DVR_Config.get_log_archiving()
 
         cls.LOG_FILTERS = [
@@ -63,24 +65,22 @@ class LogManager:
             cls.DOWNLOAD_LIVE_LOG_FILTER,
             cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILTER,
             cls.DOWNLOAD_POSTED_LOG_FILTER,
-            cls.POSTED_PLAYLIST_LOG_FILTER,
+            cls.channel_playlist_LOG_FILTER,
             cls.DOWNLOAD_POSTED_NOTICES_LOG_FILTER,
             cls.UPLOAD_LIVE_LOG_FILTER,
             cls.UPLOAD_IA_LOG_FILTER,
-            cls.UPLOAD_YT_LOG_FILTER,
-        ]
+            cls.UPLOAD_YT_LOG_FILTER,            cls.UPLOAD_CAPTIONS_LOG_FILTER,        ]
         cls.LOG_FILES = [
             cls.CORE_LOG_FILE,
             cls.DOWNLOAD_CAPTIONS_LOG_FILE,
             cls.DOWNLOAD_LIVE_LOG_FILE,
             cls.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
             cls.DOWNLOAD_POSTED_LOG_FILE,
-            cls.POSTED_PLAYLIST_LOG_FILE,
+            cls.channel_playlist_LOG_FILE,
             cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE,
             cls.UPLOAD_LIVE_LOG_FILE,
             cls.UPLOAD_IA_LOG_FILE,
-            cls.UPLOAD_YT_LOG_FILE,
-        ]
+            cls.UPLOAD_YT_LOG_FILE,            cls.UPLOAD_CAPTIONS_LOG_FILE,        ]
 
         cls._initialized = True
 
@@ -191,10 +191,10 @@ class LogManager:
         cls.log_message(message, cls.DOWNLOAD_POSTED_LOG_FILE)
 
     @classmethod
-    def log_posted_playlist(cls, message):
+    def log_channel_playlist(cls, message):
         """Log a message to the Posted Playlist log."""
         cls._initialize_log_paths()
-        cls.log_message(message, cls.POSTED_PLAYLIST_LOG_FILE)
+        cls.log_message(message, cls.channel_playlist_LOG_FILE)
 
     @classmethod
     def log_download_posted_notices(cls, message):
@@ -229,6 +229,12 @@ class LogManager:
         cls.log_message(message, cls.UPLOAD_YT_LOG_FILE)
 
     @classmethod
+    def log_upload_captions(cls, message):
+        """Log a message to the Upload Captions log."""
+        cls._initialize_log_paths()
+        cls.log_message(message, cls.UPLOAD_CAPTIONS_LOG_FILE)
+
+    @classmethod
     def archive_logs(cls, filename, parent_folder, log_files):
         """Archive all log files to a folder named after the uploaded file inside the specified parent_folder."""
         cls._initialize_log_paths()
@@ -251,3 +257,4 @@ class LogManager:
             cls.log_core(
                 f"Failed to archive logs for {filename}: {e}\n{traceback.format_exc()}"
             )
+

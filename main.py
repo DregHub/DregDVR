@@ -102,6 +102,7 @@ async def main():
         livestream_download_enabled = DVR_Tasks.get_livestream_download()
         livestream_recovery_download_enabled = DVR_Tasks.get_livestream_recovery_download()
         captions_download_enabled = DVR_Tasks.get_captions_download()
+        captions_upload_enabled = DVR_Tasks.get_captions_upload()
         #currently download comments is scheduled by the live download dlp events
         #comments_download_enabled = DVR_Tasks.get_comments_download()
         comments_republish_enabled = DVR_Tasks.get_comments_republish()
@@ -118,6 +119,7 @@ async def main():
         from downloader.posts import CommunityDownloader
         from uploader.livestreams import LiveStreamUploader
         from uploader.videos import VideoUploader
+        from uploader.captions import CaptionsUploader
         from downloader.comments import LiveCommentsDownloader
 
         tasks = []
@@ -144,8 +146,13 @@ async def main():
             ),
             (
                 captions_download_enabled,
-                CaptionsDownloader.monitor_channel,
+                CaptionsDownloader.download_captions,
                 "Caption Download is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                captions_upload_enabled,
+                CaptionsUploader.upload_captions,
+                "Caption Upload is disabled in INI Tasks. Skipping...",
             ),
             (
                 posted_notices_download_enabled,

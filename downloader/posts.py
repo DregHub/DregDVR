@@ -16,16 +16,20 @@ from yp_dl.yp_dl import YoutubePosts, get_SOCS_cookie
 
 class CommunityDownloader:
     _download_lock = asyncio.Lock()
+    _youtube_source = Account_Config.get_youtube_source()
+    _youtube_handle = Account_Config.extract_channel_handle(_youtube_source)
     json_dir = os.path.join(
         DVR_Config.get_posted_notices_dir(),
-        Account_Config.get_youtube_handle_name().lstrip("/"),
+        _youtube_handle,
     )
     community_archive = os.path.join(
         DVR_Config.get_posted_notices_dir(), "Community_Post_Archive.html"
     )
-    json_path = os.path.join(json_dir, "posts_posts.json")
-    posts_url = f"{Account_Config.get_youtube_handle()}/posts"
-    ythandle = Account_Config.get_youtube_handle_name()
+    json_path = os.path.join(
+        json_dir, "posts_posts.json"
+    )
+    posts_url = f"{Account_Config.build_youtube_url(_youtube_source)}/posts"
+    ythandle = _youtube_handle
     templates_dir = DVR_Config.get_templates_dir()
     posts_template = os.path.join(templates_dir, "posts_page.html")
     posts_youtube_placeholder_template = os.path.join(
@@ -101,7 +105,7 @@ class CommunityDownloader:
                 LogManager.log_download_posted_notices(f"Error loading JSON: {e}")
                 return
 
-            pagetitle = f"Community Posts Archive for {Account_Config.get_youtube_handle_name()}"
+            pagetitle = f"Community Posts Archive for {cls.ythandle}"
 
             # Load template content
             if not os.path.exists(cls.posts_template):
@@ -205,7 +209,7 @@ class CommunityDownloader:
                 f"Unhandled exception in export_json_to_html: {e}\n{traceback.format_exc()}"
             )
         pagetitle = (
-            f"Community Posts Archive for {Account_Config.get_youtube_handle_name()}"
+            f"Community Posts Archive for {cls.ythandle}"
         )
         # Ensure HTML file exists with base structure (must come from template)
         if not os.path.exists(output_html_path):
@@ -301,15 +305,17 @@ class CommunityDownloader:
             cookies = {"SOCS": get_SOCS_cookie()}
             yp = YoutubePosts(cls.posts_url, cookies)
             try:
+                # Ensure parent directory exists before any save operations
+                os.makedirs(DVR_Config.get_posted_notices_dir(), exist_ok=True)
+                
                 if not os.path.exists(cls.json_path):
                     LogManager.log_download_posted_notices(
                         f"Creating new Community Posts Archive for {cls.ythandle}"
                     )
-                    os.makedirs(cls.json_dir, exist_ok=True)
                     await yp.scrape(pbar=None, limit=None)
                     yp.save(
                         pbar=None,
-                        folder=DVR_Config.get_posted_notices_dir(),
+                        folder=DVR_Config.get_posted_notices_dir() + os.sep,
                         reverse=False,
                         update=False,
                     )
@@ -318,7 +324,7 @@ class CommunityDownloader:
                     await yp.scrape(pbar=None, limit=None)
                     yp.save(
                         pbar=None,
-                        folder=DVR_Config.get_posted_notices_dir(),
+                        folder=DVR_Config.get_posted_notices_dir() + os.sep,
                         reverse=False,
                         update=True,
                     )

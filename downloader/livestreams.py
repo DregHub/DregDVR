@@ -20,9 +20,7 @@ class LivestreamDownloader:
     Live_CompletedUploads_Dir = DVR_Config.get_live_completeduploads_dir()
     DownloadFilePrefix = Account_Config.get_live_downloadprefix()
     DownloadTimeStampFormat = DVR_Config.get_download_timestamp_format()
-    dlp_keep_fragments = DVR_Config.get_keep_fragments_dlp_downloads()
     dlp_no_progress = DVR_Config.no_progress_dlp_downloads()
-    dlp_max_fragment_retries = DVR_Config.get_max_dlp_fragment_retries()
     dlp_max_dlp_download_retries = DVR_Config.get_max_dlp_download_retries()
     dlp_max_title_chars = DVR_Config.get_max_title_filename_chars()
     comment_download = DVR_Tasks.get_comments_download()
@@ -106,9 +104,10 @@ class LivestreamDownloader:
                 }
 
                 try:
+                    live_channel_url = f"https://www.youtube.com/{cls.youtube_source}/live"
                     info = await DLPHelpers.getinfo_with_retry(
                         mon_ydl_opts,
-                        cls.youtube_source,
+                        live_channel_url,
                         LogManager.DOWNLOAD_LIVE_LOG_FILE,
                     )
                     LiveStatus = info.get("live_status")
@@ -161,7 +160,6 @@ class LivestreamDownloader:
                     "live_from_start": True,
                     "downloader_args": {"ffmpeg_i": "-loglevel quiet"},
                     "ignore_no_formats_error": True,  # ← prevents livestream errors from crashing
-                    "fragment_retries": int(cls.dlp_max_fragment_retries),
                     "retries": int(cls.dlp_max_dlp_download_retries),
                     "skip_unavailable_fragments": True,
                     "no_abort_on_error": True,
@@ -173,7 +171,7 @@ class LivestreamDownloader:
                 # Use helper to extract info with retry behavior
                 info = await DLPHelpers.getinfo_with_retry(
                     dlp_download_opts,
-                    cls.youtube_source,
+                    item["url"],
                     LogManager.DOWNLOAD_LIVE_LOG_FILE,
                 )
 
