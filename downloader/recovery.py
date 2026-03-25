@@ -96,6 +96,7 @@ class RecoveryDownloader:
                 info_ydl_opts,
                 currenturl,
                 LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
+                desired_dicts=["live_status","is_live", "webpage_url"]
             )
 
             if info is None:

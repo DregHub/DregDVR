@@ -1,6 +1,8 @@
 import traceback
 import logging
+import time
 from utils.logging_utils import LogManager
+from config.config_settings import DVR_Config
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
@@ -32,6 +34,8 @@ class DLPEvents:
         self.download_processing = (
             download_processing if download_processing is not None else (lambda: None)
         )
+        # Get stall timeout from config
+        self.stall_timeout = DVR_Config.get_dlp_stall_timeout()
         # Track active downloads and last-logged elapsed/bytes per stream and per-file
         self._active_downloads = set()  # filenames seen (legacy per-file tracking)
         # Map stream_key -> set(filenames)
@@ -41,6 +45,12 @@ class DLPEvents:
         self._per_file_total = {}
         self._per_file_speed = {}
         self._per_file_eta = {}
+        # Per-file stall detection: track last update time and bytes
+        self._per_file_last_update_time = {}
+        self._per_file_last_update_bytes = {}
+        # Global last update tracking for stall detection
+        self._last_progress_update = None
+        self._last_progress_bytes = 0
         # Per-stream last logged elapsed/bytes for throttling
         self._streams_last_logged_elapsed = {}
         self._streams_last_logged_bytes = {}
@@ -71,6 +81,21 @@ class DLPEvents:
             self._per_file_downloaded[filename] = downloaded
             if total is not None:
                 self._per_file_total[filename] = total
+
+            # Update global progress tracking for external stall detection
+            current_time = time.time()
+            self._last_progress_update = current_time
+            self._last_progress_bytes = max(self._last_progress_bytes, downloaded)
+
+            # Track per-file progress for reference
+            if filename not in self._per_file_last_update_time:
+                self._per_file_last_update_time[filename] = current_time
+                self._per_file_last_update_bytes[filename] = downloaded
+            else:
+                # Update timestamps if progress was made
+                if downloaded > self._per_file_last_update_bytes.get(filename, 0):
+                    self._per_file_last_update_time[filename] = current_time
+                    self._per_file_last_update_bytes[filename] = downloaded
 
             # If first time we see this stream, call started callback for the stream once
             if stream_key not in self._streams_last_logged_elapsed:
@@ -297,6 +322,27 @@ class DLPEvents:
         except Exception as e:
             logger.error(f"Failed to forward log message: {e}")
 
+    def check_for_stall(self):
+        """Check if download has stalled (no progress for stall_timeout seconds).
+        
+        Returns:
+            (bool, str) - (is_stalled, stall_message)
+        """
+        if self._last_progress_update is None:
+            return False, ""
+        
+        current_time = time.time()
+        time_since_update = current_time - self._last_progress_update
+        
+        if time_since_update > self.stall_timeout:
+            stall_msg = (
+                f"Download stall detected: No progress for {int(time_since_update)}s "
+                f"(timeout: {self.stall_timeout}s). Total bytes: {self.format_bytes(self._last_progress_bytes)}."
+            )
+            return True, stall_msg
+        
+        return False, ""
+
     RATE_LIMIT_STRINGS = [
         "429",
         "rate limit",
@@ -320,6 +366,11 @@ class DLPEvents:
     AGE_CONFIRMATION_STRINGS = [
         "sign in to confirm your age",
         "this video may be inappropriate for some users",
+    ]
+
+    DENO_JS_TIMEOUT_STRINGS = [
+        "solving js challenges using deno",
+        "jsc:deno",
     ]
 
     TLS_SSL_ERROR_STRINGS = [
@@ -355,3 +406,9 @@ class DLPEvents:
     def is_age_confirmation_error(cls, err: Exception) -> bool:
         msg = str(err).lower()
         return any(s in msg for s in cls.AGE_CONFIRMATION_STRINGS)
+
+    @classmethod
+    def is_deno_js_timeout_error(cls, err: Exception) -> bool:
+        """Detect if error occurred during Deno JS challenge solving (which can timeout)."""
+        msg = str(err).lower()
+        return any(s in msg for s in cls.DENO_JS_TIMEOUT_STRINGS)

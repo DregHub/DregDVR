@@ -1,6 +1,7 @@
 import os
 import asyncio
 import json
+import time
 from yt_dlp import YoutubeDL
 from utils.logging_utils import LogManager
 from config.config_settings import DVR_Config
@@ -36,6 +37,9 @@ class DLPHelpers:
     dlp_no_progress = DVR_Config.no_progress_dlp_downloads()
     dlp_keep_fragments = DVR_Config.get_keep_fragments_dlp_downloads()
     dlp_max_fragment_retries = int(DVR_Config.get_max_dlp_fragment_retries() or 10)
+    dlp_download_timeout = DVR_Config.get_dlp_download_timeout()
+    dlp_getinfo_timeout = DVR_Config.get_dlp_getinfo_timeout()
+    dlp_stall_timeout = DVR_Config.get_dlp_stall_timeout()
 
     @staticmethod
     def _is_signin_or_age_error(dlp_logger):
@@ -50,92 +54,136 @@ class DLPHelpers:
         return dlp_logger.detected and dlp_logger.last_match_result == "is_rate_limited"
 
     @staticmethod
+    def _is_deno_js_timeout_logger(dlp_logger):
+        """Check if logger detected Deno JS timeout error."""
+        return dlp_logger.detected and dlp_logger.last_match_result == "is_deno_js_timeout"
+
+    @staticmethod
     def _reset_logger(log_file_name):
         """Create a fresh logger instance."""
         return DLP_Logger(patterns=DLP_Logger_Patterns, log_file_name=log_file_name)
 
     @classmethod
-    async def _handle_signin_or_age_error(
-        cls, ydl_opts, exception, dlp_logger, log_file_name, operation, is_signin_exception
-    ):
-        """Handle signin or age confirmation errors with cookie retry."""
-        is_age_conf_logger = (
-            dlp_logger.detected and dlp_logger.last_match_result == "is_age_confirmation_required"
-        )
-        is_signin_logger = (
-            dlp_logger.detected and dlp_logger.last_match_result == "is_signin_required"
-        )
-
-        LogManager.log_message(
-            f"Signin/age confirmation required detected (exception: {is_signin_exception}, logger: {is_age_conf_logger or is_signin_logger}), retrying with cookiefile: {exception}",
-            log_file_name,
-        )
-
-        if not cls.dlp_cookies_present:
-            LogManager.log_message(
-                "Signin/age confirmation required but no cookiefile available, cannot retry",
-                log_file_name,
-            )
-            return None
-
-        ydl_opts["cookiefile"] = cls.dlp_cookies_file
-        ydl_opts["logger"] = cls._reset_logger(log_file_name)
+    def _apply_js_runtime(cls, ydl_opts, log_file_name=None):
+        """Apply js_runtime configuration to ydl_opts if not 'deno' (the default).
         
-        try:
-            return await operation(ydl_opts)
-        except Exception as retry_error:
-            LogManager.log_message(
-                f"Failed to resolve signin/age confirmation with cookies: {retry_error}",
-                log_file_name,
-            )
-            return None
+        Args:
+            ydl_opts: Dictionary of yt-dlp options to modify
+            log_file_name: Optional log file for messages
+        
+        Returns:
+            Modified ydl_opts dictionary
+        """
+        if ydl_opts is None:
+            ydl_opts = {}
+        
+        js_runtime = DVR_Config.get_dlp_js_runtime()
+        # Only add the option if it's not the default 'deno'
+        if js_runtime != "deno":
+            ydl_opts["compat_opts"] = ["no-deno", f"js-{js_runtime}"]
+        return ydl_opts
+
+    @staticmethod
+    def _setup_attempt1_buffer():
+        """Setup buffering for attempt 1 logs."""
+        attempt1_buffer = LogBuffer()
+        original_log_message = LogManager.log_message
+        
+        def buffered_log(message, log_file=None):
+            attempt1_buffer.add(message, log_file)
+        
+        return attempt1_buffer, original_log_message, buffered_log
 
     @classmethod
-    async def _handle_rate_limit_error(
-        cls, ydl_opts, dlp_logger, log_file_name, operation, max_retries
+    async def _retry_with_cookies(
+        cls, ydl_opts, operation_func, operation_args, error_reason, log_file_name=None
     ):
-        """Handle rate limit errors with cookie retry."""
+        """Attempt an operation with cookies after initial failure.
+        
+        Args:
+            ydl_opts: Base YoutubeDL options
+            operation_func: The async function to call (e.g., cls.getinfo, cls.getentries)
+            operation_args: Dict of kwargs for operation_func (excluding ydl_opts, which is updated)
+            error_reason: String describing why retry is needed
+            log_file_name: Log file for messages
+        
+        Returns:
+            Result from operation if successful, or raises exception if it fails
+        """
+        if not cls.dlp_cookies_present:
+            error_msg = (
+                f"{error_reason.replace('_', ' ').title()}: No cookies file available to authenticate. "
+                f"Please export YouTube cookies using yt-dlp."
+            )
+            LogManager.log_message(f"ERROR: {error_msg}", log_file_name)
+            raise Exception(error_msg)
+        
         LogManager.log_message(
-            "Rate limit detected, retrying with cookiefile",
+            f"First DLP Attempt Failed: {error_reason} [RESOLVED]",
             log_file_name,
         )
+        LogManager.log_message(
+            f"Attempt 2: Retrying with cookies file: {cls.dlp_cookies_file}",
+            log_file_name,
+        )
+        
+        # Prepare options with cookies
+        ydl_opts_with_cookies = dict(ydl_opts)
+        ydl_opts_with_cookies["cookiefile"] = cls.dlp_cookies_file
+        ydl_opts_with_cookies["logger"] = cls._reset_logger(log_file_name)
+        
+        # Build retry args with updated ydl_opts
+        retry_args = dict(operation_args) if isinstance(operation_args, dict) else operation_args
+        if isinstance(retry_args, dict):
+            retry_args["ydl_opts"] = ydl_opts_with_cookies
+        
+        try:
+            return await operation_func(**retry_args)
+        except Exception as retry_error:
+            error_msg = f"{error_reason.replace('_', ' ').title()}: Failed even with cookies: {retry_error}"
+            LogManager.log_message(f"ERROR: {error_msg}", log_file_name)
+            raise Exception(error_msg)
 
-        if not cls.dlp_cookies_present:
-            LogManager.log_message(
-                "Rate limit detected but no cookiefile available, cannot retry",
+    @staticmethod
+    def _handle_signin_error(
+        error_msg, attempt1_buffer=None, log_file_name=None
+    ):
+        """Log and raise a signin-related error."""
+        if attempt1_buffer != None:
+            attempt1_buffer.flush()
+        LogManager.log_message(f"ERROR: {error_msg}", log_file_name)
+        raise Exception(error_msg)
+
+    @staticmethod
+    async def _attempt_operation(operation_func, operation_args, attempt1_buffer, buffered_log, log_file_name=None):
+        """Execute an operation with buffered logging.
+        
+        Returns: (result, error_reason, success)
+            result: The result from the operation (or None if failed)
+            error_reason: Error description if failed
+            success: Whether operation succeeded
+        """
+        try:
+            result = await operation_func(**operation_args)
+            return result, None, True
+        except Exception as e:
+            error_reason = f"{type(e).__name__}: {str(e)[:100]}"
+            buffered_log(
+                f"Exception on first attempt: {error_reason}",
                 log_file_name,
             )
-            return None
-
-        ydl_opts["cookiefile"] = cls.dlp_cookies_file
-        rate_limit_retry_delay = 2
-
-        for rate_attempt in range(max_retries + 1):
-            ydl_opts["logger"] = cls._reset_logger(log_file_name)
-            try:
-                return await operation(ydl_opts)
-            except Exception as retry_error:
-                is_tls_error = DLPEvents.is_tls_ssl_error(retry_error)
-                if is_tls_error and rate_attempt < max_retries:
-                    LogManager.log_message(
-                        f"TLS/SSL error during rate-limit retry, retrying in {rate_limit_retry_delay} seconds: {retry_error}",
-                        log_file_name,
-                    )
-                    await asyncio.sleep(rate_limit_retry_delay)
-                    rate_limit_retry_delay *= 2
-                    continue
-                break
-
-        LogManager.log_message(
-            f"Failed to resolve rate limit even with cookiefile after {max_retries + 1} attempts",
-            log_file_name,
-        )
-        return None
+            return None, error_reason, False
 
     @classmethod
     async def download(cls, ydl_opts, url_or_list, log_file_name=None):
-        """Core download helper that invokes YoutubeDL.download with given options."""
+        """Core download helper that invokes YoutubeDL.download with given options.
+        
+        Uses dual timeout protection: overall limit + stall detection.
+        Stall timeout triggers faster than overall timeout.
+        """
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
+        ydl_opts = cls._apply_js_runtime(ydl_opts, log_file_name)
+
         ydl_opts["keep_fragments"] = cls.dlp_keep_fragments == True
         ydl_opts["fragment_retries"] = cls.dlp_max_fragment_retries
         
@@ -145,14 +193,77 @@ class DLPHelpers:
                 log_file_name,
             )
         
-        with YoutubeDL(ydl_opts) as ydl:
-            await asyncio.to_thread(ydl.download, url_or_list)
-        LogManager.log_message("finished youtube downloader helper", log_file_name)
+        # Use a stall timeout to detect hung downloads faster
+        stall_check_interval = 10
+        download_start_time = time.time()
+        
+        def get_progress_hooks():
+            """Extract DLPEvents from progress hooks if present."""
+            hooks = ydl_opts.get("progress_hooks", [])
+            events = []
+            for hook in hooks:
+                if hasattr(hook, "__self__"):
+                    obj = hook.__self__
+                    if hasattr(obj, "check_for_stall"):
+                        events.append(obj)
+            return events
+        
+        # Wrap download in timeout
+        try:
+            with YoutubeDL(ydl_opts) as ydl:
+                download_task = asyncio.create_task(
+                    asyncio.to_thread(ydl.download, url_or_list)
+                )
+                
+                # Get DLPEvents instances for stall monitoring
+                dlp_events_list = get_progress_hooks()
+                
+                # Monitor for stalls while download runs
+                while not download_task.done():
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.shield(download_task),
+                            timeout=stall_check_interval
+                        )
+                        break  # Download completed
+                    except asyncio.TimeoutError:
+                        # Check for stalls
+                        for dlp_events in dlp_events_list:
+                            is_stalled, stall_msg = dlp_events.check_for_stall()
+                            if is_stalled:
+                                download_task.cancel()
+                                LogManager.log_message(f"ERROR: {stall_msg}", log_file_name)
+                                raise TimeoutError(stall_msg)
+                    
+                    # Overall timeout safeguard (30 minutes)
+                    elapsed = time.time() - download_start_time
+                    if elapsed > cls.dlp_download_timeout:
+                        download_task.cancel()
+                        error_msg = f"Download exceeded maximum time limit ({cls.dlp_download_timeout}s)"
+                        LogManager.log_message(f"ERROR: {error_msg}", log_file_name)
+                        raise TimeoutError(error_msg)
+                
+                # Get final result
+                await download_task
+                
+            LogManager.log_message("finished youtube downloader helper", log_file_name)
+        except TimeoutError:
+            # Re-raise TimeoutError as-is
+            raise
+        except asyncio.CancelledError:
+            error_msg = "Download was cancelled due to stall detection"
+            LogManager.log_message(f"ERROR: {error_msg}", log_file_name)
+            raise TimeoutError(error_msg)
+        except Exception as e:
+            # Log unexpected errors but let them propagate
+            LogManager.log_message(f"Unexpected error in download: {e}", log_file_name)
+            raise
 
     @classmethod
     async def getinfo(cls, ydl_opts, url_or_list, log_file_name=None):
         """Core info helper that invokes YoutubeDL.extract_info with a detection logger."""
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
+        ydl_opts = cls._apply_js_runtime(ydl_opts, log_file_name)
         ydl_opts["keep_fragments"] = cls.dlp_keep_fragments == True
         ydl_opts["fragment_retries"] = cls.dlp_max_fragment_retries
         if "logger" in ydl_opts:
@@ -169,14 +280,21 @@ class DLPHelpers:
         info = None
         with YoutubeDL(ydl_opts) as ydl:
             try:
-                info = await asyncio.to_thread(ydl.extract_info, url_or_list, False)
+                info = await asyncio.wait_for(
+                    asyncio.to_thread(ydl.extract_info, url_or_list, False),
+                    timeout=cls.dlp_getinfo_timeout
+                )
+            except asyncio.TimeoutError:
+                error_msg = f"Getinfo timeout exceeded ({cls.dlp_getinfo_timeout}s). Metadata retrieval stalled."
+                LogManager.log_message(f"ERROR: {error_msg}", log_file_name)
+                raise TimeoutError(error_msg)
             except Exception as e:
                 if not DLPLogger.detected:
                     LogManager.log_message(
                         f"Exception in getinfo helper {e}",
                         log_file_name,
                     )
-
+            
             # Check logger detection using centralized patterns
             if cls._is_signin_or_age_error(DLPLogger):
                 error_type = DLPLogger.last_match_result
@@ -236,6 +354,7 @@ class DLPHelpers:
     ):
         """Fetch entries for provided section URLs (videos/shorts)."""
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
+        ydl_opts = cls._apply_js_runtime(ydl_opts, log_file_name)
         ydl_opts["keep_fragments"] = cls.dlp_keep_fragments == True
         ydl_opts["fragment_retries"] = cls.dlp_max_fragment_retries
         collected = []
@@ -264,9 +383,14 @@ class DLPHelpers:
                 if not section_url:
                     continue
                 try:
-                    info = await asyncio.to_thread(
-                        flat_ydl.extract_info, section_url, False
+                    info = await asyncio.wait_for(
+                        asyncio.to_thread(flat_ydl.extract_info, section_url, False),
+                        timeout=cls.dlp_getinfo_timeout
                     )
+                except asyncio.TimeoutError:
+                    error_msg = f"Getentries timeout exceeded ({cls.dlp_getinfo_timeout}s) for {section_url}"
+                    LogManager.log_message(f"ERROR: {error_msg}", log_file_name)
+                    raise TimeoutError(error_msg)
                 except Exception as e:
                     last_exception = e
                     try:
@@ -374,7 +498,10 @@ class DLPHelpers:
                     if not url:
                         continue
                     try:
-                        info = await asyncio.to_thread(ydl.extract_info, url, False)
+                        info = await asyncio.wait_for(
+                            asyncio.to_thread(ydl.extract_info, url, False),
+                            timeout=cls.dlp_getinfo_timeout
+                        )
 
                         # Check for signin/age errors after each entry fetch
                         if cls._is_signin_or_age_error(dlp_logger):
@@ -441,30 +568,34 @@ class DLPHelpers:
     async def download_with_retry(cls, ydl_opts, url_or_list, log_file_name=None):
         """Download using YoutubeDL; retry on transient TLS errors and signin-required errors.
         
-        Buffers attempt 1 logs and outputs conditionally based on success/failure.
+        Buffers attempt 1 logs and outputs conditionally based on success/failure (if enabled in config).
         """
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
+        ydl_opts = cls._apply_js_runtime(ydl_opts, log_file_name)
+        
+        # Check if buffered logging is enabled
+        use_buffering = DVR_Config.get_dlp_buffer_first_attempt_errors()
+        if use_buffering:
+            attempt1_buffer, original_log_message, buffered_log = cls._setup_attempt1_buffer()
+        else:
+            attempt1_buffer = None
+            original_log_message = LogManager.log_message
+            buffered_log = LogManager.log_message  # Use direct logging when buffering disabled
 
-        # Create buffer for attempt 1
-        attempt1_buffer = LogBuffer()
-        original_log_message = LogManager.log_message
-
-        def buffered_log(message, log_file=None):
-            attempt1_buffer.add(message, log_file)
-
-        max_retries = 3
         first_attempt_error = None
         first_attempt_logger = None
         first_error_reason = None
 
-        # First attempt without cookies (with buffering)
+        # First attempt without cookies (with optional buffering)
         dlp_logger = cls._reset_logger(log_file_name)
         ydl_opts["logger"] = dlp_logger
 
-        LogManager.log_message = buffered_log
+
+        if use_buffering:
+            LogManager.log_message = buffered_log
         try:
             buffered_log(
-                "[download_with_retry] Attempt 1: Calling download without cookies",
+                "[download_with_retry] Attempt 1: Calling [download] without cookies",
                 log_file_name,
             )
             try:
@@ -475,7 +606,8 @@ class DLPHelpers:
                 )
                 # Success - flush the buffer
                 LogManager.log_message = original_log_message
-                attempt1_buffer.flush()
+                if attempt1_buffer != None:
+                    attempt1_buffer.flush()
                 return
             except Exception as e:
                 first_attempt_error = e
@@ -493,7 +625,8 @@ class DLPHelpers:
                     log_file_name,
                 )
         finally:
-            LogManager.log_message = original_log_message
+            if use_buffering:
+                LogManager.log_message = original_log_message
 
         # Attempt 1 failed, now check what kind of error and retry if possible
         if cls._is_signin_or_age_error(first_attempt_logger):
@@ -504,7 +637,8 @@ class DLPHelpers:
                     f"{error_type.replace('_', ' ').title()}: No cookies file available to authenticate. "
                     f"Please export YouTube cookies using yt-dlp."
                 )
-                attempt1_buffer.flush()
+                if use_buffering and attempt1_buffer != None:
+                    attempt1_buffer.flush()
                 LogManager.log_message(f"[download_with_retry] ERROR: {error_msg}", log_file_name)
                 raise Exception(error_msg)
 
@@ -536,11 +670,13 @@ class DLPHelpers:
                         f"{error_type.replace('_', ' ').title()}: Even with cookies, YouTube is still requiring authentication. "
                         f"Please update your cookies and try again."
                     )
-                    attempt1_buffer.flush()
+                    if attempt1_buffer != None:
+                        attempt1_buffer.flush()
                     LogManager.log_message(f"[download_with_retry] ERROR: {error_msg}", log_file_name)
                     raise Exception(error_msg)
                 error_msg = f"{error_type.replace('_', ' ').title()}: Failed even with cookies: {retry_error}"
-                attempt1_buffer.flush()
+                if use_buffering and attempt1_buffer != None:
+                    attempt1_buffer.flush()
                 LogManager.log_message(f"[download_with_retry] ERROR: {error_msg}", log_file_name)
                 raise Exception(error_msg)
 
@@ -550,7 +686,8 @@ class DLPHelpers:
 
             if not cls.dlp_cookies_present:
                 error_msg = 'Signin Required: No cookies file available to authenticate. Please export YouTube cookies using yt-dlp.'
-                attempt1_buffer.flush()
+                if use_buffering and attempt1_buffer != None:
+                    attempt1_buffer.flush()
                 LogManager.log_message(f"[download_with_retry] ERROR: {error_msg}", log_file_name)
                 raise Exception(error_msg)
 
@@ -576,14 +713,16 @@ class DLPHelpers:
                 return
             except Exception as retry_error:
                 error_msg = f"Signin Required: Failed even with cookies: {retry_error}"
-                attempt1_buffer.flush()
+                if use_buffering and attempt1_buffer != None:
+                    attempt1_buffer.flush()
                 LogManager.log_message(f"[download_with_retry] ERROR: {error_msg}", log_file_name)
                 raise Exception(error_msg)
 
         # Check for "No video formats found" which often indicates signin requirement
         if "no video formats found" in exc_str:
             if not cls.dlp_cookies_present:
-                attempt1_buffer.flush()
+                if use_buffering and attempt1_buffer != None:
+                    attempt1_buffer.flush()
                 LogManager.log_message(
                     "[download_with_retry] No formats and no cookies available - cannot retry",
                     log_file_name,
@@ -619,14 +758,30 @@ class DLPHelpers:
                         )
                     else:
                         error_msg = f"Failed with cookies: {retry_error}"
-                    attempt1_buffer.flush()
+                    if use_buffering and attempt1_buffer:
+                        attempt1_buffer.flush()
                     LogManager.log_message(f"[download_with_retry] ERROR: {error_msg}", log_file_name)
                     raise Exception(error_msg)
+
+        # Handle timeout/stall errors - these should fail immediately
+        if isinstance(first_attempt_error, (TimeoutError, asyncio.TimeoutError)):
+            error_str = str(first_attempt_error).lower()
+            if "stall" in error_str or "timeout" in error_str:
+                if use_buffering and attempt1_buffer != None:
+                    attempt1_buffer.flush()
+                error_msg = (
+                    f"Download Timeout/Stall: {first_attempt_error}. "
+                    f"This typically indicates a network issue or the video server is unresponsive. "
+                    f"Retries will not help as the issue is likely server-side."
+                )
+                LogManager.log_message(f"[download_with_retry] ERROR: {error_msg}", log_file_name)
+                raise Exception(error_msg)
 
         # Handle TLS/SSL errors with retries
         if DLPEvents.is_tls_ssl_error(first_attempt_error):
             retry_delay = 2
 
+            max_retries = 3
             for attempt in range(1, max_retries + 1):
                 LogManager.log_message(
                     f"[download_with_retry] TLS/SSL error, retrying in {retry_delay}s (attempt {attempt}/{max_retries}): {first_attempt_error}",
@@ -652,124 +807,167 @@ class DLPHelpers:
                     raise retry_error
 
         # If we get here, re-raise the first error
-        attempt1_buffer.flush()
+        if use_buffering and attempt1_buffer != None:
+            attempt1_buffer.flush()
         LogManager.log_message(
             f"[download_with_retry] FAILED: No recovery possible for error: {first_attempt_error}",
             log_file_name,
         )
         raise first_attempt_error
+
+    @classmethod
+    async def getinfo_with_retry(cls, ydl_opts, url_or_list, log_file_name=None, desired_dicts=None):
         """Retrieve info using YoutubeDL.extract_info without downloading.
         
         Automatically attempts retry with cookies if signin/age errors are detected.
-        Buffers attempt 1 logs and outputs conditionally based on success/failure.
+        Automatically attempts retry with QuickJS if Deno JS challenge timeout is detected.
+        Buffers attempt 1 logs and outputs conditionally based on success/failure (if enabled in config).
+        
+        Args:
+            ydl_opts: YoutubeDL options dictionary
+            url_or_list: URL or list of URLs to extract info from
+            log_file_name: Optional log file name
+            desired_dicts: Optional set/list of dictionary keys that indicate successful info retrieval.
+                          If info is not None and contains all these keys, returns immediately
+                          without checking for signin/age errors.
         """
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
+        ydl_opts = cls._apply_js_runtime(ydl_opts, log_file_name)
         
-        # Create buffer for attempt 1
-        attempt1_buffer = LogBuffer()
-        original_log_message = LogManager.log_message
+        # Add JS runtime options to avoid Deno JS challenge timeouts
+        ydl_opts["compat_opts"] = ["no-deno"]
+        if "extractor_args" not in ydl_opts:
+            ydl_opts["extractor_args"] = {}
+        if "youtube" not in ydl_opts["extractor_args"]:
+            ydl_opts["extractor_args"]["youtube"] = {}
+        ydl_opts["extractor_args"]["youtube"]["player_skip"] = ["js"]
         
-        def buffered_log(message, log_file=None):
-            attempt1_buffer.add(message, log_file)
+        # Check if buffered logging is enabled
+        use_buffering = DVR_Config.get_dlp_buffer_first_attempt_errors()
+        if use_buffering:
+            attempt1_buffer, original_log_message, buffered_log = cls._setup_attempt1_buffer()
+        else:
+            attempt1_buffer = None
+            original_log_message = LogManager.log_message
+            buffered_log = LogManager.log_message  # Use direct logging when buffering disabled
         
         dlp_logger = cls._reset_logger(log_file_name)
         ydl_opts["logger"] = dlp_logger
         
-        max_retries = 3
-        retry_delay = 2
         first_error_reason = None
-        needs_retry = False
+        deno_js_timeout_detected = False
         
-        # First attempt without cookies (with buffering)
-        LogManager.log_message = buffered_log
+        # First attempt without cookies (with optional buffering)
+        if use_buffering:
+            LogManager.log_message = buffered_log
         try:
             buffered_log(
-                "[getinfo_with_retry] Attempt 1: Calling getinfo without cookies",
+                "[getinfo_with_retry] Attempt 1: Calling [getinfo] without cookies",
                 log_file_name,
             )
-            try:
-                result = await cls.getinfo(ydl_opts, url_or_list, log_file_name)
-                
-                # Check if the result indicates we need signin/age verification
-                if isinstance(result, dict) and result.get("_needs_signin"):
-                    error_type = result.get("_error_type", "unknown")
-                    first_error_reason = error_type
-                    needs_retry = True
+            result = await cls.getinfo(ydl_opts, url_or_list, log_file_name)
+            
+            # If desired_dicts is specified and result contains all desired keys, return immediately
+            if result is not None and desired_dicts and isinstance(result, dict):
+                has_all_desired = all(key in result for key in desired_dicts)
+                if has_all_desired:
                     buffered_log(
-                        f"[getinfo_with_retry] Signin/age confirmation required ({error_type}) detected",
+                        "[getinfo_with_retry] Result contains all desired keys, returning immediately without signin check",
                         log_file_name,
                     )
-                else:
-                    buffered_log(
-                        "[getinfo_with_retry] SUCCESS: Retrieved info without cookies needed",
-                        log_file_name,
-                    )
-                    LogManager.log_message = original_log_message
-                    attempt1_buffer.flush()
+                    if use_buffering:
+                        LogManager.log_message = original_log_message
+                    if use_buffering and attempt1_buffer != None:
+                        attempt1_buffer.flush()
                     return result
-                    
-            except Exception as e:
-                first_error_reason = f"{type(e).__name__}: {str(e)[:100]}"
+            
+            # Check if the result indicates we need signin/age verification
+            if isinstance(result, dict) and result.get("_needs_signin"):
+                first_error_reason = result.get("_error_type", "unknown")
                 buffered_log(
-                    f"[getinfo_with_retry] Exception on first attempt: {first_error_reason}",
+                    f"[getinfo_with_retry] Signin/age confirmation required ({first_error_reason}) detected",
                     log_file_name,
                 )
-                needs_retry = True
-        finally:
-            LogManager.log_message = original_log_message
-
-        # If attempt 1 didn't need retry, we already returned
-        if not needs_retry:
-            return result
-
-        # Attempt 1 indicated signin is needed, now try attempt 2 with cookies
-        if not cls.dlp_cookies_present:
-            attempt1_buffer.flush()
-            error_msg = (
-                f"{first_error_reason.replace('_', ' ').title()}: No cookies file available to authenticate. "
-                f"Please export YouTube cookies using yt-dlp."
-            )
-            LogManager.log_message(f"[getinfo_with_retry] ERROR: {error_msg}", log_file_name)
-            raise Exception(error_msg)
-        
-        # Log summary line for attempt 2
-        LogManager.log_message(
-            f"[getinfo_with_retry] First DLP Attempt Failed: {first_error_reason} [RESOLVED]",
-            log_file_name,
-        )
-        LogManager.log_message(
-            f"[getinfo_with_retry] Attempt 2: Retrying with cookies file: {cls.dlp_cookies_file}",
-            log_file_name,
-        )
-        
-        ydl_opts_with_cookies = dict(ydl_opts)
-        ydl_opts_with_cookies["cookiefile"] = cls.dlp_cookies_file
-        ydl_opts_with_cookies["logger"] = cls._reset_logger(log_file_name)
-        
-        try:
-            retry_result = await cls.getinfo(ydl_opts_with_cookies, url_or_list, log_file_name)
-            # If retry result also indicates signin is needed, it failed
-            if isinstance(retry_result, dict) and retry_result.get("_needs_signin"):
-                error_type = retry_result.get("_error_type", "unknown")
-                LogManager.log_message(
-                    f"[getinfo_with_retry] Retry attempt with cookies ALSO detected {error_type}: {retry_result}",
+            else:
+                buffered_log(
+                    "[getinfo_with_retry] SUCCESS: Retrieved info without cookies needed",
                     log_file_name,
                 )
-                error_msg = (
-                    f"{error_type.replace('_', ' ').title()}: Even with cookies, YouTube is still requiring authentication. "
-                    f"Please update your cookies and try again."
-                )
-                LogManager.log_message(f"[getinfo_with_retry] ERROR: {error_msg}", log_file_name)
-                raise Exception(error_msg)
-            LogManager.log_message(
-                f"[getinfo_with_retry] SUCCESS: Retrieved info with cookies after {first_error_reason}",
+                if use_buffering:
+                    LogManager.log_message = original_log_message
+                if use_buffering and attempt1_buffer != None:
+                    attempt1_buffer.flush()
+                return result
+                
+        except Exception as e:
+            first_error_reason = f"{type(e).__name__}: {str(e)[:100]}"
+            buffered_log(
+                f"[getinfo_with_retry] Exception on first attempt: {first_error_reason}",
                 log_file_name,
             )
-            return retry_result
-        except Exception as retry_error:
-            error_msg = f"{first_error_reason.replace('_', ' ').title()}: Failed even with cookies: {retry_error}"
-            LogManager.log_message(f"[getinfo_with_retry] ERROR: {error_msg}", log_file_name)
+            # Check if this is a Deno JS timeout error
+            if isinstance(e, TimeoutError) and cls._is_deno_js_timeout_logger(dlp_logger):
+                deno_js_timeout_detected = True
+                buffered_log(
+                    "[getinfo_with_retry] Deno JS challenge timeout detected - will retry with QuickJS",
+                    log_file_name,
+                )
+        finally:
+            if use_buffering:
+                LogManager.log_message = original_log_message
+
+        # If Deno JS timeout was detected, retry with QuickJS runtime
+        if deno_js_timeout_detected:
+            LogManager.log_message(
+                f"First DLP Attempt Failed: {first_error_reason} [DENO_JS_TIMEOUT] [RESOLVED]",
+                log_file_name,
+            )
+            LogManager.log_message(
+                f"Attempt 2: Retrying with QuickJS runtime instead of Deno",
+                log_file_name,
+            )
+            
+            # Prepare options with QuickJS
+            ydl_opts_quickjs = dict(ydl_opts)
+            ydl_opts_quickjs["js_runtimes"] = ["quickjs"]
+            ydl_opts_quickjs["compat_opts"] = ["no-deno"]
+            ydl_opts_quickjs["logger"] = cls._reset_logger(log_file_name)
+            
+            try:
+                result = await cls.getinfo(ydl_opts_quickjs, url_or_list, log_file_name)
+                LogManager.log_message(
+                    f"[getinfo_with_retry] SUCCESS: Retrieved info with QuickJS after {first_error_reason}",
+                    log_file_name,
+                )
+                return result
+            except Exception as quickjs_error:
+                LogManager.log_message(
+                    f"[getinfo_with_retry] QuickJS retry also failed: {quickjs_error}",
+                    log_file_name,
+                )
+                raise
+
+        # Attempt 1 failed with non-Deno error, retry with cookies
+        retry_result = await cls._retry_with_cookies(
+            ydl_opts, cls.getinfo, {"url_or_list": url_or_list, "log_file_name": log_file_name}, 
+            first_error_reason, log_file_name
+        )
+        
+        # Check if retry was successful
+        if isinstance(retry_result, dict) and retry_result.get("_needs_signin"):
+            error_type = retry_result.get("_error_type", "unknown")
+            error_msg = (
+                f"{error_type.replace('_', ' ').title()}: Even with cookies, YouTube is still requiring authentication. "
+                f"Please update your cookies and try again."
+            )
+            LogManager.log_message(f"ERROR: {error_msg}", log_file_name)
             raise Exception(error_msg)
+        
+        LogManager.log_message(
+            f"[getinfo_with_retry] SUCCESS: Retrieved info with cookies after {first_error_reason}",
+            log_file_name,
+        )
+        return retry_result
 
     @classmethod
     async def getentries_with_retry(
@@ -778,114 +976,83 @@ class DLPHelpers:
         """Fetch entries for provided section URLs (videos/shorts).
         
         Automatically attempts retry with cookies if signin/age errors are detected.
-        Buffers attempt 1 logs and outputs conditionally based on success/failure.
+        Buffers attempt 1 logs and outputs conditionally based on success/failure (if enabled in config).
         """
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
-
-        # Create buffer for attempt 1
-        attempt1_buffer = LogBuffer()
-        original_log_message = LogManager.log_message
+        ydl_opts = cls._apply_js_runtime(ydl_opts, log_file_name)
         
-        def buffered_log(message, log_file=None):
-            attempt1_buffer.add(message, log_file)
-
-        max_retries = 3
-        retry_delay = 2
+        # Check if buffered logging is enabled
+        use_buffering = DVR_Config.get_dlp_buffer_first_attempt_errors()
+        if use_buffering:
+            attempt1_buffer, original_log_message, buffered_log = cls._setup_attempt1_buffer()
+        else:
+            attempt1_buffer = None
+            original_log_message = LogManager.log_message
+            buffered_log = LogManager.log_message  # Use direct logging when buffering disabled
         
         dlp_logger = cls._reset_logger(log_file_name)
         ydl_opts["logger"] = dlp_logger
         
         first_error_reason = None
-        needs_retry = False
         
-        # First attempt without cookies (with buffering)
-        LogManager.log_message = buffered_log
+        # First attempt without cookies (with optional buffering)
+        if use_buffering:
+            LogManager.log_message = buffered_log
         try:
             buffered_log(
-                "[getentries_with_retry] Attempt 1: Calling getentries without cookies",
+                "[getentries_with_retry] Attempt 1: Calling [getentries] without cookies",
                 log_file_name,
             )
-            try:
-                result = await cls.getentries(ydl_opts, videos_url, shorts_url, log_file_name)
-                
-                # Check if result indicates we need signin/age verification
-                if isinstance(result, dict) and result.get("_needs_signin"):
-                    error_type = result.get("_error_type", "unknown")
-                    first_error_reason = error_type
-                    needs_retry = True
-                    buffered_log(
-                        f"[getentries_with_retry] Signin/age confirmation required ({error_type}) detected",
-                        log_file_name,
-                    )
-                else:
-                    buffered_log(
-                        "[getentries_with_retry] SUCCESS: Retrieved entries without cookies needed",
-                        log_file_name,
-                    )
-                    LogManager.log_message = original_log_message
-                    attempt1_buffer.flush()
-                    return result
-                    
-            except Exception as e:
-                first_error_reason = f"{type(e).__name__}: {str(e)[:100]}"
+            result = await cls.getentries(ydl_opts, videos_url, shorts_url, log_file_name)
+            
+            # Check if result indicates we need signin/age verification
+            if isinstance(result, dict) and result.get("_needs_signin"):
+                first_error_reason = result.get("_error_type", "unknown")
                 buffered_log(
-                    f"[getentries_with_retry] Exception on first attempt: {first_error_reason}",
+                    f"[getentries_with_retry] Signin/age confirmation required ({first_error_reason}) detected",
                     log_file_name,
                 )
-                needs_retry = True
-        finally:
-            LogManager.log_message = original_log_message
-
-        # If attempt 1 didn't need retry, we already returned
-        if not needs_retry:
-            return result
-
-        # Attempt 1 indicated signin is needed, now try attempt 2 with cookies
-        if not cls.dlp_cookies_present:
-            attempt1_buffer.flush()
-            error_msg = (
-                f"{first_error_reason.replace('_', ' ').title()}: No cookies file available to authenticate. "
-                f"Please export YouTube cookies using yt-dlp."
-            )
-            LogManager.log_message(f"[getentries_with_retry] ERROR: {error_msg}", log_file_name)
-            raise Exception(error_msg)
-        
-        # Log summary line for attempt 2
-        LogManager.log_message(
-            f"[getentries_with_retry] First DLP Attempt Failed: {first_error_reason} [RESOLVED]",
-            log_file_name,
-        )
-        LogManager.log_message(
-            f"[getentries_with_retry] Attempt 2: Retrying with cookies file: {cls.dlp_cookies_file}",
-            log_file_name,
-        )
-        
-        ydl_opts_with_cookies = dict(ydl_opts)
-        ydl_opts_with_cookies["cookiefile"] = cls.dlp_cookies_file
-        ydl_opts_with_cookies["logger"] = cls._reset_logger(log_file_name)
-        
-        try:
-            retry_result = await cls.getentries(ydl_opts_with_cookies, videos_url, shorts_url, log_file_name)
-            # If retry result also indicates signin is needed, it failed
-            if isinstance(retry_result, dict) and retry_result.get("_needs_signin"):
-                error_type = retry_result.get("_error_type", "unknown")
-                LogManager.log_message(
-                    f"[getentries_with_retry] Retry attempt with cookies ALSO detected {error_type}: {retry_result}",
+            else:
+                buffered_log(
+                    "[getentries_with_retry] SUCCESS: Retrieved entries without cookies needed",
                     log_file_name,
                 )
-                error_msg = (
-                    f"{error_type.replace('_', ' ').title()}: Even with cookies, YouTube is still requiring authentication. "
-                    f"Please update your cookies and try again."
-                )
-                LogManager.log_message(f"[getentries_with_retry] ERROR: {error_msg}", log_file_name)
-                raise Exception(error_msg)
-            LogManager.log_message(
-                f"[getentries_with_retry] SUCCESS: Retrieved entries with cookies after {first_error_reason}",
+                if use_buffering:
+                    LogManager.log_message = original_log_message
+                if use_buffering and attempt1_buffer != None:
+                    attempt1_buffer.flush()
+                return result
+                
+        except Exception as e:
+            first_error_reason = f"{type(e).__name__}: {str(e)[:100]}"
+            buffered_log(
+                f"[getentries_with_retry] Exception on first attempt: {first_error_reason}",
                 log_file_name,
             )
-            return retry_result
-        except Exception as retry_error:
-            error_msg = f"{first_error_reason.replace('_', ' ').title()}: Failed even with cookies: {retry_error}"
-            LogManager.log_message(f"[getentries_with_retry] ERROR: {error_msg}", log_file_name)
+        finally:
+            if use_buffering:
+                LogManager.log_message = original_log_message
+
+        # Attempt 1 failed, retry with cookies
+        retry_result = await cls._retry_with_cookies(
+            ydl_opts, cls.getentries, 
+            {"videos_url": videos_url, "shorts_url": shorts_url, "log_file_name": log_file_name},
+            first_error_reason, log_file_name
+        )
+        
+        # Check if retry was successful
+        if isinstance(retry_result, dict) and retry_result.get("_needs_signin"):
+            error_type = retry_result.get("_error_type", "unknown")
+            error_msg = (
+                f"{error_type.replace('_', ' ').title()}: Even with cookies, YouTube is still requiring authentication. "
+                f"Please update your cookies and try again."
+            )
+            LogManager.log_message(f"ERROR: {error_msg}", log_file_name)
             raise Exception(error_msg)
+        
+        LogManager.log_message(
+            f"[getentries_with_retry] SUCCESS: Retrieved entries with cookies after {first_error_reason}",
+            log_file_name,
+        )
+        return retry_result
 

@@ -7,6 +7,8 @@ from .config import BaseConfig
 # Configure logger for this module
 
 logger = logging.getLogger(__name__)
+
+
 class DVR_Config(BaseConfig):
     parser = None
     parser_attr_name = "parser"
@@ -152,7 +154,6 @@ class DVR_Config(BaseConfig):
 
             logger.error(f"Error in get_captions_completed_uploads_dir: {e}\n{traceback.format_exc()}")
             raise
-
 
     # Posted Directories
 
@@ -652,6 +653,81 @@ class DVR_Config(BaseConfig):
                 f"Error in get_max_dlp_fragment_retries: {e}\n{traceback.format_exc()}"
             )
             raise
+
+    @classmethod
+    def get_dlp_download_timeout(cls):
+        """Get download timeout in seconds (default: 1800 = 30 minutes)."""
+        try:
+            timeout = cls.get_value("YT_DownloadSettings", "dlp_download_timeout_seconds")
+            return int(timeout) if timeout else 1800
+        except Exception as e:
+            logger.error(
+                f"Error in get_dlp_download_timeout: {e}\n{traceback.format_exc()}"
+            )
+            return 1800
+
+    @classmethod
+    def get_dlp_getinfo_timeout(cls):
+        """Get getinfo timeout in seconds (default: 300 = 5 minutes)."""
+        try:
+            timeout = cls.get_value("YT_DownloadSettings", "dlp_getinfo_timeout_seconds")
+            return int(timeout) if timeout else 300
+        except Exception as e:
+            logger.error(
+                f"Error in get_dlp_getinfo_timeout: {e}\n{traceback.format_exc()}"
+            )
+            return 300
+
+    @classmethod
+    def get_dlp_stall_timeout(cls):
+        """Get stall detection timeout in seconds (default: 300 = 5 minutes with no progress)."""
+        try:
+            timeout = cls.get_value("YT_DownloadSettings", "dlp_stall_timeout_seconds")
+            return int(timeout) if timeout else 300
+        except Exception as e:
+            logger.error(
+                f"Error in get_dlp_stall_timeout: {e}\n{traceback.format_exc()}"
+            )
+            return 300
+
+    @classmethod
+    def get_dlp_buffer_first_attempt_errors(cls):
+        """Get whether to use buffered logging for first-attempt errors (default: True).
+        When True, hides first attempt exceptions if resolved on retry."""
+        try:
+            return cls.get_value_as_bool("YT_DownloadSettings", "dlp_buffer_first_attempt_errors")
+        except Exception as e:
+            logger.error(
+                f"Error in get_dlp_buffer_first_attempt_errors: {e}\n{traceback.format_exc()}"
+            )
+            return True  # Default to buffering
+
+    @classmethod
+    def get_dlp_js_runtime(cls):
+        """Get the JS runtime for yt-dlp (default: 'deno').
+        Valid values: 'deno', 'node', 'bun', 'quickjs'.
+        Returns lowercase value; invalid values default to 'deno' with error logging."""
+        try:
+            if runtime := cls.get_value("YT_DownloadSettings", "dlp_js_runtime"):
+                # Normalize to lowercase
+                runtime_lower = str(runtime).strip('"').strip().lower()
+                # Validate against supported runtimes
+                valid_runtimes = {"deno", "node", "bun", "quickjs"}
+                if runtime_lower in valid_runtimes:
+                    return runtime_lower
+                # Invalid runtime - log error and default to deno
+                logger.error(
+                    f"Invalid dlp_js_runtime value: '{runtime}'. "
+                    f"Valid values are: {', '.join(sorted(valid_runtimes))}. "
+                    f"Defaulting to 'deno'."
+                )
+                return "deno"
+            return "deno"
+        except Exception as e:
+            logger.error(
+                f"Error in get_dlp_js_runtime: {e}\n{traceback.format_exc()}"
+            )
+            return "deno"
 
     @classmethod
     def get_verbose_dlp_mode(cls):

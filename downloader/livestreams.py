@@ -109,6 +109,7 @@ class LivestreamDownloader:
                         mon_ydl_opts,
                         live_channel_url,
                         LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                        desired_dicts=["live_status","is_live", "webpage_url"],
                     )
                     LiveStatus = info.get("live_status")
                     if LiveStatus == "is_live":
@@ -173,6 +174,7 @@ class LivestreamDownloader:
                     dlp_download_opts,
                     item["url"],
                     LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                    desired_dicts=["live_status","is_live", "webpage_url"],
                 )
 
                 if info.get("live_status") in ("is_live"):

@@ -161,4 +161,9 @@ DLP_Logger_Patterns = [
         "message": "confirm you're not a bot",
         "result": "is_signin_required",
     },
+    {
+        "message_source": "[jsc:deno]",
+        "message": "solving js challenges",
+        "result": "is_deno_js_timeout",
+    },
 ]
