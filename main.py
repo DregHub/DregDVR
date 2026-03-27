@@ -53,9 +53,9 @@ async def handle_dependency_updates():
             # Windows
             LogManager.log_core("Skipping Dependency Package Update as os = Windows")
         else:
-            apk_dependencies = DVR_Config.get_required_apk_dependencies()
-            for dependency in apk_dependencies:
-                await DependencyManager.install_apk_dependency(dependency)
+            apt_dependencies = DVR_Config.get_required_apt_dependencies()
+            for dependency in apt_dependencies:
+                await DependencyManager.install_apt_dependency(dependency)
 
             pip_dependencies = DVR_Config.get_required_py_dependencies()
             for dependency in pip_dependencies:
@@ -110,6 +110,8 @@ async def main():
         posted_notices_download_enabled = DVR_Tasks.get_posted_notices_download()
         livestream_upload_enabled = DVR_Tasks.get_livestream_upload()
         posted_videos_upload_enabled = DVR_Tasks.get_posted_videos_upload()
+        update_yt_source_playlist = DVR_Tasks.get_update_yt_source_playlist()
+        update_caption_source_playlist = DVR_Tasks.get_update_caption_source_playlist()
 
         # Import all task modules
         from downloader.livestreams import LivestreamDownloader
@@ -117,10 +119,11 @@ async def main():
         from downloader.videos import VideoDownloader
         from downloader.captions import CaptionsDownloader
         from downloader.posts import CommunityDownloader
-        from uploader.livestreams import LiveStreamUploader
         from uploader.videos import VideoUploader
         from uploader.captions import CaptionsUploader
         from downloader.comments import LiveCommentsDownloader
+        from downloader.videos import VideosPlaylistManager
+        from downloader.captions import CaptionsPlaylistManager
 
         tasks = []
         task_configs = [
@@ -161,13 +164,23 @@ async def main():
             ),
             (
                 livestream_upload_enabled,
-                LiveStreamUploader.upload_live_videos,
+                VideoUploader.upload_livestreams,
                 "Livestream Upload is disabled in INI Tasks. Skipping...",
             ),
             (
                 posted_videos_upload_enabled,
-                VideoUploader.upload_videos,
+                VideoUploader.upload_posted_videos,
                 "Posted Video Upload is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                update_yt_source_playlist,
+                VideosPlaylistManager.run_playlist_update_task,
+                "Update YouTube Source Playlist is disabled in INI Tasks. Skipping...",
+            ),
+            (
+                update_caption_source_playlist,
+                CaptionsPlaylistManager.run_playlist_update_task,
+                "Update Caption Source Playlist is disabled in INI Tasks. Skipping...",
             ),
         ]
 

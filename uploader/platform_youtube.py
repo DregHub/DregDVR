@@ -15,7 +15,7 @@ from config.config_settings import DVR_Config
 from config.config_accounts import Account_Config
 
 
-async def upload_to_youtube(filepath, filename):
+async def upload_to_youtube(filepath, filename, title):
     """Upload a video file to YouTube."""
     media_upload = None
     try:
@@ -39,7 +39,7 @@ async def upload_to_youtube(filepath, filename):
             credentials = run_flow(flow, storage, args)
 
         # Derive a clean title from the provided filename (handle both basename and name-without-ext)
-        Title = os.path.splitext(os.path.basename(filename))[0]
+        Title = title if title else os.path.splitext(os.path.basename(filename))[0]
 
         # Build the API client using authorized HTTP
         youtube = build("youtube", "v3", http=credentials.authorize(httplib2.Http()))

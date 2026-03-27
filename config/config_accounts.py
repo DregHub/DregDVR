@@ -180,3 +180,53 @@ class Account_Config(BaseConfig):
         except Exception as e:
             logger.error(f"Error in get_github_captions_path: {e}\n{traceback.format_exc()}")
             raise
+
+    @classmethod
+    def get_rumble_email(cls):
+        """Retrieve Rumble email for video uploads."""
+        try:
+            cls._init_parser()
+            return cls.get_value("Rumble_Credentials", "email").strip('"')
+        except Exception as e:
+            logger.error(f"Error in get_rumble_email: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_rumble_password(cls):
+        """Retrieve Rumble password for video uploads."""
+        try:
+            cls._init_parser()
+            return cls.get_value("Rumble_Credentials", "password").strip('"')
+        except Exception as e:
+            logger.error(f"Error in get_rumble_password: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_rumble_channel(cls):
+        """Retrieve Rumble channel name for video uploads."""
+        try:
+            cls._init_parser()
+            return cls.get_value("Rumble_Credentials", "channel").strip('"')
+        except Exception as e:
+            logger.error(f"Error in get_rumble_channel: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_rumble_primary_category(cls):
+        """Retrieve Rumble primary category from config."""
+        try:
+            cls._init_parser()
+            return cls.get_value("Rumble_Settings", "primary_category").strip('"')
+        except Exception as e:
+            logger.error(f"Error in get_rumble_primary_category: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_rumble_secondary_category(cls):
+        """Retrieve Rumble secondary category from config."""
+        try:
+            cls._init_parser()
+            return cls.get_value("Rumble_Settings", "secondary_category").strip('"')
+        except Exception as e:
+            logger.error(f"Error in get_rumble_secondary_category: {e}\n{traceback.format_exc()}")
+            raise

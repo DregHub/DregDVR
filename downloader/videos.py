@@ -6,7 +6,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from utils.logging_utils import LogManager
 from utils.file_utils import FileManager
-from downloader.playlist import PlaylistManager
+from utils.playlist_manager import PlaylistManager
 from utils.index_utils import IndexManager
 from config.config_settings import DVR_Config
 from config.config_accounts import Account_Config
@@ -314,7 +314,6 @@ class VideoDownloader:
         )
         while True:
             try:
-                await cls.playlist.update_channel_playlist()
 
                 urls = await cls._load_urls()
                 url_count = len(urls)

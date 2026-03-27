@@ -22,6 +22,24 @@ class MetaDataManager:
             return None
 
     @classmethod
+    def get_thumbnail_path(cls):
+        """
+        Get the full path to Thumbnail.png in the metadata directory.
+        
+        Returns:
+            str: Full path to Thumbnail.png, or None if metadata directory is not found
+        """
+        try:
+            MetaData_Dir = DVR_Config.get_meta_data_dir()
+            thumbnail_path = os.path.join(MetaData_Dir, "Thumbnail.png")
+            return thumbnail_path
+        except Exception as e:
+            LogManager.log_core(
+                f"Failed to get thumbnail path:  {e}\n{traceback.format_exc()}"
+            )
+            return None
+
+    @classmethod
     def read_value(cls, xpath, logfile):
         try:
             meta_path = cls.init_reader()

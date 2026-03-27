@@ -16,7 +16,7 @@ from yt_dlp import YoutubeDL
 from dlp.helpers import DLPHelpers
 from dlp.events import DLPEvents
 from yt_dlp_plugins.postprocessor import srt_fix as srt_fix_module
-from downloader.playlist import PlaylistManager
+from utils.playlist_manager import PlaylistManager
 
 
 class CaptionsPlaylistManager(PlaylistManager):
@@ -187,7 +187,6 @@ class CaptionsDownloader:
                     LogManager.log_download_captions(
                         "Starting caption download cycle..."
                     )
-                    await CaptionsPlaylistManager.update_channel_playlist()
                     playlist_data = await JSONUtils.read_json(cls.caption_channel_playlist)
 
                     items = playlist_data if isinstance(playlist_data, list) else []

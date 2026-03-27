@@ -476,6 +476,15 @@ class DVR_Config(BaseConfig):
             logger.error(f"Error in get_upload_captions_log_file: {e}\n{traceback.format_exc()}")
             raise
 
+    @classmethod
+    def get_upload_rumble_log_file(cls):
+        try:
+            cls._init_parser()
+            return os.path.join(cls.get_log_dir(), "Upload_Platform_Rumble.log")
+        except Exception as e:
+            logger.error(f"Error in get_upload_rumble_log_file: {e}\n{traceback.format_exc()}")
+            raise
+
     # Log Filters
 
     @classmethod
@@ -600,6 +609,16 @@ class DVR_Config(BaseConfig):
             )
         except Exception as e:
             logger.error(f"Error in upload_captions_log_filter: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def upload_rumble_log_filter(cls):
+        try:
+            return cls.parse_string_list(
+                cls.get_value("Log_Filters", "upload_rumble_log_filter")
+            )
+        except Exception as e:
+            logger.error(f"Error in upload_rumble_log_filter: {e}\n{traceback.format_exc()}")
             raise
 
     # Strings
@@ -787,6 +806,36 @@ class DVR_Config(BaseConfig):
             raise
 
     @classmethod
+    def upload_to_youtube_enabled(cls):
+        """Check if YouTube uploads are enabled."""
+        try:
+            cls._init_parser()
+            return cls.get_value_as_bool("Uploaders", "upload_to_youtube")
+        except Exception as e:
+            logger.error(f"Error in upload_to_youtube_enabled: {e}\n{traceback.format_exc()}")
+            return True  # Default to enabled
+
+    @classmethod
+    def upload_to_ia_enabled(cls):
+        """Check if Internet Archive uploads are enabled."""
+        try:
+            cls._init_parser()
+            return cls.get_value_as_bool("Uploaders", "upload_to_ia")
+        except Exception as e:
+            logger.error(f"Error in upload_to_ia_enabled: {e}\n{traceback.format_exc()}")
+            return True  # Default to enabled
+
+    @classmethod
+    def upload_to_rumble_enabled(cls):
+        """Check if Rumble uploads are enabled."""
+        try:
+            cls._init_parser()
+            return cls.get_value_as_bool("Uploaders", "upload_to_rumble")
+        except Exception as e:
+            logger.error(f"Error in upload_to_rumble_enabled: {e}\n{traceback.format_exc()}")
+            return True  # Default to enabled
+
+    @classmethod
     def get_required_py_dependencies(cls):
         try:
             dependencies = json.loads(
@@ -800,15 +849,15 @@ class DVR_Config(BaseConfig):
             raise
 
     @classmethod
-    def get_required_apk_dependencies(cls):
+    def get_required_apt_dependencies(cls):
         try:
             dependencies = json.loads(
-                cls.get_value("General", "required_apk_dependencies")
+                cls.get_value("General", "required_apt_dependencies")
             )
             return tuple(dependencies)
         except Exception as e:
             logger.error(
-                f"Error in get_required_apk_dependencies: {e}\n{traceback.format_exc()}"
+                f"Error in get_required_apt_dependencies: {e}\n{traceback.format_exc()}"
             )
             raise
 

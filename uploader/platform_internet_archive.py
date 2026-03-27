@@ -59,7 +59,7 @@ async def login_ia_session(email, password, user_agent):
         raise
 
 
-async def upload_to_ia(filepath, filename):
+async def upload_to_ia(filepath, filename, title):
     """Upload a video file to Internet Archive using the Python API."""
     global _ia_session, _ia_authenticated
 
@@ -74,9 +74,10 @@ async def upload_to_ia(filepath, filename):
             IA_UserAgent = Account_Config.get_ia_user_agent()
 
             if not IA_ItemID or not IA_Email or not IA_Password or not IA_UserAgent:
-                raise ValueError(
+                LogManager.log_upload_ia(
                     "Internet Archive credentials, User Agent, or Item ID missing in config"
                 )
+                return False
 
             LogManager.log_upload_ia(
                 f"Retrieved Internet Archive credentials for item: {IA_ItemID}"
@@ -85,7 +86,7 @@ async def upload_to_ia(filepath, filename):
             LogManager.log_upload_ia(
                 f"ERROR: Failed to retrieve Internet Archive credentials: {e}"
             )
-            raise
+            return False
 
         # Establish session only if not already authenticated
         if not _ia_authenticated:
@@ -143,14 +144,15 @@ async def upload_to_ia(filepath, filename):
             LogManager.log_upload_ia(
                 f"ERROR: Failed to upload file to Internet Archive: {filepath} - {e}\n{traceback.format_exc()}"
             )
-            raise
+            return False
 
         LogManager.log_upload_ia(
             f"Completed archive of file: {filepath} to Internet Archive"
         )
+        return True
 
     except Exception as e:
         LogManager.log_upload_ia(
             f"ERROR: Upload process failed for {filepath}: {e}\n{traceback.format_exc()}"
         )
-        raise
+        return False

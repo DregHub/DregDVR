@@ -334,7 +334,7 @@ class DLPHelpers:
                         # Check if this is a playlist/channel (which naturally has no formats)
                         if is_playlist:
                             LogManager.log_message(
-                                f"[getinfo] Channel/Playlist {video_id} with {entry_count} entries returned successfully (no formats expected for playlists)",
+                                f"[getinfo] Channel/Playlist {video_id} with {entry_count} entries returned successfully",
                                 log_file_name,
                             )
                             return info

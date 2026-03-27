@@ -7,27 +7,27 @@ from utils.logging_utils import LogManager
 class DependencyManager:
 
     @classmethod
-    async def install_apk_dependency(cls, package_name):
+    async def install_apt_dependency(cls, package_name):
         try:
-            process_apk = await asyncio.create_subprocess_exec(
-                "apk",
-                "add",
-                "--update-cache",
+            process_apt = await asyncio.create_subprocess_exec(
+                "apt-get",
+                "install",
+                "-y",
                 package_name,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
-            output_apk, _ = await process_apk.communicate()
-            output_apk = output_apk.decode()
-            LogManager.log_core("apk add output:\n" + output_apk)
-            if process_apk.returncode != 0:
+            output_apt, _ = await process_apt.communicate()
+            output_apt = output_apt.decode()
+            LogManager.log_core("apt-get install output:\n" + output_apt)
+            if process_apt.returncode != 0:
                 LogManager.log_core(
-                    f"Failed to install {package_name}. Return code: {process_apk.returncode}"
+                    f"Failed to install {package_name}. Return code: {process_apt.returncode}"
                 )
                 return False
             else:
                 LogManager.log_core(
-                    f"{package_name} installed successfully. Return code: {process_apk.returncode}"
+                    f"{package_name} installed successfully. Return code: {process_apt.returncode}"
                 )
                 return True
         except Exception as e:
@@ -85,9 +85,9 @@ class DependencyManager:
             )
 
     @classmethod
-    async def install_apk_packages(cls):
+    async def install_apt_packages(cls):
         """
-        Ensure build dependencies, python3 and py3-pip are installed via apk, and wheel is installed via pip.
+        Ensure build dependencies, python3 and py3-pip are installed via apt, and wheel is installed via pip.
         """
         try:
             # Install wheel using pip

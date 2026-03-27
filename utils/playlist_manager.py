@@ -4,6 +4,7 @@ import traceback
 import asyncio
 import json
 import threading
+import zipfile
 from datetime import datetime, timezone
 from dlp.helpers import DLPHelpers
 from utils.file_utils import FileManager
@@ -45,7 +46,7 @@ class PlaylistManager:
                         f.write("[]")
                 await asyncio.to_thread(create_file)
             except Exception as ex:
-                LogManager.log_message(f"Failed to create playlist file: {ex}",cls.channel_playlist_log_file)
+                LogManager.log_message(f"Failed to create playlist file: {ex}", cls.channel_playlist_log_file)
 
     @classmethod
     def _normalize_entries(cls, info):
@@ -58,33 +59,217 @@ class PlaylistManager:
             return []
 
     @classmethod
+    def _convert_to_new_format(cls, playlist_data):
+        """Convert legacy playlist structures into new format with Totals + Videos."""
+        if isinstance(playlist_data, list):
+            playlist_data = {"Videos": playlist_data}
+
+        if not isinstance(playlist_data, dict):
+            return {"Videos": []}
+
+        # If old style dict with video objects at top-level, detect and convert.
+        if "Videos" not in playlist_data:
+            candidate_videos = [v for v in playlist_data.values() if isinstance(v, dict) and "Title" in v]
+            if candidate_videos and len(candidate_videos) > 0:
+                playlist_data = {"Videos": candidate_videos}
+
+        if "Videos" not in playlist_data or not isinstance(playlist_data.get("Videos"), list):
+            playlist_data["Videos"] = []
+
+        # Ensure totals are populated for new format (nor always saved on load, but consistent in memory)
+        playlist_data = cls._update_json_totals(playlist_data)
+        return playlist_data
+
+    @classmethod
     async def _load_playlist_data(cls):
         """Load the current playlist data from the persistent file."""
         try:
             def load_json():
                 with cls._playlist_file_lock:
                     with open(cls.channel_playlist, "r", encoding="utf-8") as f:
-                        return json.load(f)
-            return await asyncio.to_thread(load_json)
+                        data = json.load(f)
+                        if not isinstance(data, dict):
+                            # If it's still a list (old format), convert to new format
+                            data = {"Videos": data}
+                        return data
+            playlist_data = await asyncio.to_thread(load_json)
+            return cls._convert_to_new_format(playlist_data)
         except Exception:
-            return []
+            return {"Videos": []}
+
+    @classmethod
+    def _update_json_totals(cls, playlist_data):
+        """Update playlist data with sorted videos and computed totals."""
+        videos = playlist_data.get("Videos", [])
+        # Sort the playlist data by title before saving
+        videos.sort(key=lambda x: x.get("Title", "").lower())
+        
+        # Compute totals
+        total_entries = len(videos)
+        total_livestreams = sum(1 for item in videos if item.get("Was_Live") or item.get("Live_Status") == "was_live")
+        total_posted_videos = sum(1 for item in videos if item.get("Live_Status") == "not_live" and not item.get("IsShort"))
+        total_captions = sum(1 for item in videos if item.get("Has_Captions"))
+        
+        # Update the data in Totals section (and keep top-level for compatibility)
+        totals = {
+            "Total_Entries": total_entries,
+            "Total_Livestreams": total_livestreams,
+            "Total_Posted_Videos": total_posted_videos,
+            "Total_Captions": total_captions,
+            "Total_Downloads": sum(1 for item in videos if item.get("Downloaded_Video", False)),
+            "Total_All_Platform_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_All_Hosts", False)),
+            "Total_YouTube_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_YT", False)),
+            "Total_Internet_Archive_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_IA", False)),
+            "Total_Rumble_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_RM", False)),
+            "Total_BitChute_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_BC", False)),
+            "Total_Odyssey_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_OD", False)),
+        }
+
+        # Reconstruct dict to put Totals before Videos while preserving other keys
+        ordered_data = {
+            "Playlist_Totals": totals,
+        }
+
+        # Preserve any additional metadata keys from original data except Totals/Videos
+        for key, value in playlist_data.items():
+            if key in ["Playlist_Totals", "Videos"]:
+                continue
+            ordered_data[key] = value
+
+        ordered_data["Videos"] = videos
+
+        return ordered_data
 
     @classmethod
     async def _save_playlist_data(cls, playlist_data):
         """Save the playlist data to the persistent file."""
         try:
             def save_json():
+                updated_data = cls._update_json_totals(playlist_data)
                 with cls._playlist_file_lock:
                     with open(cls.channel_playlist, "w", encoding="utf-8") as f:
                         json.dump(
-                            playlist_data,
+                            updated_data,
                             f,
                             ensure_ascii=False,
                             indent=2,
                         )
             await asyncio.to_thread(save_json)
         except Exception as ex:
-            LogManager.log_message(f"Failed to save playlist data: {ex}",cls.channel_playlist_log_file)
+            LogManager.log_message(f"Failed to save playlist data: {ex}", cls.channel_playlist_log_file)
+
+    @classmethod
+    async def _add_missing_playlist_fields(cls, playlist_data):
+        """Ensure each playlist entry includes required fields with sane defaults."""
+        videos = playlist_data.get("Videos", [])
+        if not isinstance(videos, list):
+            return False
+
+        required_defaults = {
+            "IsShort": None,
+            "Live_Status": None,
+            "Was_Live": None,
+            "Has_Captions": None,
+            "Downloaded_Video": False,
+            "Downloaded_Caption": False,
+            "Uploaded_Video_All_Hosts": False,
+            "Uploaded_Video_IA": False,
+            "Uploaded_Video_YT": False,
+            "Uploaded_Video_RM": False,
+            "Uploaded_Video_BC": False,
+            "Uploaded_Video_OD": False,
+            "Uploaded_Caption": False,
+            "Video_Download_Attempts": 0,
+            "Caption_Download_Attempts": 0,
+        }
+
+        updated = False
+        for item in videos:
+            if not isinstance(item, dict):
+                continue
+            for key, default in required_defaults.items():
+                if key not in item:
+                    item[key] = default
+                    updated = True
+
+        if updated:
+            await cls._save_playlist_data(playlist_data)
+
+        return updated
+
+    @classmethod
+    async def get_pending_upload_entries(cls, live_status_filter=None):
+        """Return playlist entries ready for upload (downloaded but not all hosts uploaded)."""
+        playlist_data = await cls._load_playlist_data()
+        videos = playlist_data.get("Videos", [])
+        pending = []
+
+        for item in videos:
+            if not item.get("Downloaded_Video", False):
+                continue
+            if item.get("Uploaded_Video_All_Hosts", False):
+                continue
+
+            if live_status_filter == "not_live":
+                if item.get("Live_Status") != "not_live":
+                    continue
+            elif live_status_filter == "live":
+                if item.get("Live_Status") == "not_live":
+                    continue
+
+            pending.append(item)
+
+        return pending
+
+    @classmethod
+    async def mark_video_upload_status(cls, url, platform_key, status: bool):
+        """Mark a playlist item upload status for a specific platform and update All_Hosts."""
+        if platform_key not in [
+            "Uploaded_Video_IA",
+            "Uploaded_Video_YT",
+            "Uploaded_Video_RM",
+        ]:
+            return False
+
+        playlist_data = await cls._load_playlist_data()
+        videos = playlist_data.get("Videos", [])
+        updated = False
+
+        for item in videos:
+            if item.get("URL") == url:
+                item[platform_key] = bool(status)
+
+                if (
+                    item.get("Uploaded_Video_IA", False)
+                    and item.get("Uploaded_Video_YT", False)
+                    and item.get("Uploaded_Video_RM", False)
+                ):
+                    item["Uploaded_Video_All_Hosts"] = True
+                else:
+                    item["Uploaded_Video_All_Hosts"] = False
+
+                updated = True
+                break
+
+        if updated:
+            await cls._save_playlist_data(playlist_data)
+
+        return updated
+
+    @classmethod
+    async def is_entry_fully_uploaded(cls, url):
+        """Return True if all individual platform upload markers are set for the URL."""
+        playlist_data = await cls._load_playlist_data()
+        videos = playlist_data.get("Videos", [])
+        for item in videos:
+            if item.get("URL") == url:
+                return (
+                    item.get("Uploaded_Video_IA", False)
+                    and item.get("Uploaded_Video_YT", False)
+                    and item.get("Uploaded_Video_RM", False)
+                    and item.get("Uploaded_Video_All_Hosts", False)
+                )
+        return False
 
     @classmethod
     async def _check_video_captions(cls, metadata, vidurl, thread_log_file=None):
@@ -108,7 +293,8 @@ class PlaylistManager:
         cls, vid_id, title, vidurl, thread_log_file
     ):  
         playlist_data = await cls._load_playlist_data()
-        exists = any(item.get("UniqueID") == vid_id for item in playlist_data)
+        videos = playlist_data.get("Videos", [])
+        exists = any(item.get("UniqueID") == vid_id for item in videos)
         if not exists:
             new_item = {
                 "Title": title,
@@ -121,10 +307,18 @@ class PlaylistManager:
                 "Has_Captions": None,
                 "Downloaded_Video": False,
                 "Downloaded_Caption": False,
+                "Uploaded_Video_All_Hosts": False,
+                "Uploaded_Video_IA": False,
+                "Uploaded_Video_YT": False,
+                "Uploaded_Video_RM": False,
+                "Uploaded_Video_BC": False,
+                "Uploaded_Video_OD": False,
+                "Uploaded_Caption": False,
                 "Video_Download_Attempts": 0,
                 "Caption_Download_Attempts": 0,
             }
-            playlist_data.append(new_item)
+            videos.append(new_item)
+            playlist_data["Videos"] = videos
             await cls._save_playlist_data(playlist_data)
         else:
             LogManager.log_message(
@@ -226,8 +420,9 @@ class PlaylistManager:
             cls.channel_playlist_log_file,
         )
         playlist_data = await cls._load_playlist_data()
+        videos = playlist_data.get("Videos", [])
         existing_item = next(
-            (item for item in playlist_data if item.get("UniqueID") == vid_id),
+            (item for item in videos if item.get("UniqueID") == vid_id),
             None,
         )
 
@@ -244,10 +439,17 @@ class PlaylistManager:
                 "Has_Captions": None,
                 "Downloaded_Video": False,
                 "Downloaded_Caption": False,
+                "Uploaded_Video_All_Hosts": False,
+                "Uploaded_Video_IA": False,
+                "Uploaded_Video_YT": False,
+                "Uploaded_Video_RM": False,
+                "Uploaded_Video_BC": False,
+                "Uploaded_Video_OD": False,
+                "Uploaded_Caption": False,
                 "Video_Download_Attempts": 0,
                 "Caption_Download_Attempts": 0,
             }
-            playlist_data.append(existing_item)
+            videos.append(existing_item)
 
         # Fetch full metadata
         metadata = await cls._fetch_full_metadata(vidurl, thread_log_file=thread_log_file)
@@ -266,6 +468,7 @@ class PlaylistManager:
                     existing_item, metadata, vid_id, title, vidurl, is_short, was_live, live_status, thread_log_file=thread_log_file
                 )
 
+        playlist_data["Videos"] = videos
         await cls._save_playlist_data(playlist_data)
 
     @classmethod
@@ -346,8 +549,9 @@ class PlaylistManager:
     @classmethod
     async def _filter_new_entries(cls, flat_entries):
         """Filter entries that are not already in the persistent playlist."""
-        channel_playlist = await cls._load_playlist_data()
-        existing_ids = {item.get("UniqueID") for item in channel_playlist}
+        playlist_data = await cls._load_playlist_data()
+        videos = playlist_data.get("Videos", [])
+        existing_ids = {item.get("UniqueID") for item in videos}
         
         return [
             e
@@ -427,9 +631,40 @@ class PlaylistManager:
                 await cls._add_full_video_info_to_playlist(vid_id, title, vidurl, cls.channel_playlist_log_file)
 
     @classmethod
+    async def run_playlist_update_task(cls):
+        """Run a continuous task that updates the channel playlist every 5 minutes."""
+        while True:
+            await cls.update_channel_playlist()
+            await asyncio.sleep(300)  # Sleep for 5 minutes
+
+    @classmethod
     async def update_channel_playlist(cls):
         """Update the channel playlist with new videos and shorts."""
         async with cls._update_playlist_lock:
+            # Create automatic zip backup
+            try:
+                current_date = datetime.now().strftime('%Y-%m-%d')
+                channel_name = cls._channel_source.lstrip('@').replace(' ', '_') if cls._channel_source else 'channel'
+                backup_name = FileManager.gen_safe_filename(f"Playlist_Backup_{channel_name}_{current_date}.zip")
+                backup_dir = os.path.join(cls.playlist_dir, "_Backups")
+                backup_path = os.path.join(backup_dir, backup_name)
+                
+                def create_backup():
+                    os.makedirs(backup_dir, exist_ok=True)
+                    with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                        zipf.write(cls.channel_playlist, os.path.basename(cls.channel_playlist))
+                
+                await asyncio.to_thread(create_backup)
+                LogManager.log_message(
+                    f"Created playlist backup: {backup_path}",
+                    cls.channel_playlist_log_file,
+                )
+            except Exception as ex:
+                LogManager.log_message(
+                    f"Failed to create playlist backup: {ex}",
+                    cls.channel_playlist_log_file,
+                )
+
             # Step 1: Fetch videos and shorts from the channel
             videos_info, shorts_info = await cls._fetch_channel_entries()
 
@@ -442,7 +677,11 @@ class PlaylistManager:
 
             await cls._ensure_playlist_file_exists()
 
-            # Step 2: Normalize and merge flat entries from both sources
+            # Step 2: Upgrade existing playlist entries with missing fields (new defaults)
+            playlist_data = await cls._load_playlist_data()
+            await cls._add_missing_playlist_fields(playlist_data)
+
+            # Step 3: Normalize and merge flat entries from both sources
             videos_entries = cls._normalize_entries(videos_info)
             shorts_entries = cls._normalize_entries(shorts_info)
             flat_entries = videos_entries + shorts_entries
@@ -458,6 +697,12 @@ class PlaylistManager:
                     "No new videos or shorts have been added since the last scan",
                     cls.channel_playlist_log_file,
                 )
+
+            # Sort and update totals regardless of new entries
+            playlist_data = await cls._load_playlist_data()
+            await cls._save_playlist_data(playlist_data)
+
+
 
     @classmethod
     async def mark_as_downloaded(cls, url):

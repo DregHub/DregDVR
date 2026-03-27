@@ -126,3 +126,21 @@ class DVR_Tasks(BaseConfig):
                 f"Error in get_dependency_package_update: {e}\n{traceback.format_exc()}"
             )
             raise
+
+    @classmethod
+    def get_update_yt_source_playlist(cls):
+        try:
+            cls._init_parser()
+            return cls.get_value_as_bool("Tasks", "update_yt_source_playlist")
+        except Exception as e:
+            logger.error(f"Error in get_update_yt_source_playlist: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_update_caption_source_playlist(cls):
+        try:
+            cls._init_parser()
+            return cls.get_value_as_bool("Tasks", "update_caption_source_playlist")
+        except Exception as e:
+            logger.error(f"Error in get_update_caption_source_playlist: {e}\n{traceback.format_exc()}")
+            raise

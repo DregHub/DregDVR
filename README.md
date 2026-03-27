@@ -117,6 +117,9 @@ Here is a quick breakdown of the config files
 | IA_Settings    | user_agent            | The user agent for your instence of this bot                         |
 | IA_Credentials | email                 | Your IA Credentials                                                  |
 | IA_Credentials | password              | Your IA Credentials                                                  |
+| Rumble_Credentials | email              | Your Rumble account email                                             |
+| Rumble_Credentials | password           | Your Rumble account password                                          |
+| Rumble_Credentials | channel            | Your Rumble channel name                                              |
 
 #### **dvr_settings.cfg**
 
@@ -132,8 +135,9 @@ Here is a quick breakdown of the config files
 | YT_DownloadSettings | dlp_truncate_title_after_x_chars   | Trim the title of the source video when its too large                                                            |
 | YT_UploadSettings   | upload_file_extensions             | Defines what file extensions the uploader should watch for                                                       |
 | YT_UploadSettings   | upload_visibility                  | Valid values are Public Private or Unlisted                                                                      |
-| YT_UploadSettings   | upload_category                    | 22 = People & Blogs  https://mixedanalytics.com/blog/list-of-youtube-video-category-ids                          |
-| Directories         | live_uploadqueue_dir               | The name of the directory is customizable for reasons                                                            |
+| YT_UploadSettings   | upload_category                    | 22 = People & Blogs  https://mixedanalytics.com/blog/list-of-youtube-video-category-ids                          || Uploaders           | upload_to_youtube                  | Set to true/false to enable/disable YouTube uploads                                                              |
+| Uploaders           | upload_to_ia                       | Set to true/false to enable/disable Internet Archive uploads                                                     |
+| Uploaders           | upload_to_rumble                   | Set to true/false to enable/disable Rumble uploads                                                               || Directories         | live_uploadqueue_dir               | The name of the directory is customizable for reasons                                                            |
 | Directories         | live_downloadqueue_dir             | The name of the directory is customizable for reasons                                                            |
 | Directories         | live_completeduploads_dir          | The name of the directory is customizable for reasons                                                            |
 | Directories         | live_downloadrecovery_dir          | The name of the directory is customizable for reasons                                                            |
@@ -159,6 +163,7 @@ Here is a quick breakdown of the config files
 | Log_Filters         | upload_live_log_filter             | ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy |
 | Log_Filters         | upload_ia_log_filter               | ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy |
 | Log_Filters         | upload_yt_log_filter               | ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy |
+| Log_Filters         | upload_rumble_log_filter           | ["ignore this", "and that", "and the other"] any log message with one of these strings will be ignored neet&tidy |
 | General             | required_dependencies              | these get installed & updated automatically on startup                                                           |
 | General             | maximum_threads                    | Currently only used for the caption downloader can help speed up initial caption generation                      |
 
@@ -182,8 +187,6 @@ Here is a quick breakdown of the config files
 https://github.com/yt-dlp/yt-dlp
 
 https://github.com/xenova/chat-downloader
-
-https://github.com/NothingNaN/YoutubeCommunityScraper/
 
 https://github.com/bindestriche/srt_fix
 

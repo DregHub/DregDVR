@@ -38,6 +38,7 @@ class LogManager:
         cls.UPLOAD_LIVE_LOG_FILE = DVR_Config.get_upload_live_log_file()
         cls.UPLOAD_IA_LOG_FILE = DVR_Config.get_upload_ia_log_file()
         cls.UPLOAD_YT_LOG_FILE = DVR_Config.get_upload_yt_log_file()
+        cls.UPLOAD_RUMBLE_LOG_FILE = DVR_Config.get_upload_rumble_log_file()
         cls.UPLOAD_CAPTIONS_LOG_FILE = DVR_Config.get_upload_captions_log_file()
         cls.ArchivedLogs_Dir = DVR_Config.get_archived_logs_dir()
 
@@ -56,6 +57,7 @@ class LogManager:
         cls.UPLOAD_LIVE_LOG_FILTER = DVR_Config.upload_live_log_filter()
         cls.UPLOAD_IA_LOG_FILTER = DVR_Config.upload_ia_log_filter()
         cls.UPLOAD_YT_LOG_FILTER = DVR_Config.upload_yt_log_filter()
+        cls.UPLOAD_RUMBLE_LOG_FILTER = DVR_Config.upload_rumble_log_filter()
         cls.UPLOAD_CAPTIONS_LOG_FILTER = DVR_Config.upload_captions_log_filter()
         cls.log_archiving = DVR_Config.get_log_archiving()
 
@@ -69,7 +71,10 @@ class LogManager:
             cls.DOWNLOAD_POSTED_NOTICES_LOG_FILTER,
             cls.UPLOAD_LIVE_LOG_FILTER,
             cls.UPLOAD_IA_LOG_FILTER,
-            cls.UPLOAD_YT_LOG_FILTER,            cls.UPLOAD_CAPTIONS_LOG_FILTER,        ]
+            cls.UPLOAD_YT_LOG_FILTER,
+            cls.UPLOAD_RUMBLE_LOG_FILTER,
+            cls.UPLOAD_CAPTIONS_LOG_FILTER,
+        ]
         cls.LOG_FILES = [
             cls.CORE_LOG_FILE,
             cls.DOWNLOAD_CAPTIONS_LOG_FILE,
@@ -80,7 +85,10 @@ class LogManager:
             cls.DOWNLOAD_POSTED_NOTICES_LOG_FILE,
             cls.UPLOAD_LIVE_LOG_FILE,
             cls.UPLOAD_IA_LOG_FILE,
-            cls.UPLOAD_YT_LOG_FILE,            cls.UPLOAD_CAPTIONS_LOG_FILE,        ]
+            cls.UPLOAD_YT_LOG_FILE,
+            cls.UPLOAD_RUMBLE_LOG_FILE,
+            cls.UPLOAD_CAPTIONS_LOG_FILE,
+        ]
 
         cls._initialized = True
 
@@ -233,6 +241,12 @@ class LogManager:
         """Log a message to the Upload Captions log."""
         cls._initialize_log_paths()
         cls.log_message(message, cls.UPLOAD_CAPTIONS_LOG_FILE)
+
+    @classmethod
+    def log_upload_rumble(cls, message):
+        """Log a message to the Upload Rumble log."""
+        cls._initialize_log_paths()
+        cls.log_message(message, cls.UPLOAD_RUMBLE_LOG_FILE)
 
     @classmethod
     def archive_logs(cls, filename, parent_folder, log_files):
