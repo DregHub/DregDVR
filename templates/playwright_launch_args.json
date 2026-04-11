@@ -1,0 +1,11 @@
+[
+  "--disable-blink-features=AutomationControlled",
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-features=MediaSessionService",
+  "--disable-features=PreloadMediaEngagementData",
+  "--autoplay-policy=document-user-activation-required",
+  "--disable-accelerated-video-decode",
+  "--disable-accelerated-video-encode",
+  "--disable-features=HardwareMediaKeyHandling"
+]

@@ -106,9 +106,10 @@ class LivestreamDownloader:
                 try:
                     live_channel_url = f"https://www.youtube.com/{cls.youtube_source}/live"
                     info = await DLPHelpers.getinfo_with_retry(
-                        mon_ydl_opts,
-                        live_channel_url,
-                        LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                        ydl_opts=mon_ydl_opts,
+                        url_or_list=live_channel_url,
+                        log_file_name=LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                        log_warnings_and_above_only=True,
                         desired_dicts=["live_status","is_live", "webpage_url"],
                     )
                     LiveStatus = info.get("live_status")
@@ -171,9 +172,10 @@ class LivestreamDownloader:
                 # Convert the /@channel/live into an actual video url and get the publish file name
                 # Use helper to extract info with retry behavior
                 info = await DLPHelpers.getinfo_with_retry(
-                    dlp_download_opts,
-                    item["url"],
-                    LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                    ydl_opts=dlp_download_opts,
+                    url_or_list=item["url"],
+                    log_file_name=LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                    log_warnings_and_above_only=True,
                     desired_dicts=["live_status","is_live", "webpage_url"],
                 )
 
@@ -192,10 +194,13 @@ class LivestreamDownloader:
                         cls.download_processing,
                     )
                     dlp_download_opts["progress_hooks"] = [cls.dlp_events.on_progress]
+                    #Disable the download stall detection for livestreams since they can be very long and may not have regular progress updates
                     await DLPHelpers.download_with_retry(
-                        dlp_download_opts,
-                        cls.current_videourl,
-                        LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                        ydl_opts=dlp_download_opts,
+                        url_or_list=cls.current_videourl,
+                        timeout_enabled=False,
+                        log_file_name=LogManager.DOWNLOAD_LIVE_LOG_FILE,
+                        log_warnings_and_above_only=False,
                     )
 
                     # If we reach here, download succeeded; mark item complete

@@ -21,6 +21,7 @@ class DLP_Logger:
         result=None,
         patterns: list = None,
         log_file_name: str = None,
+        log_warnings_and_above_only: bool = False,
     ):
         # Normalize patterns into a list of dicts: {message_source, message, result}
         self._patterns = []
@@ -58,6 +59,7 @@ class DLP_Logger:
         self.dlp_no_progress = DVR_Config.no_progress_dlp_downloads()
         self.detected = False
         self.last_match_result = None
+        self.log_warnings_and_above_only = log_warnings_and_above_only
         # optional file name to forward logs to LogManager
         self.log_file_name = log_file_name
 
@@ -88,6 +90,8 @@ class DLP_Logger:
 
     def debug(self, msg):
         # forward debug messages to centralized LogManager when available
+        if self.log_warnings_and_above_only:
+            return None
         with contextlib.suppress(Exception):
             if self.dlp_verbose == True:
                 LogManager.log_message(str(f"DLP Debug: {msg}"), self.log_file_name)
@@ -96,7 +100,9 @@ class DLP_Logger:
         return None
 
     def info(self, msg):
-        # forward debug messages to centralized LogManager when available
+        # forward info messages to centralized LogManager when available
+        if self.log_warnings_and_above_only:
+            return None
         with contextlib.suppress(Exception):
             if self.dlp_verbose == True:
                 LogManager.log_message(str(f"DLP Info: {msg}"), self.log_file_name)

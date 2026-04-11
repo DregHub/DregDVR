@@ -11,10 +11,10 @@ class MetaDataManager:
         pass
 
     @classmethod
-    def init_reader(cls):
+    def init_reader(cls, platform):
         try:
             MetaData_Dir = DVR_Config.get_meta_data_dir()
-            return os.path.join(MetaData_Dir, "Default.xml")
+            return os.path.join(MetaData_Dir, f"{platform}.xml")
         except Exception as e:
             LogManager.log_core(
                 f"Failed to read value from meta:  {e}\n{traceback.format_exc()}"
@@ -22,17 +22,23 @@ class MetaDataManager:
             return None
 
     @classmethod
-    def get_thumbnail_path(cls):
+    def get_thumbnail_path(cls, platform):
         """
-        Get the full path to Thumbnail.png in the metadata directory.
+        Get the full path to the thumbnail file in the metadata directory.
+        
+        Args:
+            platform: The platform name (e.g., 'bitchute', 'rumble')
         
         Returns:
-            str: Full path to Thumbnail.png, or None if metadata directory is not found
+            str: Full path to the thumbnail file, or None if metadata directory is not found
         """
         try:
             MetaData_Dir = DVR_Config.get_meta_data_dir()
-            thumbnail_path = os.path.join(MetaData_Dir, "Thumbnail.png")
-            return thumbnail_path
+            thumbnail_file = cls.read_value("ThumbnailFile", platform, None)
+            if thumbnail_file:
+                return os.path.join(MetaData_Dir, thumbnail_file)
+            else:
+                return os.path.join(MetaData_Dir, "Thumbnail.png")  # fallback
         except Exception as e:
             LogManager.log_core(
                 f"Failed to get thumbnail path:  {e}\n{traceback.format_exc()}"
@@ -40,9 +46,9 @@ class MetaDataManager:
             return None
 
     @classmethod
-    def read_value(cls, xpath, logfile):
+    def read_value(cls, xpath, platform, logfile):
         try:
-            meta_path = cls.init_reader()
+            meta_path = cls.init_reader(platform)
             if not meta_path or not os.path.exists(meta_path):
                 LogManager.log_message(
                     f"Meta file not found at path: {meta_path}", logfile
@@ -60,9 +66,9 @@ class MetaDataManager:
             return None
 
     @classmethod
-    def write_value(cls, xpath, value, logfile):
+    def write_value(cls, xpath, value, platform, logfile):
         try:
-            meta_path = cls.init_reader()
+            meta_path = cls.init_reader(platform)
             if not meta_path or not os.path.exists(meta_path):
                 LogManager.log_message(
                     f"Meta file not found at path: {meta_path}", logfile

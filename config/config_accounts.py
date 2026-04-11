@@ -202,16 +202,6 @@ class Account_Config(BaseConfig):
             raise
 
     @classmethod
-    def get_rumble_channel(cls):
-        """Retrieve Rumble channel name for video uploads."""
-        try:
-            cls._init_parser()
-            return cls.get_value("Rumble_Credentials", "channel").strip('"')
-        except Exception as e:
-            logger.error(f"Error in get_rumble_channel: {e}\n{traceback.format_exc()}")
-            raise
-
-    @classmethod
     def get_rumble_primary_category(cls):
         """Retrieve Rumble primary category from config."""
         try:
@@ -229,4 +219,44 @@ class Account_Config(BaseConfig):
             return cls.get_value("Rumble_Settings", "secondary_category").strip('"')
         except Exception as e:
             logger.error(f"Error in get_rumble_secondary_category: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_bitchute_email(cls):
+        """Retrieve BitChute email for video uploads."""
+        try:
+            cls._init_parser()
+            return cls.get_value("BitChute_Credentials", "email").strip('"')
+        except Exception as e:
+            logger.error(f"Error in get_bitchute_email: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_bitchute_password(cls):
+        """Retrieve BitChute password for video uploads."""
+        try:
+            cls._init_parser()
+            return cls.get_value("BitChute_Credentials", "password").strip('"')
+        except Exception as e:
+            logger.error(f"Error in get_bitchute_password: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_odysee_email(cls):
+        """Retrieve Odysee email for video uploads."""
+        try:
+            cls._init_parser()
+            return cls.get_value("Odysee_Credentials", "email").strip('"')
+        except Exception as e:
+            logger.error(f"Error in get_odysee_email: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_odysee_password(cls):
+        """Retrieve Odysee password for video uploads."""
+        try:
+            cls._init_parser()
+            return cls.get_value("Odysee_Credentials", "password").strip('"')
+        except Exception as e:
+            logger.error(f"Error in get_odysee_password: {e}\n{traceback.format_exc()}")
             raise

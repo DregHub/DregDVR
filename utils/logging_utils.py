@@ -4,6 +4,7 @@ import shutil
 import traceback
 import logging
 import re
+import threading
 from config.config_settings import DVR_Config
 
 # Configure logger for this module
@@ -14,6 +15,7 @@ class LogManager:
     _initialized = False
     _log_paths = {}
     _log_filters = {}
+    _log_lock = threading.Lock()
 
     @classmethod
     def _initialize_log_paths(cls):
@@ -39,6 +41,8 @@ class LogManager:
         cls.UPLOAD_IA_LOG_FILE = DVR_Config.get_upload_ia_log_file()
         cls.UPLOAD_YT_LOG_FILE = DVR_Config.get_upload_yt_log_file()
         cls.UPLOAD_RUMBLE_LOG_FILE = DVR_Config.get_upload_rumble_log_file()
+        cls.UPLOAD_BITCHUTE_LOG_FILE = DVR_Config.get_upload_bitchute_log_file()
+        cls.UPLOAD_ODYSEE_LOG_FILE = DVR_Config.get_upload_odysee_log_file()
         cls.UPLOAD_CAPTIONS_LOG_FILE = DVR_Config.get_upload_captions_log_file()
         cls.ArchivedLogs_Dir = DVR_Config.get_archived_logs_dir()
 
@@ -87,18 +91,48 @@ class LogManager:
             cls.UPLOAD_IA_LOG_FILE,
             cls.UPLOAD_YT_LOG_FILE,
             cls.UPLOAD_RUMBLE_LOG_FILE,
+            cls.UPLOAD_BITCHUTE_LOG_FILE,
+            cls.UPLOAD_ODYSEE_LOG_FILE,
             cls.UPLOAD_CAPTIONS_LOG_FILE,
         ]
 
         cls._initialized = True
 
     @classmethod
+    def _normalize_log_path(cls, log_file_name):
+        if isinstance(log_file_name, (str, bytes, os.PathLike)):
+            try:
+                return os.fspath(log_file_name)
+            except Exception:
+                return None
+
+        if isinstance(log_file_name, int):
+            return log_file_name
+
+        if hasattr(log_file_name, "name"):
+            try:
+                return os.fspath(log_file_name.name)
+            except Exception:
+                return None
+
+        return None
+
+    @classmethod
     def log_message(cls, message, log_file_name):
         """Log a message with a timestamp to the specified log file, aggregating consecutive duplicates, and filter messages."""
         cls._initialize_log_paths()
-        # logging.info(message)
         if not log_file_name:
             return
+
+        if not isinstance(log_file_name, str):
+            return
+
+        normalized_log_path = cls._normalize_log_path(log_file_name)
+        if normalized_log_path is None:
+            logger.error(f"Invalid log file target: {log_file_name!r}")
+            return
+
+        log_file_name = normalized_log_path
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:
             # Find the index of the log file and get the corresponding filter
@@ -112,52 +146,73 @@ class LogManager:
             if any(f in message for f in log_filter):
                 return
 
-            # Ensure the log file exists
-            if not os.path.exists(log_file_name):
-                open(log_file_name, "w").close()
+            with cls._log_lock:
+                # Ensure the log file exists when using a path string
+                if isinstance(log_file_name, str) and not os.path.exists(log_file_name):
+                    try:
+                        os.makedirs(os.path.dirname(log_file_name), exist_ok=True)
+                        open(log_file_name, "w", encoding="utf-8").close()
+                    except OSError as e:
+                        logger.error(f"Failed to create log file {log_file_name}: {e}")
 
-            # Read the last line to check for repeat
-            last_line = ""
-            with open(log_file_name, "r", encoding="utf-8") as log_file:
-                lines = log_file.readlines()
-                if lines:
-                    last_line = lines[-1].rstrip("\n")
+                # Read the last line to check for repeat
+                last_line = ""
+                try:
+                    with open(log_file_name, "r", encoding="utf-8") as log_file:
+                        lines = log_file.readlines()
+                        if lines:
+                            last_line = lines[-1].rstrip("\n")
+                except (OSError, ValueError):
+                    last_line = ""
 
-            # Pattern to match the aggregated log format
-            agg_pattern = re.compile(
-                r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) > (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (.+) \[Repeat X (\d+)\]"
-            )
-            # Pattern to match the normal log format
-            normal_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - (.+)")
+                # Pattern to match the aggregated log format
+                agg_pattern = re.compile(
+                    r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) > (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (.+) \[Repeat X (\d+)\]"
+                )
+                # Pattern to match the normal log format
+                normal_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - (.+)")
 
-            if last_line:
-                agg_match = agg_pattern.fullmatch(last_line)
-                normal_match = normal_pattern.fullmatch(last_line)
+                if last_line:
+                    agg_match = agg_pattern.fullmatch(last_line)
+                    normal_match = normal_pattern.fullmatch(last_line)
 
-                if agg_match and agg_match[3] == message:
-                    # Update the aggregated line
-                    first_ts = agg_match[1]
-                    repeat_count = int(agg_match[4]) + 1
-                    new_line = f"[{first_ts} > {timestamp}] {message} [Repeat X {repeat_count}]"
-                    lines[-1] = new_line + "\n"
-                    with open(log_file_name, "w", encoding="utf-8") as log_file:
-                        log_file.writelines(lines)
-                    logger.info(f"{log_file_name}   :   {new_line}")
-                    return
-                elif normal_match and normal_match[2] == message:
-                    # Convert to aggregated line
-                    first_ts = normal_match[1]
-                    new_line = f"[{first_ts} > {timestamp}] {message} [Repeat X 2]"
-                    lines[-1] = new_line + "\n"
-                    with open(log_file_name, "w", encoding="utf-8") as log_file:
-                        log_file.writelines(lines)
-                    logger.info(f"{log_file_name}   :   {new_line}")
-                    return
+                    if agg_match and agg_match[3] == message:
+                        # Update the aggregated line
+                        first_ts = agg_match[1]
+                        repeat_count = int(agg_match[4]) + 1
+                        new_line = f"[{first_ts} > {timestamp}] {message} [Repeat X {repeat_count}]"
+                        lines[-1] = new_line + "\n"
+                        with open(log_file_name, "w", encoding="utf-8") as log_file:
+                            log_file.writelines(lines)
+                        logger.info(f"{log_file_name}   :   {new_line}")
+                        return
+                    elif normal_match and normal_match[2] == message:
+                        # Convert to aggregated line
+                        first_ts = normal_match[1]
+                        new_line = f"[{first_ts} > {timestamp}] {message} [Repeat X 2]"
+                        lines[-1] = new_line + "\n"
+                        with open(log_file_name, "w", encoding="utf-8") as log_file:
+                            log_file.writelines(lines)
+                        logger.info(f"{log_file_name}   :   {new_line}")
+                        return
 
-            # Otherwise, just append as normal
-            with open(log_file_name, "a", encoding="utf-8") as log_file:
-                log_file.write(f"{timestamp} - {message}\n")
-            logger.info(f"{log_file_name}   :   {message}")
+                # Otherwise, just append as normal
+                try:
+                    if isinstance(log_file_name, str):
+                        with open(log_file_name, "a", encoding="utf-8") as log_file:
+                            log_file.write(f"{timestamp} - {message}\n")
+                    else:
+                        # Ignore non-string log_file_name
+                        pass
+                except Exception as e:
+                    logger.error(f"Failed to append to log file {log_file_name}: {e}")
+                    if log_file_name != cls.CORE_LOG_FILE:
+                        try:
+                            with open(cls.CORE_LOG_FILE, "a", encoding="utf-8") as log_file:
+                                log_file.write(f"{timestamp} - {message}\n")
+                        except Exception:
+                            pass
+                logger.info(f"{log_file_name}   :   {message}")
 
         except Exception as e:
             logger.error(f"Failed to log message: {e}\n{traceback.format_exc()}")
@@ -247,6 +302,12 @@ class LogManager:
         """Log a message to the Upload Rumble log."""
         cls._initialize_log_paths()
         cls.log_message(message, cls.UPLOAD_RUMBLE_LOG_FILE)
+
+    @classmethod
+    def log_upload_bitchute(cls, message):
+        """Log a message to the Upload BitChute log."""
+        cls._initialize_log_paths()
+        cls.log_message(message, cls.UPLOAD_BITCHUTE_LOG_FILE)
 
     @classmethod
     def archive_logs(cls, filename, parent_folder, log_files):

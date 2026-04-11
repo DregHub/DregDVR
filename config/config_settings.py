@@ -248,6 +248,45 @@ class DVR_Config(BaseConfig):
             raise
 
     @classmethod
+    def get_playwright_dir(cls):
+        try:
+            cls._init_parser()
+            return os.path.join(
+                cls.Runtime_Profile_Dir,
+                cls.get_value("Directories", "playwright_dir").strip('"'),
+            )
+        except Exception as e:
+            logger.error(f"Error in get_playwright_dir: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_playwright_videos_dir(cls):
+        try:
+            cls._init_parser()
+            return os.path.join(cls.get_playwright_dir(), "_Session_Videos")
+        except Exception as e:
+            logger.error(f"Error in get_playwright_videos_dir: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_playwright_storage_dir(cls):
+        try:
+            cls._init_parser()
+            return os.path.join(cls.get_playwright_dir(), "_Session_Storage")
+        except Exception as e:
+            logger.error(f"Error in get_playwright_storage_dir: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_playwright_html_dir(cls):
+        try:
+            cls._init_parser()
+            return os.path.join(cls.get_playwright_dir(), "_Session_HTML_Dumps")
+        except Exception as e:
+            logger.error(f"Error in get_playwright_html_dir: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
     def get_templates_dir(cls):
         try:
             cls._init_parser()
@@ -483,6 +522,24 @@ class DVR_Config(BaseConfig):
             return os.path.join(cls.get_log_dir(), "Upload_Platform_Rumble.log")
         except Exception as e:
             logger.error(f"Error in get_upload_rumble_log_file: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_upload_bitchute_log_file(cls):
+        try:
+            cls._init_parser()
+            return os.path.join(cls.get_log_dir(), "Upload_Platform_BitChute.log")
+        except Exception as e:
+            logger.error(f"Error in get_upload_bitchute_log_file: {e}\n{traceback.format_exc()}")
+            raise
+
+    @classmethod
+    def get_upload_odysee_log_file(cls):
+        try:
+            cls._init_parser()
+            return os.path.join(cls.get_log_dir(), "Upload_Platform_Odysee.log")
+        except Exception as e:
+            logger.error(f"Error in get_upload_odysee_log_file: {e}\n{traceback.format_exc()}")
             raise
 
     # Log Filters
@@ -833,6 +890,26 @@ class DVR_Config(BaseConfig):
             return cls.get_value_as_bool("Uploaders", "upload_to_rumble")
         except Exception as e:
             logger.error(f"Error in upload_to_rumble_enabled: {e}\n{traceback.format_exc()}")
+            return True  # Default to enabled
+
+    @classmethod
+    def upload_to_bitchute_enabled(cls):
+        """Check if BitChute uploads are enabled."""
+        try:
+            cls._init_parser()
+            return cls.get_value_as_bool("Uploaders", "upload_to_bitchute")
+        except Exception as e:
+            logger.error(f"Error in upload_to_bitchute_enabled: {e}\n{traceback.format_exc()}")
+            return True  # Default to enabled
+
+    @classmethod
+    def upload_to_odysee_enabled(cls):
+        """Check if Odysee uploads are enabled."""
+        try:
+            cls._init_parser()
+            return cls.get_value_as_bool("Uploaders", "upload_to_odysee")
+        except Exception as e:
+            logger.error(f"Error in upload_to_odysee_enabled: {e}\n{traceback.format_exc()}")
             return True  # Default to enabled
 
     @classmethod

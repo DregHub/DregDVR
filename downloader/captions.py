@@ -324,7 +324,13 @@ class CaptionsDownloader:
             )
             
             # Call download_with_retry to download subtitles
-            await DLPHelpers.download_with_retry(ydl_subtitle_opts, suburl, log_file)
+            await DLPHelpers.download_with_retry(
+                ydl_opts=ydl_subtitle_opts,
+                url_or_list=suburl,
+                timeout_enabled=True,
+                log_file_name=log_file,
+                log_warnings_and_above_only=False,
+            )
             
             # For caption downloads with skip_download=True, construct the expected file path
             # yt-dlp appends the language code to the output template

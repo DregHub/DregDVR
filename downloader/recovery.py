@@ -93,10 +93,11 @@ class RecoveryDownloader:
             }
 
             info = await DLPHelpers.getinfo_with_retry(
-                info_ydl_opts,
-                currenturl,
-                LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
-                desired_dicts=["live_status","is_live", "webpage_url"]
+                ydl_opts=info_ydl_opts,
+                url_or_list=currenturl,
+                log_file_name=LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
+                log_warnings_and_above_only=False,
+                desired_dicts=["live_status","is_live", "webpage_url"],
             )
 
             if info is None:
@@ -146,9 +147,11 @@ class RecoveryDownloader:
             }
 
             await DLPHelpers.download_with_retry(
-                download_ydl_opts,
-                [currenturl],
-                LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
+                ydl_opts=download_ydl_opts,
+                url_or_list=[currenturl],
+                timeout_enabled=True,
+                log_file_name=LogManager.DOWNLOAD_LIVE_RECOVERY_LOG_FILE,
+                log_warnings_and_above_only=False,
             )
 
             item["download_complete"] = True

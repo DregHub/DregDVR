@@ -59,9 +59,13 @@ class DLPHelpers:
         return dlp_logger.detected and dlp_logger.last_match_result == "is_deno_js_timeout"
 
     @staticmethod
-    def _reset_logger(log_file_name):
+    def _reset_logger(log_file_name, log_warnings_and_above_only=False):
         """Create a fresh logger instance."""
-        return DLP_Logger(patterns=DLP_Logger_Patterns, log_file_name=log_file_name)
+        return DLP_Logger(
+            patterns=DLP_Logger_Patterns,
+            log_file_name=log_file_name,
+            log_warnings_and_above_only=log_warnings_and_above_only,
+        )
 
     @classmethod
     def _apply_js_runtime(cls, ydl_opts, log_file_name=None):
@@ -96,7 +100,8 @@ class DLPHelpers:
 
     @classmethod
     async def _retry_with_cookies(
-        cls, ydl_opts, operation_func, operation_args, error_reason, log_file_name=None
+        cls, ydl_opts, operation_func, operation_args, error_reason, log_file_name=None,
+        log_warnings_and_above_only=False,
     ):
         """Attempt an operation with cookies after initial failure.
         
@@ -106,7 +111,8 @@ class DLPHelpers:
             operation_args: Dict of kwargs for operation_func (excluding ydl_opts, which is updated)
             error_reason: String describing why retry is needed
             log_file_name: Log file for messages
-        
+            log_warnings_and_above_only: Whether to ignore DLP messages below warning level
+
         Returns:
             Result from operation if successful, or raises exception if it fails
         """
@@ -130,12 +136,16 @@ class DLPHelpers:
         # Prepare options with cookies
         ydl_opts_with_cookies = dict(ydl_opts)
         ydl_opts_with_cookies["cookiefile"] = cls.dlp_cookies_file
-        ydl_opts_with_cookies["logger"] = cls._reset_logger(log_file_name)
+        ydl_opts_with_cookies["logger"] = cls._reset_logger(
+            log_file_name,
+            log_warnings_and_above_only=log_warnings_and_above_only,
+        )
         
         # Build retry args with updated ydl_opts
         retry_args = dict(operation_args) if isinstance(operation_args, dict) else operation_args
         if isinstance(retry_args, dict):
             retry_args["ydl_opts"] = ydl_opts_with_cookies
+            retry_args["log_warnings_and_above_only"] = log_warnings_and_above_only
         
         try:
             return await operation_func(**retry_args)
@@ -175,7 +185,14 @@ class DLPHelpers:
             return None, error_reason, False
 
     @classmethod
-    async def download(cls, ydl_opts, url_or_list, log_file_name=None):
+    async def download(
+        cls,
+        ydl_opts,
+        url_or_list,
+        timeout_enabled=True,
+        log_file_name=None,
+        log_warnings_and_above_only=False,
+    ):
         """Core download helper that invokes YoutubeDL.download with given options.
         
         Uses dual timeout protection: overall limit + stall detection.
@@ -183,6 +200,16 @@ class DLPHelpers:
         """
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
         ydl_opts = cls._apply_js_runtime(ydl_opts, log_file_name)
+
+        if "logger" in ydl_opts:
+            logger = ydl_opts["logger"]
+            if isinstance(logger, DLP_Logger):
+                logger.log_warnings_and_above_only = log_warnings_and_above_only
+        elif log_warnings_and_above_only:
+            ydl_opts["logger"] = cls._reset_logger(
+                log_file_name,
+                log_warnings_and_above_only=log_warnings_and_above_only,
+            )
 
         ydl_opts["keep_fragments"] = cls.dlp_keep_fragments == True
         ydl_opts["fragment_retries"] = cls.dlp_max_fragment_retries
@@ -193,21 +220,6 @@ class DLPHelpers:
                 log_file_name,
             )
         
-        # Use a stall timeout to detect hung downloads faster
-        stall_check_interval = 10
-        download_start_time = time.time()
-        
-        def get_progress_hooks():
-            """Extract DLPEvents from progress hooks if present."""
-            hooks = ydl_opts.get("progress_hooks", [])
-            events = []
-            for hook in hooks:
-                if hasattr(hook, "__self__"):
-                    obj = hook.__self__
-                    if hasattr(obj, "check_for_stall"):
-                        events.append(obj)
-            return events
-        
         # Wrap download in timeout
         try:
             with YoutubeDL(ydl_opts) as ydl:
@@ -215,33 +227,52 @@ class DLPHelpers:
                     asyncio.to_thread(ydl.download, url_or_list)
                 )
                 
-                # Get DLPEvents instances for stall monitoring
-                dlp_events_list = get_progress_hooks()
-                
-                # Monitor for stalls while download runs
-                while not download_task.done():
-                    try:
-                        await asyncio.wait_for(
-                            asyncio.shield(download_task),
-                            timeout=stall_check_interval
-                        )
-                        break  # Download completed
-                    except asyncio.TimeoutError:
-                        # Check for stalls
-                        for dlp_events in dlp_events_list:
-                            is_stalled, stall_msg = dlp_events.check_for_stall()
-                            if is_stalled:
-                                download_task.cancel()
-                                LogManager.log_message(f"ERROR: {stall_msg}", log_file_name)
-                                raise TimeoutError(stall_msg)
+                if timeout_enabled:
+                    # Use a stall timeout to detect hung downloads faster
+                    stall_check_interval = 10
+                    download_start_time = time.time()
                     
-                    # Overall timeout safeguard (30 minutes)
-                    elapsed = time.time() - download_start_time
-                    if elapsed > cls.dlp_download_timeout:
-                        download_task.cancel()
-                        error_msg = f"Download exceeded maximum time limit ({cls.dlp_download_timeout}s)"
-                        LogManager.log_message(f"ERROR: {error_msg}", log_file_name)
-                        raise TimeoutError(error_msg)
+                    def get_progress_hooks():
+                        """Extract DLPEvents from progress hooks if present."""
+                        hooks = ydl_opts.get("progress_hooks", [])
+                        events = []
+                        for hook in hooks:
+                            if hasattr(hook, "__self__"):
+                                obj = hook.__self__
+                                if hasattr(obj, "check_for_stall"):
+                                    events.append(obj)
+                        return events
+                    
+                    # Get DLPEvents instances for stall monitoring
+                    dlp_events_list = get_progress_hooks()
+                    
+                    # Monitor for stalls while download runs
+                    while not download_task.done():
+                        try:
+                            await asyncio.wait_for(
+                                asyncio.shield(download_task),
+                                timeout=stall_check_interval
+                            )
+                            break  # Download completed
+                        except asyncio.TimeoutError:
+                            # Check for stalls
+                            for dlp_events in dlp_events_list:
+                                is_stalled, stall_msg = dlp_events.check_for_stall()
+                                if is_stalled:
+                                    download_task.cancel()
+                                    LogManager.log_message(f"ERROR: {stall_msg}", log_file_name)
+                                    raise TimeoutError(stall_msg)
+                        
+                        # Overall timeout safeguard (30 minutes)
+                        elapsed = time.time() - download_start_time
+                        if elapsed > cls.dlp_download_timeout:
+                            download_task.cancel()
+                            error_msg = f"Download exceeded maximum time limit ({cls.dlp_download_timeout}s)"
+                            LogManager.log_message(f"ERROR: {error_msg}", log_file_name)
+                            raise TimeoutError(error_msg)
+                else:
+                    # No timeout detection
+                    pass
                 
                 # Get final result
                 await download_task
@@ -260,7 +291,13 @@ class DLPHelpers:
             raise
 
     @classmethod
-    async def getinfo(cls, ydl_opts, url_or_list, log_file_name=None):
+    async def getinfo(
+        cls,
+        ydl_opts,
+        url_or_list,
+        log_file_name=None,
+        log_warnings_and_above_only=False,
+    ):
         """Core info helper that invokes YoutubeDL.extract_info with a detection logger."""
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
         ydl_opts = cls._apply_js_runtime(ydl_opts, log_file_name)
@@ -268,8 +305,14 @@ class DLPHelpers:
         ydl_opts["fragment_retries"] = cls.dlp_max_fragment_retries
         if "logger" in ydl_opts:
             DLPLogger = ydl_opts["logger"]
+            if isinstance(DLPLogger, DLP_Logger):
+                DLPLogger.log_warnings_and_above_only = log_warnings_and_above_only
         else:
-            DLPLogger = DLP_Logger(patterns=DLP_Logger_Patterns)
+            DLPLogger = DLP_Logger(
+                patterns=DLP_Logger_Patterns,
+                log_file_name=log_file_name,
+                log_warnings_and_above_only=log_warnings_and_above_only,
+            )
             ydl_opts["logger"] = DLPLogger
 
         if cls.dlp_verbose == True:
@@ -350,7 +393,12 @@ class DLPHelpers:
 
     @classmethod
     async def getentries(
-        cls, ydl_opts, videos_url=None, shorts_url=None, log_file_name=None
+        cls,
+        ydl_opts,
+        videos_url=None,
+        shorts_url=None,
+        log_file_name=None,
+        log_warnings_and_above_only=False,
     ):
         """Fetch entries for provided section URLs (videos/shorts)."""
         ydl_opts = dict(ydl_opts) if ydl_opts is not None else {}
@@ -361,9 +409,13 @@ class DLPHelpers:
 
         if "logger" in ydl_opts:
             dlp_logger = ydl_opts["logger"]
+            if isinstance(dlp_logger, DLP_Logger):
+                dlp_logger.log_warnings_and_above_only = log_warnings_and_above_only
         else:
             dlp_logger = DLP_Logger(
-                patterns=DLP_Logger_Patterns, log_file_name=log_file_name
+                patterns=DLP_Logger_Patterns,
+                log_file_name=log_file_name,
+                log_warnings_and_above_only=log_warnings_and_above_only,
             )
 
         flat_opts = dict(ydl_opts)
@@ -565,7 +617,14 @@ class DLPHelpers:
             return []
 
     @classmethod
-    async def download_with_retry(cls, ydl_opts, url_or_list, log_file_name=None):
+    async def download_with_retry(
+        cls,
+        ydl_opts,
+        url_or_list,
+        timeout_enabled=True,
+        log_file_name=None,
+        log_warnings_and_above_only=False,
+    ):
         """Download using YoutubeDL; retry on transient TLS errors and signin-required errors.
         
         Buffers attempt 1 logs and outputs conditionally based on success/failure (if enabled in config).
@@ -587,9 +646,11 @@ class DLPHelpers:
         first_error_reason = None
 
         # First attempt without cookies (with optional buffering)
-        dlp_logger = cls._reset_logger(log_file_name)
+        dlp_logger = cls._reset_logger(
+            log_file_name,
+            log_warnings_and_above_only=log_warnings_and_above_only,
+        )
         ydl_opts["logger"] = dlp_logger
-
 
         if use_buffering:
             LogManager.log_message = buffered_log
@@ -599,13 +660,20 @@ class DLPHelpers:
                 log_file_name,
             )
             try:
-                await cls.download(ydl_opts, url_or_list, log_file_name)
+                await cls.download(
+                    ydl_opts,
+                    url_or_list,
+                    timeout_enabled,
+                    log_file_name,
+                    log_warnings_and_above_only,
+                )
                 buffered_log(
                     "[download_with_retry] SUCCESS: Downloaded without cookies needed",
                     log_file_name,
                 )
-                # Success - flush the buffer
-                LogManager.log_message = original_log_message
+                # Success - restore logger and flush the buffer
+                if use_buffering:
+                    LogManager.log_message = original_log_message
                 if attempt1_buffer != None:
                     attempt1_buffer.flush()
                 return
@@ -653,10 +721,19 @@ class DLPHelpers:
             )
             ydl_opts_with_cookies = dict(ydl_opts)
             ydl_opts_with_cookies["cookiefile"] = cls.dlp_cookies_file
-            ydl_opts_with_cookies["logger"] = cls._reset_logger(log_file_name)
+            ydl_opts_with_cookies["logger"] = cls._reset_logger(
+                log_file_name,
+                log_warnings_and_above_only=log_warnings_and_above_only,
+            )
 
             try:
-                await cls.download(ydl_opts_with_cookies, url_or_list, log_file_name)
+                await cls.download(
+                    ydl_opts_with_cookies,
+                    url_or_list,
+                    timeout_enabled,
+                    log_file_name,
+                    log_warnings_and_above_only,
+                )
                 LogManager.log_message(
                     f"[download_with_retry] SUCCESS: Downloaded with cookies after {error_type}",
                     log_file_name,
@@ -702,10 +779,19 @@ class DLPHelpers:
             )
             ydl_opts_with_cookies = dict(ydl_opts)
             ydl_opts_with_cookies["cookiefile"] = cls.dlp_cookies_file
-            ydl_opts_with_cookies["logger"] = cls._reset_logger(log_file_name)
+            ydl_opts_with_cookies["logger"] = cls._reset_logger(
+                log_file_name,
+                log_warnings_and_above_only=log_warnings_and_above_only,
+            )
 
             try:
-                await cls.download(ydl_opts_with_cookies, url_or_list, log_file_name)
+                await cls.download(
+                    ydl_opts_with_cookies,
+                    url_or_list,
+                    timeout_enabled,
+                    log_file_name,
+                    log_warnings_and_above_only,
+                )
                 LogManager.log_message(
                     "[download_with_retry] SUCCESS: Downloaded with cookies after bot confirmation",
                     log_file_name,
@@ -739,10 +825,19 @@ class DLPHelpers:
                 )
                 ydl_opts_with_cookies = dict(ydl_opts)
                 ydl_opts_with_cookies["cookiefile"] = cls.dlp_cookies_file
-                ydl_opts_with_cookies["logger"] = cls._reset_logger(log_file_name)
+                ydl_opts_with_cookies["logger"] = cls._reset_logger(
+                    log_file_name,
+                    log_warnings_and_above_only=log_warnings_and_above_only,
+                )
 
                 try:
-                    await cls.download(ydl_opts_with_cookies, url_or_list, log_file_name)
+                    await cls.download(
+                        ydl_opts_with_cookies,
+                        url_or_list,
+                        timeout_enabled,
+                        log_file_name,
+                        log_warnings_and_above_only,
+                    )
                     LogManager.log_message(
                         "[download_with_retry] SUCCESS: Downloaded with cookies after 'no formats' error",
                         log_file_name,
@@ -764,7 +859,7 @@ class DLPHelpers:
                     raise Exception(error_msg)
 
         # Handle timeout/stall errors - these should fail immediately
-        if isinstance(first_attempt_error, (TimeoutError, asyncio.TimeoutError)):
+        if timeout_enabled and isinstance(first_attempt_error, (TimeoutError, asyncio.TimeoutError)):
             error_str = str(first_attempt_error).lower()
             if "stall" in error_str or "timeout" in error_str:
                 if use_buffering and attempt1_buffer != None:
@@ -790,12 +885,21 @@ class DLPHelpers:
                 await asyncio.sleep(retry_delay)
                 retry_delay *= 2
 
-                dlp_logger = cls._reset_logger(log_file_name)
+                dlp_logger = cls._reset_logger(
+                    log_file_name,
+                    log_warnings_and_above_only=log_warnings_and_above_only,
+                )
                 retry_ydl_opts = dict(ydl_opts)
                 retry_ydl_opts["logger"] = dlp_logger
 
                 try:
-                    await cls.download(retry_ydl_opts, url_or_list, log_file_name)
+                    await cls.download(
+                        retry_ydl_opts,
+                        url_or_list,
+                        timeout_enabled,
+                        log_file_name,
+                        log_warnings_and_above_only,
+                    )
                     LogManager.log_message(
                         "[download_with_retry] SUCCESS: Downloaded after TLS/SSL retry",
                         log_file_name,
@@ -816,7 +920,14 @@ class DLPHelpers:
         raise first_attempt_error
 
     @classmethod
-    async def getinfo_with_retry(cls, ydl_opts, url_or_list, log_file_name=None, desired_dicts=None):
+    async def getinfo_with_retry(
+        cls,
+        ydl_opts,
+        url_or_list,
+        log_file_name=None,
+        log_warnings_and_above_only=False,
+        desired_dicts=None,
+    ):
         """Retrieve info using YoutubeDL.extract_info without downloading.
         
         Automatically attempts retry with cookies if signin/age errors are detected.
@@ -851,7 +962,10 @@ class DLPHelpers:
             original_log_message = LogManager.log_message
             buffered_log = LogManager.log_message  # Use direct logging when buffering disabled
         
-        dlp_logger = cls._reset_logger(log_file_name)
+        dlp_logger = cls._reset_logger(
+            log_file_name,
+            log_warnings_and_above_only=log_warnings_and_above_only,
+        )
         ydl_opts["logger"] = dlp_logger
         
         first_error_reason = None
@@ -865,7 +979,12 @@ class DLPHelpers:
                 "[getinfo_with_retry] Attempt 1: Calling [getinfo] without cookies",
                 log_file_name,
             )
-            result = await cls.getinfo(ydl_opts, url_or_list, log_file_name)
+            result = await cls.getinfo(
+                ydl_opts,
+                url_or_list,
+                log_file_name,
+                log_warnings_and_above_only,
+            )
             
             # If desired_dicts is specified and result contains all desired keys, return immediately
             if result is not None and desired_dicts and isinstance(result, dict):
@@ -895,7 +1014,7 @@ class DLPHelpers:
                 )
                 if use_buffering:
                     LogManager.log_message = original_log_message
-                if use_buffering and attempt1_buffer != None:
+                if attempt1_buffer != None:
                     attempt1_buffer.flush()
                 return result
                 
@@ -931,10 +1050,18 @@ class DLPHelpers:
             ydl_opts_quickjs = dict(ydl_opts)
             ydl_opts_quickjs["js_runtimes"] = ["quickjs"]
             ydl_opts_quickjs["compat_opts"] = ["no-deno"]
-            ydl_opts_quickjs["logger"] = cls._reset_logger(log_file_name)
+            ydl_opts_quickjs["logger"] = cls._reset_logger(
+                log_file_name,
+                log_warnings_and_above_only=log_warnings_and_above_only,
+            )
             
             try:
-                result = await cls.getinfo(ydl_opts_quickjs, url_or_list, log_file_name)
+                result = await cls.getinfo(
+                    ydl_opts_quickjs,
+                    url_or_list,
+                    log_file_name,
+                    log_warnings_and_above_only,
+                )
                 LogManager.log_message(
                     f"[getinfo_with_retry] SUCCESS: Retrieved info with QuickJS after {first_error_reason}",
                     log_file_name,
@@ -949,8 +1076,16 @@ class DLPHelpers:
 
         # Attempt 1 failed with non-Deno error, retry with cookies
         retry_result = await cls._retry_with_cookies(
-            ydl_opts, cls.getinfo, {"url_or_list": url_or_list, "log_file_name": log_file_name}, 
-            first_error_reason, log_file_name
+            ydl_opts,
+            cls.getinfo,
+            {
+                "url_or_list": url_or_list,
+                "log_file_name": log_file_name,
+                "log_warnings_and_above_only": log_warnings_and_above_only,
+            },
+            first_error_reason,
+            log_file_name,
+            log_warnings_and_above_only=log_warnings_and_above_only,
         )
         
         # Check if retry was successful
@@ -971,7 +1106,12 @@ class DLPHelpers:
 
     @classmethod
     async def getentries_with_retry(
-        cls, ydl_opts, videos_url=None, shorts_url=None, log_file_name=None
+        cls,
+        ydl_opts,
+        videos_url=None,
+        shorts_url=None,
+        log_file_name=None,
+        log_warnings_and_above_only=False,
     ):
         """Fetch entries for provided section URLs (videos/shorts).
         
@@ -990,7 +1130,10 @@ class DLPHelpers:
             original_log_message = LogManager.log_message
             buffered_log = LogManager.log_message  # Use direct logging when buffering disabled
         
-        dlp_logger = cls._reset_logger(log_file_name)
+        dlp_logger = cls._reset_logger(
+            log_file_name,
+            log_warnings_and_above_only=log_warnings_and_above_only,
+        )
         ydl_opts["logger"] = dlp_logger
         
         first_error_reason = None
@@ -1003,7 +1146,13 @@ class DLPHelpers:
                 "[getentries_with_retry] Attempt 1: Calling [getentries] without cookies",
                 log_file_name,
             )
-            result = await cls.getentries(ydl_opts, videos_url, shorts_url, log_file_name)
+            result = await cls.getentries(
+                ydl_opts,
+                videos_url,
+                shorts_url,
+                log_file_name,
+                log_warnings_and_above_only,
+            )
             
             # Check if result indicates we need signin/age verification
             if isinstance(result, dict) and result.get("_needs_signin"):
@@ -1019,7 +1168,7 @@ class DLPHelpers:
                 )
                 if use_buffering:
                     LogManager.log_message = original_log_message
-                if use_buffering and attempt1_buffer != None:
+                if attempt1_buffer != None:
                     attempt1_buffer.flush()
                 return result
                 
@@ -1035,9 +1184,17 @@ class DLPHelpers:
 
         # Attempt 1 failed, retry with cookies
         retry_result = await cls._retry_with_cookies(
-            ydl_opts, cls.getentries, 
-            {"videos_url": videos_url, "shorts_url": shorts_url, "log_file_name": log_file_name},
-            first_error_reason, log_file_name
+            ydl_opts,
+            cls.getentries,
+            {
+                "videos_url": videos_url,
+                "shorts_url": shorts_url,
+                "log_file_name": log_file_name,
+                "log_warnings_and_above_only": log_warnings_and_above_only,
+            },
+            first_error_reason,
+            log_file_name,
+            log_warnings_and_above_only=log_warnings_and_above_only,
         )
         
         # Check if retry was successful

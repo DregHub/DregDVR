@@ -1,0 +1,10 @@
+VIDEOJS: WARN: videojs.extend is deprecated
+blocked by CORS policy
+Error in Optanon wrapper
+ERR_CONNECTION_REFUSED
+Failed to load resource
+hasStorageAccess
+requestStorageAccess
+Multiple GoTrueClient
+does not match the recipient window's origin
+Connected to notification WS

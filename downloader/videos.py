@@ -91,7 +91,10 @@ class VideoDownloader:
                         thread_log_file
                     )
                     info = await DLPHelpers.getinfo_with_retry(
-                        ydl_opts, url, thread_log_file, desired_dicts=["live_status","is_live", "webpage_url"]
+                        ydl_opts=ydl_opts,
+                        url_or_list=url,
+                        log_file_name=thread_log_file,
+                        desired_dicts=["live_status","is_live", "webpage_url"],
                     )
                     
                     # Handle case where info is None
@@ -130,7 +133,11 @@ class VideoDownloader:
                     )
                     try:
                         await DLPHelpers.download_with_retry(
-                            ydl_opts, [url], thread_log_file
+                            ydl_opts=ydl_opts,
+                            url_or_list=[url],
+                            timeout_enabled=True,
+                            log_file_name=thread_log_file,
+                            log_warnings_and_above_only=False,
                         )
                         LogManager.log_message(
                             f"Posted Video {url} Downloaded Successfully",
@@ -244,9 +251,13 @@ class VideoDownloader:
                         f"Launching getinfo_with_retry for URL: {url} to determine live status before downloading."
                 )
                 info = await DLPHelpers.getinfo_with_retry(
-                    ydl_opts, url, LogManager.DOWNLOAD_POSTED_LOG_FILE, desired_dicts=["live_status","is_live", "webpage_url"]
+                    ydl_opts=ydl_opts,
+                    url_or_list=url,
+                    log_file_name=LogManager.DOWNLOAD_POSTED_LOG_FILE,
+                    log_warnings_and_above_only=False,
+                    desired_dicts=["live_status","is_live", "webpage_url"],
                 )
-                
+
                 # Handle case where info is None
                 if info is None:
                     LogManager.log_download_posted(
@@ -277,7 +288,11 @@ class VideoDownloader:
                 )
                 try:
                     await DLPHelpers.download_with_retry(
-                        ydl_opts, [url], LogManager.DOWNLOAD_POSTED_LOG_FILE
+                        ydl_opts=ydl_opts,
+                        url_or_list=[url],
+                        timeout_enabled=True,
+                        log_file_name=LogManager.DOWNLOAD_POSTED_LOG_FILE,
+                        log_warnings_and_above_only=False,
                     )
                     LogManager.log_download_posted(
                         f"Posted Video {url} Downloaded Successfully"

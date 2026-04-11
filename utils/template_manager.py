@@ -12,6 +12,7 @@ class TemplateManager:
         templates: Dict[str, str],
         log_func: Optional[Callable[[str], None]] = None,
         loaded_flag_name: str = "_templates_loaded",
+        base_path: str = None,
     ):
         """
         Initialize the TemplateManager.
@@ -24,10 +25,12 @@ class TemplateManager:
                        }
             log_func: Optional logging function that accepts a string message.
             loaded_flag_name: Name of the flag attribute to check if templates are already loaded.
+            base_path: Base path for relative template paths. If None, uses current working directory.
         """
         self.templates = templates
         self.log_func = log_func or (lambda msg: None)
         self.loaded_flag_name = loaded_flag_name
+        self.base_path = base_path or os.getcwd()
         self._cache: Dict[str, str] = {}
         self._is_loaded = False
         self._load_lock = asyncio.Lock()
@@ -68,9 +71,20 @@ class TemplateManager:
             Template content as string, or empty string if loading fails.
         """
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = await asyncio.to_thread(f.read)
+            # Resolve relative paths based on base_path
+            if not os.path.isabs(file_path):
+                file_path = os.path.join(self.base_path, file_path)
+
+            file_path = os.path.abspath(file_path)
+
+            # Read file in thread pool to avoid blocking
+            content = await asyncio.to_thread(self._read_file_sync, file_path)
             return content
+        except FileNotFoundError as e:
+            self.log_func(
+                f"Template file not found for {attr_name}: {file_path}"
+            )
+            return ""
         except Exception as e:
             self.log_func(
                 f"Exception loading {attr_name} template from {file_path}: {e}\n{traceback.format_exc()}"

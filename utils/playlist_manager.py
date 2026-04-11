@@ -14,7 +14,6 @@ from config.config_accounts import Account_Config
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 
-
 class PlaylistManager:
     playlist_dir = DVR_Config.get_channel_playlists_dir()
     Posted_DownloadQueue_Dir = DVR_Config.get_posted_downloadqueue_dir()
@@ -35,6 +34,34 @@ class PlaylistManager:
     _update_playlist_lock = asyncio.Lock()
     # Thread-safe lock for file I/O to prevent race conditions when writing playlist JSON
     _playlist_file_lock = threading.Lock()
+
+    _playlist_entry_keys = [
+        "URL",
+        "File_Path",
+        "Title",
+        "UniqueID",
+        "DateTime",
+        "IsShort",
+        "Live_Status",
+        "Was_Live",
+        "Has_Captions",
+        "Downloaded_Video",
+        "Downloaded_Caption",
+        "Video_Download_Attempts",
+        "Caption_Download_Attempts",
+        "Uploaded_Video_All_Hosts",
+        "Uploaded_Video_IA",
+        "Uploaded_Video_YT",
+        "Uploaded_Video_RM",
+        "Uploaded_Video_BC",
+        "Uploaded_Video_OD",
+        "Uploaded_Caption",
+        "Upload_Error_BC",
+        "Upload_Error_IA",
+        "Upload_Error_YT",
+        "Upload_Error_RM",
+        "Upload_Error_OD",
+    ]
 
     @classmethod
     async def _ensure_playlist_file_exists(cls):
@@ -93,6 +120,11 @@ class PlaylistManager:
                             data = {"Videos": data}
                         return data
             playlist_data = await asyncio.to_thread(load_json)
+            videos = playlist_data.get("Videos", [])
+            if isinstance(videos, list):
+                for item in videos:
+                    if isinstance(item, dict) and "DownloadedDateTime" in item:
+                        item.pop("DownloadedDateTime", None)
             return cls._convert_to_new_format(playlist_data)
         except Exception:
             return {"Videos": []}
@@ -119,10 +151,15 @@ class PlaylistManager:
             "Total_Downloads": sum(1 for item in videos if item.get("Downloaded_Video", False)),
             "Total_All_Platform_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_All_Hosts", False)),
             "Total_YouTube_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_YT", False)),
+            "Total_Failed_YouTube_Uploads": sum(1 for item in videos if item.get("Upload_Error_YT")),
             "Total_Internet_Archive_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_IA", False)),
+            "Total_Failed_Internet_Archive_Uploads": sum(1 for item in videos if item.get("Upload_Error_IA")),
             "Total_Rumble_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_RM", False)),
+            "Total_Failed_Rumble_Uploads": sum(1 for item in videos if item.get("Upload_Error_RM")),
             "Total_BitChute_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_BC", False)),
+            "Total_Failed_BitChute_Uploads": sum(1 for item in videos if item.get("Upload_Error_BC")),
             "Total_Odyssey_Uploads": sum(1 for item in videos if item.get("Uploaded_Video_OD", False)),
+            "Total_Failed_Odyssey_Uploads": sum(1 for item in videos if item.get("Upload_Error_OD")),
         }
 
         # Reconstruct dict to put Totals before Videos while preserving other keys
@@ -136,7 +173,7 @@ class PlaylistManager:
                 continue
             ordered_data[key] = value
 
-        ordered_data["Videos"] = videos
+        ordered_data["Videos"] = [cls._order_playlist_entry_fields(item) for item in videos]
 
         return ordered_data
 
@@ -166,12 +203,19 @@ class PlaylistManager:
             return False
 
         required_defaults = {
+            "UniqueID": None,
+            "URL": None,
+            "File_Path": None,
+            "Title": None,
+            "DateTime": None,
             "IsShort": None,
             "Live_Status": None,
             "Was_Live": None,
             "Has_Captions": None,
-            "Downloaded_Video": False,
-            "Downloaded_Caption": False,
+            "Downloaded_Video": None,
+            "Downloaded_Caption": None,
+            "Video_Download_Attempts": 0,
+            "Caption_Download_Attempts": 0,
             "Uploaded_Video_All_Hosts": False,
             "Uploaded_Video_IA": False,
             "Uploaded_Video_YT": False,
@@ -179,17 +223,20 @@ class PlaylistManager:
             "Uploaded_Video_BC": False,
             "Uploaded_Video_OD": False,
             "Uploaded_Caption": False,
-            "Video_Download_Attempts": 0,
-            "Caption_Download_Attempts": 0,
+            "Upload_Error_BC": None,
+            "Upload_Error_IA": None,
+            "Upload_Error_YT": None,
+            "Upload_Error_RM": None,
+            "Upload_Error_OD": None,
         }
 
         updated = False
         for item in videos:
             if not isinstance(item, dict):
                 continue
-            for key, default in required_defaults.items():
+            for key in cls._playlist_entry_keys:
                 if key not in item:
-                    item[key] = default
+                    item[key] = required_defaults.get(key)
                     updated = True
 
         if updated:
@@ -198,16 +245,47 @@ class PlaylistManager:
         return updated
 
     @classmethod
+    def _order_playlist_entry_fields(cls, item):
+        if not isinstance(item, dict):
+            return item
+
+        ordered_item = {}
+        for key in cls._playlist_entry_keys:
+            if key in item:
+                ordered_item[key] = item[key]
+
+        for key, value in item.items():
+            if key not in cls._playlist_entry_keys:
+                ordered_item[key] = value
+
+        return ordered_item
+
+    @classmethod
     async def get_pending_upload_entries(cls, live_status_filter=None):
-        """Return playlist entries ready for upload (downloaded but not all hosts uploaded)."""
+        """Return playlist entries ready for upload (downloaded but not all enabled hosts uploaded)."""
         playlist_data = await cls._load_playlist_data()
         videos = playlist_data.get("Videos", [])
         pending = []
 
+        # Determine which platforms are enabled
+        enabled_platforms = []
+        if DVR_Config.upload_to_ia_enabled():
+            enabled_platforms.append("Uploaded_Video_IA")
+        if DVR_Config.upload_to_youtube_enabled():
+            enabled_platforms.append("Uploaded_Video_YT")
+        if DVR_Config.upload_to_rumble_enabled():
+            enabled_platforms.append("Uploaded_Video_RM")
+        if DVR_Config.upload_to_bitchute_enabled():
+            enabled_platforms.append("Uploaded_Video_BC")
+        if DVR_Config.upload_to_odysee_enabled():
+            enabled_platforms.append("Uploaded_Video_OD")
+
         for item in videos:
             if not item.get("Downloaded_Video", False):
                 continue
-            if item.get("Uploaded_Video_All_Hosts", False):
+            
+            # Skip if already uploaded to all enabled platforms
+            if enabled_platforms and all(item.get(platform, False) for platform in enabled_platforms):
                 continue
 
             if live_status_filter == "not_live":
@@ -228,6 +306,8 @@ class PlaylistManager:
             "Uploaded_Video_IA",
             "Uploaded_Video_YT",
             "Uploaded_Video_RM",
+            "Uploaded_Video_OD",
+            "Uploaded_Video_BC",
         ]:
             return False
 
@@ -238,11 +318,12 @@ class PlaylistManager:
         for item in videos:
             if item.get("URL") == url:
                 item[platform_key] = bool(status)
-
                 if (
                     item.get("Uploaded_Video_IA", False)
                     and item.get("Uploaded_Video_YT", False)
                     and item.get("Uploaded_Video_RM", False)
+                    and item.get("Uploaded_Video_OD", False)
+                    and item.get("Uploaded_Video_BC", False)
                 ):
                     item["Uploaded_Video_All_Hosts"] = True
                 else:
@@ -257,19 +338,53 @@ class PlaylistManager:
         return updated
 
     @classmethod
+    async def mark_video_upload_error(cls, uniqueid, platform_suffix, error_code: str):
+        """Mark a playlist item upload error for a specific platform.
+        
+        Args:
+            uniqueid: Unique ID of the video entry to mark
+            platform_suffix: Without 'Upload_Error_' prefix (e.g., 'BC', 'YT', 'RM', 'OD', 'IA')
+            error_code: Error code identifier (e.g., 'FileTooSmall_Min1MBForBitchute')
+        """
+        if platform_suffix not in ["IA", "YT", "RM", "OD", "BC"]:
+            return False
+
+        error_key = f"Upload_Error_{platform_suffix}"
+        playlist_data = await cls._load_playlist_data()
+        videos = playlist_data.get("Videos", [])
+        updated = False
+
+        for item in videos:
+            if item.get("UniqueID") == uniqueid:
+                item[error_key] = error_code
+                updated = True
+                break
+
+        if updated:
+            await cls._save_playlist_data(playlist_data)
+
+        return updated
+
+    @classmethod
     async def is_entry_fully_uploaded(cls, url):
         """Return True if all individual platform upload markers are set for the URL."""
         playlist_data = await cls._load_playlist_data()
         videos = playlist_data.get("Videos", [])
-        for item in videos:
-            if item.get("URL") == url:
-                return (
+        return next(
+            (
+                (
                     item.get("Uploaded_Video_IA", False)
                     and item.get("Uploaded_Video_YT", False)
                     and item.get("Uploaded_Video_RM", False)
+                    and item.get("Uploaded_Video_OD", False)
+                    and item.get("Uploaded_Video_BC", False)
                     and item.get("Uploaded_Video_All_Hosts", False)
                 )
-        return False
+                for item in videos
+                if item.get("URL") == url
+            ),
+            False,
+        )
 
     @classmethod
     async def _check_video_captions(cls, metadata, vidurl, thread_log_file=None):
@@ -336,7 +451,9 @@ class PlaylistManager:
             "extract_flat": False,
         }
         return await DLPHelpers.getinfo_with_retry(
-            ydl_opts, vidurl, thread_log_file
+            ydl_opts=ydl_opts,
+            url_or_list=vidurl,
+            log_file_name=thread_log_file,
         )
 
     @classmethod
@@ -533,15 +650,15 @@ class PlaylistManager:
         }
 
         videos_info = await DLPHelpers.getinfo_with_retry(
-            ydl_opts_flat,
-            cls.videos_url,
-            cls.channel_playlist_log_file,
+            ydl_opts=ydl_opts_flat,
+            url_or_list=cls.videos_url,
+            log_file_name=cls.channel_playlist_log_file,
         )
 
         shorts_info = await DLPHelpers.getinfo_with_retry(
-            ydl_opts_flat,
-            cls.shorts_url,
-            cls.channel_playlist_log_file,
+            ydl_opts=ydl_opts_flat,
+            url_or_list=cls.shorts_url,
+            log_file_name=cls.channel_playlist_log_file,
         )
 
         return videos_info, shorts_info
@@ -755,12 +872,6 @@ class PlaylistManager:
             for item in playlist_data:
                 if item.get("URL") == url and not item.get("Downloaded_Video", False):
                     item["Downloaded_Video"] = True
-                    try:
-                        item["DownloadedDateTime"] = datetime.now(
-                            timezone.utc
-                        ).isoformat()
-                    except Exception:
-                        item["DownloadedDateTime"] = None
                     updated = True
 
             if updated:

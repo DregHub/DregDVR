@@ -100,7 +100,11 @@ class LiveCommentsDownloader:
                 options = cls._get_download_options(name_template)
                 try:
                     await DLPHelpers.download_with_retry(
-                        options, yturl, LogManager.DOWNLOAD_COMMENTS_LOG_FILE
+                        ydl_opts=options,
+                        url_or_list=yturl,
+                        timeout_enabled=True,
+                        log_file_name=LogManager.DOWNLOAD_COMMENTS_LOG_FILE,
+                        log_warnings_and_above_only=False,
                     )
                 except Exception as e:
                     LogManager.log_download_comments(
