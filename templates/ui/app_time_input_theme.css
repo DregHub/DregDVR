@@ -1,0 +1,84 @@
+/* Time Input Theme - Standard Streamlit Design */
+/* Target Streamlit 1.28+ with time input components */
+
+.stTimeInput {
+  width: 100%;
+}
+
+/* Time input container */
+.stTimeInput > div {
+  position: relative;
+}
+
+/* Time input field */
+.stTimeInput input[type="time"] {
+  width: 100%;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-color);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease-out;
+  outline: none;
+  cursor: pointer;
+}
+
+.stTimeInput input[type="time"]::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.stTimeInput input[type="time"]:hover {
+  border-color: #d0d2d6;
+}
+
+.stTimeInput input[type="time"]:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+}
+
+.stTimeInput input[type="time"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--secondary-color);
+  border-color: var(--border-color);
+}
+
+/* Time picker icon */
+.stTimeInput input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.3);
+  padding: 4px;
+  margin-right: 4px;
+  transition: filter 0.15s ease-out;
+}
+
+.stTimeInput input[type="time"]:hover::-webkit-calendar-picker-indicator {
+  filter: invert(0.5);
+}
+
+/* Label styling */
+.stTimeInput > label {
+  color: var(--text-color);
+  font-weight: 500;
+  font-size: 14px;
+  margin-bottom: var(--spacing-xs);
+  display: block;
+}
+
+/* Help text */
+.stTimeInput small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Time picker dropdown (browser-dependent styling) */
+input[type="time"]::-webkit-inner-spin-button,
+input[type="time"]::-webkit-outer-spin-button {
+  opacity: 1;
+  filter: invert(0.3);
+}

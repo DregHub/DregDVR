@@ -1,0 +1,119 @@
+/* Messages Theme */
+/* Standard Streamlit styling for st.info, st.success, st.warning, st.error */
+
+.stAlert {
+  border-radius: var(--border-radius);
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.stAlert p {
+  margin: 0;
+  color: var(--text-color);
+}
+
+/* Info messages - blue theme */
+.stAlert[data-baseweb="notification"] [data-baseweb="notification-content"],
+.stAlert[data-testid*="info"],
+.stAlert[class*="info"] {
+  background: #e3f2fd;
+  border-color: #2196f3;
+  color: var(--text-color);
+}
+
+.stAlert[data-baseweb="notification"] [data-baseweb="notification-content"] svg,
+.stAlert[data-testid*="info"] svg,
+.stAlert[class*="info"] svg {
+  color: #2196f3;
+  flex-shrink: 0;
+}
+
+/* Success messages - green theme */
+.stAlert[data-testid*="success"],
+.stAlert[class*="success"] {
+  background: #e8f5e9;
+  border-color: #4caf50;
+  color: var(--text-color);
+}
+
+.stAlert[data-testid*="success"] svg,
+.stAlert[class*="success"] svg {
+  color: #4caf50;
+  flex-shrink: 0;
+}
+
+/* Warning messages - orange theme */
+.stAlert[data-testid*="warning"],
+.stAlert[class*="warning"] {
+  background: #fff3e0;
+  border-color: #ff9800;
+  color: var(--text-color);
+}
+
+.stAlert[data-testid*="warning"] svg,
+.stAlert[class*="warning"] svg {
+  color: #ff9800;
+  flex-shrink: 0;
+}
+
+/* Error messages - red theme */
+.stAlert[data-testid*="error"],
+.stAlert[class*="error"] {
+  background: #ffebee;
+  border-color: #f44336;
+  color: var(--text-color);
+}
+
+.stAlert[data-testid*="error"] svg,
+.stAlert[class*="error"] svg {
+  color: #f44336;
+  flex-shrink: 0;
+}
+
+/* Icon styling */
+.stAlert svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.125rem;
+}
+
+/* Message with custom icons (emojis) */
+.stAlert span:first-child {
+  font-size: 1.25rem;
+  line-height: 1;
+  margin-top: -0.125rem;
+}
+
+/* Dismissible messages */
+.stAlert button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: var(--border-radius-small);
+  transition: all var(--transition-fast);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.stAlert button:hover {
+  background: var(--secondary-color);
+  color: var(--text-color);
+}
+
+/* Toast-style messages (if used) */
+.stToast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  max-width: 400px;
+  box-shadow: var(--shadow-lg);
+}

@@ -1,202 +1,243 @@
 import os
+import sys
 import traceback
 import asyncio
-import json
 import logging
+import subprocess
+import signal
+from pathlib import Path
 from utils.logging_utils import LogManager
 from config.config_settings import DVR_Config
-from config.config_tasks import DVR_Tasks
 from utils.dependency_utils import DependencyManager
+from utils.instance_manager import InstanceManager
+from dvr_main import DVRMain
+from utils.asyncio_lifecycle_manager import AsyncioLifecycleManager
+
+
+# Configure logging to not show level and logger name
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logging.info("Starting Dregg DVR")
+_streamlit_process = None
+_main_loop = None
+
+
+async def graceful_async_shutdown():
+    """Perform graceful async shutdown including database and loop cleanup."""
+    global _main_loop
+    try:
+        # Call the lifecycle manager's graceful shutdown
+        await AsyncioLifecycleManager.graceful_shutdown(timeout=10)
+    except Exception as e:
+        logging.error(f"Error during graceful async shutdown: {e}")
+        import traceback as tb
+        logging.error(tb.format_exc())
+
+
+def signal_handler(signum, frame):
+    """Handle termination signals gracefully."""
+    global _streamlit_process, _main_loop
+
+    # Stop Streamlit process
+    if _streamlit_process and _streamlit_process.poll() is None:
+        try:
+            _streamlit_process.terminate()
+            _streamlit_process.wait(timeout=10)
+        except Exception as e:
+            logging.error(f"Error terminating Streamlit: {e}")
+            try:
+                _streamlit_process.kill()
+            except Exception:
+                pass
+
+    # Stop main event loop if running
+    if _main_loop and _main_loop.is_running():
+        try:
+            _main_loop.call_soon_threadsafe(_main_loop.stop)
+        except Exception as e:
+            logging.warning(f"Error stopping main loop: {e}")
+
+    sys.exit(0)
 
 
 def create_required_dirs():
     """
     Create project, runtime and data profile directories and their subdirectories
-    as defined in the configuration.
+    as defined in the configuration for all instances.
     """
-    DVR_Config._init_parser()
-    root = os.getcwd()
-    DVR_Config.Project_Root_Dir = os.path.dirname(os.path.abspath(__file__))
-    runtime_profiledir_name = json.loads(
-        DVR_Config.get_value("Directories", "runtime_dir")
-    )
-    data_profiledir_name = json.loads(DVR_Config.get_value("Directories", "data_dir"))
-    runtime_profiledir = os.path.join(root, runtime_profiledir_name)
-    data_profiledir = os.path.join(root, data_profiledir_name)
+    try:
+        DVR_Config.Project_Root_Dir = os.path.dirname(os.path.abspath(__file__))
 
-    runtime_subdirs_to_create = json.loads(
-        DVR_Config.get_value("Directories", "runtime_subdirs_to_create")
-    )
-    data_subdirs_to_create = json.loads(
-        DVR_Config.get_value("Directories", "data_subdirs_to_create")
-    )
-
-    for sub in runtime_subdirs_to_create:
-        newdir = os.path.join(runtime_profiledir, sub)
-        # Cant use log manager yet as the dirs may not exist log to container shell instead
-        logging.info(f"making new runtime profile subdirectory: {newdir}")
-        os.makedirs(newdir, exist_ok=True)
-
-    for sub in data_subdirs_to_create:
-        newdir = os.path.join(data_profiledir, sub)
-        logging.info(f"making new dvr data subdirectory: {newdir}")
-        os.makedirs(newdir, exist_ok=True)
-
-    logging.info("Created required directories successfully.")
+    except Exception as e:
+        logging.error(
+            f"Error creating required directories: {e}\n{traceback.format_exc()}"
+        )
+        raise
 
 
-async def handle_dependency_updates():
-    dependency_package_update_enabled = DVR_Tasks.get_dependency_package_update()
+async def initialize_instances_async():
+    """
+    Asynchronously initialize all instances from the config.
+    Returns the initialized instances or None if no instances exist.
+    """
+    try:
+        initialized_instances = await InstanceManager.initialize_instances()
 
-    if dependency_package_update_enabled == True:
-        if os.name == "nt":
-            # Windows
-            LogManager.log_core("Skipping Dependency Package Update as os = Windows")
-        else:
-            apt_dependencies = DVR_Config.get_required_apt_dependencies()
-            for dependency in apt_dependencies:
-                await DependencyManager.install_apt_dependency(dependency)
+        if not initialized_instances:
+            logging.info("Please create a DVR instance in the web interface.")
+        return initialized_instances
+    except Exception as e:
+        logging.error(f"Error initializing instances: {e}\n{traceback.format_exc()}")
+        raise
 
-            pip_dependencies = DVR_Config.get_required_py_dependencies()
-            for dependency in pip_dependencies:
-                await DependencyManager.install_pip_dependency(dependency)
 
-            await DependencyManager.update_ytdlp()
+def start_streamlit_portal():
+    """
+    Start the Streamlit portal in a separate process using the official
+    'python -m streamlit run' invocation recommended by Streamlit.
 
-            LogManager.log_core(
-                "All required dependencies installed/updated successfully."
-            )
-    else:
-        LogManager.log_core(
-            "Skipping Dependency Package Update as dependency_package_update = false in dvr_tasks.ini"
+    NOTE: Uses logging instead of LogManager to avoid database access before event loop exists.
+    """
+    try:
+        project_root = Path(__file__).parent
+        ui_app_path = project_root / "ui" / "app.py"
+
+        if not ui_app_path.exists():
+            logging.error(f"Error: UI app not found at {ui_app_path}")
+            return None
+
+        os.chdir(project_root)
+        cmd = [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            str(ui_app_path),
+            "--server.headless=true",
+            "--server.address=0.0.0.0",
+            "--server.port=8501",
+            "--server.enableCORS=false",
+            "--server.enableXsrfProtection=false",
+            "--logger.level=info",
+        ]
+
+        # IMPORTANT: Do NOT suppress output in Docker
+        try:
+            preexec_fn = os.setsid
+        except AttributeError:
+            preexec_fn = None
+        process = subprocess.Popen(
+            cmd,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            preexec_fn=preexec_fn,  # Process group for graceful termination
         )
 
+        return process
 
-async def handle_container_maintenance():
-    ContainerMaintenance = DVR_Tasks.get_container_maintenance_inf_loop()
-    if ContainerMaintenance == True:
-        LogManager.log_core("Container Maintenance Mode is ON")
-        LogManager.log_core("Script Will Loop Forever...")
-        # Infinite loop incase we need to access the containers shell
-        while True:
-            await asyncio.sleep(600000)
-
-
-def add_task_if_enabled(tasks, enabled, coro_func, disabled_message):
-    if enabled == True:
-        tasks.append(coro_func())
-    else:
-        LogManager.log_core(disabled_message)
+    except Exception as e:
+        logging.error(f"Error starting Streamlit portal: {e}\n{traceback.format_exc()}")
+        return None
 
 
 async def main():
+    global _main_loop
     try:
-        logging.info("Starting Dregg DVR")
-        # Ensure required project/runtime/data directories exist
+        # Get the current event loop and register it with lifecycle manager
+        _main_loop = asyncio.get_running_loop()
+        try:
+            AsyncioLifecycleManager.register_loop(_main_loop, loop_name="main_dvr_loop")
+        except Exception as e:
+            logging.error(f"Failed to register main loop: {e}")
+            import traceback
+
+            logging.error(traceback.format_exc())
+            raise
+        try:
+            from db.dvr_db import DVRDB
+            from db.log_db import LogDB
+
+            await LogDB.get_global()
+            await DVRDB.get_global()
+
+        except Exception as e:
+            logging.error(f"Error initializing database managers: {e}")
+            import traceback as tb
+            logging.error(tb.format_exc())
+            raise
+
+        try:
+            await LogManager._ensure_database_schema()
+        except Exception as e:
+            logging.warning(f"Could not initialize logging database schema: {e}")
+
         create_required_dirs()
+        initialized_instances = await initialize_instances_async()
 
-        await handle_dependency_updates()
-
-        await handle_container_maintenance()
-
-        livestream_download_enabled = DVR_Tasks.get_livestream_download()
-        livestream_recovery_download_enabled = DVR_Tasks.get_livestream_recovery_download()
-        captions_download_enabled = DVR_Tasks.get_captions_download()
-        captions_upload_enabled = DVR_Tasks.get_captions_upload()
-        #currently download comments is scheduled by the live download dlp events
-        #comments_download_enabled = DVR_Tasks.get_comments_download()
-        comments_republish_enabled = DVR_Tasks.get_comments_republish()
-        posted_videos_download_enabled = DVR_Tasks.get_posted_videos_download()
-        posted_notices_download_enabled = DVR_Tasks.get_posted_notices_download()
-        livestream_upload_enabled = DVR_Tasks.get_livestream_upload()
-        posted_videos_upload_enabled = DVR_Tasks.get_posted_videos_upload()
-        update_yt_source_playlist = DVR_Tasks.get_update_yt_source_playlist()
-        update_caption_source_playlist = DVR_Tasks.get_update_caption_source_playlist()
-
-        # Import all task modules
-        from downloader.livestreams import LivestreamDownloader
-        from downloader.recovery import RecoveryDownloader
-        from downloader.videos import VideoDownloader
-        from downloader.captions import CaptionsDownloader
-        from downloader.posts import CommunityDownloader
-        from uploader.videos import VideoUploader
-        from uploader.captions import CaptionsUploader
-        from downloader.comments import LiveCommentsDownloader
-        from downloader.videos import VideosPlaylistManager
-        from downloader.captions import CaptionsPlaylistManager
-
-        tasks = []
-        task_configs = [
-            (
-                livestream_download_enabled,
-                LivestreamDownloader.download_livestreams,
-                "Livestream Download is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                livestream_recovery_download_enabled,
-                RecoveryDownloader.monitor_recoveryqueue,
-                "Livestream Recovery Download is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                comments_republish_enabled,
-                LiveCommentsDownloader.republish_comments,
-                "Comments Republish is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                posted_videos_download_enabled,
-                VideoDownloader.download_videos,
-                "Posted Video Download is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                captions_download_enabled,
-                CaptionsDownloader.download_captions,
-                "Caption Download is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                captions_upload_enabled,
-                CaptionsUploader.upload_captions,
-                "Caption Upload is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                posted_notices_download_enabled,
-                CommunityDownloader.monitor_channel,
-                "Posted Community Message Download is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                livestream_upload_enabled,
-                VideoUploader.upload_livestreams,
-                "Livestream Upload is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                posted_videos_upload_enabled,
-                VideoUploader.upload_posted_videos,
-                "Posted Video Upload is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                update_yt_source_playlist,
-                VideosPlaylistManager.run_playlist_update_task,
-                "Update YouTube Source Playlist is disabled in INI Tasks. Skipping...",
-            ),
-            (
-                update_caption_source_playlist,
-                CaptionsPlaylistManager.run_playlist_update_task,
-                "Update Caption Source Playlist is disabled in INI Tasks. Skipping...",
-            ),
-        ]
-
-        for enabled, coro_func, msg in task_configs:
-            add_task_if_enabled(tasks, enabled, coro_func, msg)
-
-        if not tasks:
-            LogManager.log_core("All Tasks are disabled in INI Tasks. Exiting...")
+        # Only start DVR tasks if there is at least 1 instance present
+        if initialized_instances:
+            dvr = DVRMain()
+            result = await dvr.run_dvr()
         else:
-            LogManager.log_core(
-                "Starting Dregg's DVR... Am i 4k wecording? Yes im 4k wecording!"
-            )
-            await asyncio.gather(*tasks)
+            result = False
+        return result
 
     except Exception as e:
-        LogManager.log_core(f"Exception in main:  {e}\n{traceback.format_exc()}")
+        logging.error(f"Exception in main: {e}\n{traceback.format_exc()}")
+        logging.error(f"FATAL ERROR: {e}\n{traceback.format_exc()}")
+        return False
+    finally:
+        try:
+            await graceful_async_shutdown()
+        except Exception as e:
+            logging.error(f"Error during shutdown: {e}")
+
+        LogManager.flush_logs()
+        LogManager.shutdown_logging()
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
+    try:
+        project_root = Path(__file__).parent
+        from config.config_settings import DVR_Config
+
+        DVR_Config.Project_Root_Dir = str(project_root)
+        DependencyManager.update_py_dependencies()
+        _streamlit_process = start_streamlit_portal()
+
+        tasks_started = asyncio.run(main())
+
+        if not tasks_started:
+            if _streamlit_process:
+                try:
+                    _streamlit_process.wait()
+                except KeyboardInterrupt:
+                    logging.info("Streamlit portal termination requested.")
+                    _streamlit_process.terminate()
+                    _streamlit_process.wait(timeout=5)
+        else:
+            if _streamlit_process and _streamlit_process.poll() is None:
+                _streamlit_process.terminate()
+                try:
+                    _streamlit_process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    _streamlit_process.kill()
+                    _streamlit_process.wait()
+
+    except KeyboardInterrupt:
+        logging.info("Application interrupted by user.")
+    except Exception as e:
+        logging.error(f"Fatal error: {e}\n{traceback.format_exc()}")
+    finally:
+        if _streamlit_process and _streamlit_process.poll() is None:
+            try:
+                _streamlit_process.terminate()
+                _streamlit_process.wait(timeout=5)
+            except Exception:
+                try:
+                    _streamlit_process.kill()
+                except Exception:
+                    pass

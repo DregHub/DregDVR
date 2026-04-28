@@ -5,7 +5,7 @@ import re
 import time
 import os
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
-from utils.logging_utils import LogManager
+from utils.logging_utils import LogManager, LogLevels
 from utils.template_manager import TemplateManager
 
 
@@ -14,20 +14,23 @@ class PlaywrightUtils:
     # Resolve base path relative to this file's directory
     _base_path = os.path.dirname(os.path.abspath(__file__))
     _parent_path = os.path.dirname(_base_path)
-    
-    template_manager = TemplateManager({
-        'log_upload_percent': 'templates/playwright_log_upload_percent.js',
-        'block_media_loading': 'templates/playwright_block_media_loading.js',
-        'mask_webdriver': 'templates/playwright_mask_webdriver.js',
-        'wait_for_upload_progress': 'templates/playwright_wait_for_upload_progress.js',
-        'wait_for_navigation': 'templates/playwright_wait_for_navigation.js',
-        'launch_args': 'templates/playwright_launch_args.json',
-        'viewport': 'templates/playwright_viewport.json',
-        'headers': 'templates/playwright_headers.json',
-        'console_log_filter_rumble': 'templates/console_log_filter_rumble.txt',
-        'console_log_filter_odysee': 'templates/console_log_filter_odysee.txt',
-        'console_log_filter_bitchute': 'templates/console_log_filter_bitchute.txt',
-    }, base_path=_parent_path)
+
+    template_manager = TemplateManager(
+        {
+            "log_upload_percent": "templates/playwright/playwright_log_upload_percent.js",
+            "block_media_loading": "templates/playwright/playwright_block_media_loading.js",
+            "mask_webdriver": "templates/playwright/playwright_mask_webdriver.js",
+            "wait_for_upload_progress": "templates/playwright/playwright_wait_for_upload_progress.js",
+            "wait_for_navigation": "templates/playwright/playwright_wait_for_navigation.js",
+            "launch_args": "templates/playwright/playwright_launch_args.json",
+            "viewport": "templates/playwright/playwright_viewport.json",
+            "headers": "templates/playwright/playwright_headers.json",
+            "console_log_filter_rumble": "templates/playwright/console_log_filter_rumble.txt",
+            "console_log_filter_odysee": "templates/playwright/console_log_filter_odysee.txt",
+            "console_log_filter_bitchute": "templates/playwright/console_log_filter_bitchute.txt",
+        },
+        base_path=_parent_path,
+    )
 
     # Cached config values
     _launch_args_cache = None
@@ -41,7 +44,9 @@ class PlaywrightUtils:
         await PlaywrightUtils.template_manager.load_templates()
 
         if PlaywrightUtils._launch_args_cache is None:
-            launch_args_json = PlaywrightUtils.template_manager.get_template('launch_args')
+            launch_args_json = PlaywrightUtils.template_manager.get_template(
+                "launch_args"
+            )
             if launch_args_json:
                 try:
                     PlaywrightUtils._launch_args_cache = json.loads(launch_args_json)
@@ -51,7 +56,7 @@ class PlaywrightUtils:
                 raise ValueError("launch_args template is empty or not found")
 
         if PlaywrightUtils._viewport_cache is None:
-            viewport_json = PlaywrightUtils.template_manager.get_template('viewport')
+            viewport_json = PlaywrightUtils.template_manager.get_template("viewport")
             if viewport_json:
                 try:
                     PlaywrightUtils._viewport_cache = json.loads(viewport_json)
@@ -61,7 +66,7 @@ class PlaywrightUtils:
                 raise ValueError("viewport template is empty or not found")
 
         if PlaywrightUtils._headers_cache is None:
-            headers_json = PlaywrightUtils.template_manager.get_template('headers')
+            headers_json = PlaywrightUtils.template_manager.get_template("headers")
             if headers_json:
                 try:
                     PlaywrightUtils._headers_cache = json.loads(headers_json)
@@ -76,8 +81,6 @@ class PlaywrightUtils:
         if PlaywrightUtils._launch_args_cache is None:
             await PlaywrightUtils._load_config()
         return PlaywrightUtils._launch_args_cache
-
- 
 
     @staticmethod
     async def get_viewport():
@@ -107,9 +110,7 @@ class PlaywrightUtils:
 
     @staticmethod
     async def launch_stealth_browser(
-        headless: bool = True,
-        launch_args: list = None,
-        **kwargs
+        headless: bool = True, launch_args: list = None, **kwargs
     ) -> Browser:
         """
         Launch a Chromium browser with stealth options to avoid detection.
@@ -126,11 +127,7 @@ class PlaywrightUtils:
 
         args = launch_args or await PlaywrightUtils.get_launch_args()
 
-        browser = await p.chromium.launch(
-            headless=headless,
-            args=args,
-            **kwargs
-        )
+        browser = await p.chromium.launch(headless=headless, args=args, **kwargs)
         # Keep the playwright instance available for proper shutdown.
         try:
             browser._playwright_instance = p
@@ -144,7 +141,7 @@ class PlaywrightUtils:
         user_agent: str = None,
         viewport: dict = None,
         headers: dict = None,
-        **kwargs
+        **kwargs,
     ) -> BrowserContext:
         """
         Create a browser context with human-like settings to avoid bot detection.
@@ -164,14 +161,14 @@ class PlaywrightUtils:
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             viewport=viewport or await PlaywrightUtils.get_viewport(),
             extra_http_headers=headers or await PlaywrightUtils.get_headers(),
-            locale='en-US',
-            timezone_id='America/New_York',
-            geolocation={'latitude': 40.7128, 'longitude': -74.0060},
-            permissions=['geolocation'],
+            locale="en-US",
+            timezone_id="America/New_York",
+            geolocation={"latitude": 40.7128, "longitude": -74.0060},
+            permissions=["geolocation"],
             device_scale_factor=1,
             bypass_csp=True,
             ignore_https_errors=True,
-            **kwargs
+            **kwargs,
         )
         return context
 
@@ -185,7 +182,7 @@ class PlaywrightUtils:
             page: Page instance
         """
         await PlaywrightUtils.template_manager.load_templates()
-        js_code = PlaywrightUtils.template_manager.get_template('mask_webdriver')
+        js_code = PlaywrightUtils.template_manager.get_template("mask_webdriver")
         await page.add_init_script(js_code)
 
     @staticmethod
@@ -194,7 +191,7 @@ class PlaywrightUtils:
         selector: str,
         value: str,
         min_delay_ms: int = 300,
-        max_delay_ms: int = 600
+        max_delay_ms: int = 600,
     ) -> None:
         """
         Fill a form field with human-like delays.
@@ -215,7 +212,7 @@ class PlaywrightUtils:
         selector: str,
         min_delay_ms: int = 300,
         max_delay_ms: int = 600,
-        suppress_exceptions: bool = False
+        suppress_exceptions: bool = False,
     ) -> None:
         """
         Click an element with human-like delays.
@@ -236,10 +233,7 @@ class PlaywrightUtils:
 
     @staticmethod
     async def press_key(
-        page: Page,
-        key: str,
-        min_delay_ms: int = 300,
-        max_delay_ms: int = 600
+        page: Page, key: str, min_delay_ms: int = 300, max_delay_ms: int = 600
     ) -> None:
         """
         Press a keyboard key with human-like delays.
@@ -254,10 +248,7 @@ class PlaywrightUtils:
         await page.keyboard.press(key)
 
     @staticmethod
-    async def setup_console_logging(
-        page: Page,
-        log_callback=None
-    ) -> None:
+    async def setup_console_logging(page: Page, log_callback=None) -> None:
         """
         Set up console message capture from browser to logging system.
 
@@ -266,6 +257,7 @@ class PlaywrightUtils:
             log_callback: Function to call with console messages.
                 Should accept (msg_type, msg_text) parameters.
         """
+
         def handle_console_msg(msg):
             if log_callback:
                 log_callback(msg.type.upper(), msg.text)
@@ -279,7 +271,10 @@ class PlaywrightUtils:
             return True
 
         # Always filter out known noisy resource errors.
-        if "ERR_CONNECTION_REFUSED" in msg_text or "Failed to load resource" in msg_text:
+        if (
+            "ERR_CONNECTION_REFUSED" in msg_text
+            or "Failed to load resource" in msg_text
+        ):
             return False
 
         if filter_strings:
@@ -299,9 +294,7 @@ class PlaywrightUtils:
 
     @staticmethod
     async def create_console_log_callback(
-        log_file=None,
-        platform=None,
-        log_to_console=True
+        log_table=None, platform=None, log_to_console=True
     ):
         """Create a reusable Playwright console logging callback with filtering."""
         filter_strings = []
@@ -316,16 +309,13 @@ class PlaywrightUtils:
             message = f"[Console/{msg_type}] {msg_text}"
             if log_to_console:
                 print(message)
-            if log_file:
-                LogManager.log_message(message, log_file)
+            if log_table:
+                LogManager.log_message(message, log_table)
 
         return console_log
 
     @staticmethod
-    async def check_cloudflare(
-        page: Page,
-        log_callback=None
-    ) -> bool:
+    async def check_cloudflare(page: Page, log_callback=None) -> bool:
         """
         Check and handle Cloudflare challenge or error detection.
         Automatically waits for challenge resolution with multiple attempts.
@@ -345,7 +335,9 @@ class PlaywrightUtils:
 
             if "Just a moment" in title or "challenge" in title.lower():
                 if log_callback:
-                    log_callback(f"Cloudflare challenge detected (title: '{title}'). Waiting for automatic resolution...")
+                    log_callback(
+                        f"Cloudflare challenge detected (title: '{title}'). Waiting for automatic resolution..."
+                    )
 
                 detected = True
 
@@ -357,17 +349,21 @@ class PlaywrightUtils:
                 while elapsed < max_wait_time:
                     try:
                         # Get current title and wait for it to change
-                        await page.wait_for_load_state('networkidle', timeout=10000)
+                        await page.wait_for_load_state("networkidle", timeout=10000)
                         new_title = await page.title()
 
                         if new_title != title and "Just a moment" not in new_title:
                             if log_callback:
-                                log_callback(f"Cloudflare challenge resolved! Title changed from '{title}' to '{new_title}'")
+                                log_callback(
+                                    f"Cloudflare challenge resolved! Title changed from '{title}' to '{new_title}'"
+                                )
                             detected = False
                             return detected
 
                         if log_callback:
-                            log_callback(f"Still waiting for Cloudflare challenge... ({elapsed}s/{max_wait_time}s)")
+                            log_callback(
+                                f"Still waiting for Cloudflare challenge... ({elapsed}s/{max_wait_time}s)"
+                            )
 
                         await asyncio.sleep(wait_interval)
                         elapsed += wait_interval
@@ -380,14 +376,22 @@ class PlaywrightUtils:
 
                 if elapsed >= max_wait_time:
                     if log_callback:
-                        log_callback("WARNING: Cloudflare challenge did not resolve within 2 minutes. Continuing anyway...")
+                        log_callback(
+                            "WARNING: Cloudflare challenge did not resolve within 2 minutes. Continuing anyway..."
+                        )
 
                 # Check for Cloudflare error messages
                 try:
                     page_content = await page.content()
-                    if 'Error 1020' in page_content or 'Error 1010' in page_content or 'Error 1030' in page_content:
+                    if (
+                        "Error 1020" in page_content
+                        or "Error 1010" in page_content
+                        or "Error 1030" in page_content
+                    ):
                         if log_callback:
-                            log_callback("WARNING: Cloudflare error page detected (1020/1010/1030). Waiting before retry...")
+                            log_callback(
+                                "WARNING: Cloudflare error page detected (1020/1010/1030). Waiting before retry..."
+                            )
                         await asyncio.sleep(10)
                         detected = True
                 except:
@@ -408,7 +412,8 @@ class PlaywrightUtils:
         log_callback=None,
         progress_callback=None,
         completion_strings: dict = None,
-        ignored_strings: str = "uploading"
+        ignored_strings: str = "uploading",
+        completion_alt_selector: str = None,
     ) -> None:
         """
         Wait for upload progress to reach completion by monitoring element text.
@@ -421,38 +426,56 @@ class PlaywrightUtils:
             progress_callback: Function to call with progress updates
             completion_strings: Dict of strings that indicate completion (case insensitive)
             ignored_strings: Substring to remove from progress text if present (case insensitive check)
+            completion_alt_selector: Alternative selector to check for completion (e.g., success page element)
         """
         if completion_strings is None:
             completion_strings = {"100": None, "Complete": None}
 
         # Wait for progress element to be visible
         progress_locator = page.locator(progress_selector)
-        await progress_locator.wait_for(state='visible', timeout=timeout_ms)
+        await progress_locator.wait_for(state="visible", timeout=timeout_ms)
 
         start_time = time.time()
         last_logged_percent = -5  # Start below 0 to ensure first log
         while True:
             try:
+                # Check alternative completion selector first
+                if completion_alt_selector:
+                    alt_locator = page.locator(completion_alt_selector)
+                    if await alt_locator.count() > 0 and await alt_locator.is_visible():
+                        if log_callback:
+                            log_callback("Upload completed via alternative selector")
+                        break
+
                 # Extract progress text
                 progress_text = await progress_locator.inner_text()
-                
+
                 # Remove ignored strings if present (case insensitive)
                 if ignored_strings.lower() in progress_text.lower():
-                    progress_text = re.sub(re.escape(ignored_strings), '', progress_text, flags=re.IGNORECASE)
-                
+                    progress_text = re.sub(
+                        re.escape(ignored_strings),
+                        "",
+                        progress_text,
+                        flags=re.IGNORECASE,
+                    )
+
                 # Extract percentage for logging control
-                percent_match = re.search(r'(\d+)', progress_text)
+                percent_match = re.search(r"(\d+)", progress_text)
                 current_percent = int(percent_match.group(1)) if percent_match else 0
-                
+
                 # Only log progress every 5% change
                 if progress_callback and current_percent - last_logged_percent >= 5:
                     progress_callback(progress_text)
                     last_logged_percent = current_percent
 
                 # Check for completion strings (case insensitive)
-                if any(key.lower() in progress_text.lower() for key in completion_strings):
+                if any(
+                    key.lower() in progress_text.lower() for key in completion_strings
+                ):
                     if log_callback:
-                        log_callback(f"Upload progress reached completion: {progress_text}")
+                        log_callback(
+                            f"Upload progress reached completion: {progress_text}"
+                        )
                     break
 
             except Exception as e:
@@ -473,8 +496,8 @@ class PlaywrightUtils:
         page: Page,
         selector: str,
         timeout_ms: int = 30000,
-        state: str = 'visible',
-        log_callback=None
+        state: str = "visible",
+        log_callback=None,
     ) -> None:
         """
         Wait for an element to appear or reach a specific state.
@@ -501,8 +524,8 @@ class PlaywrightUtils:
         page: Page,
         element_id: str,
         timeout_ms: int = 30000,
-        state: str = 'visible',
-        log_callback=None
+        state: str = "visible",
+        log_callback=None,
     ) -> None:
         """
         Wait for an element by ID to appear or reach a specific state.
@@ -514,16 +537,18 @@ class PlaywrightUtils:
             state: State to wait for ('visible', 'hidden', 'attached', 'detached')
             log_callback: Function to call for logging
         """
-        selector = f'#{element_id}'
-        await PlaywrightUtils.wait_for_element(page, selector, timeout_ms, state, log_callback)
+        selector = f"#{element_id}"
+        await PlaywrightUtils.wait_for_element(
+            page, selector, timeout_ms, state, log_callback
+        )
 
     @staticmethod
     async def wait_for_element_by_name(
         page: Page,
         name: str,
         timeout_ms: int = 30000,
-        state: str = 'visible',
-        log_callback=None
+        state: str = "visible",
+        log_callback=None,
     ) -> None:
         """
         Wait for an element by name attribute to appear or reach a specific state.
@@ -536,7 +561,9 @@ class PlaywrightUtils:
             log_callback: Function to call for logging
         """
         selector = f'[name="{name}"]'
-        await PlaywrightUtils.wait_for_element(page, selector, timeout_ms, state, log_callback)
+        await PlaywrightUtils.wait_for_element(
+            page, selector, timeout_ms, state, log_callback
+        )
 
     @staticmethod
     async def wait_for_element_by_type_and_innertext(
@@ -544,8 +571,8 @@ class PlaywrightUtils:
         element_type: str,
         inner_text: str,
         timeout_ms: int = 30000,
-        state: str = 'visible',
-        log_callback=None
+        state: str = "visible",
+        log_callback=None,
     ) -> None:
         """
         Wait for an element by tag type and inner text to appear or reach a specific state.
@@ -559,14 +586,13 @@ class PlaywrightUtils:
             log_callback: Function to call for logging
         """
         selector = f'{element_type}:has-text("{inner_text}")'
-        await PlaywrightUtils.wait_for_element(page, selector, timeout_ms, state, log_callback)
+        await PlaywrightUtils.wait_for_element(
+            page, selector, timeout_ms, state, log_callback
+        )
 
     @staticmethod
     async def wait_for_text(
-        page: Page,
-        text: str,
-        timeout_ms: int = 30000,
-        log_callback=None
+        page: Page, text: str, timeout_ms: int = 30000, log_callback=None
     ) -> None:
         """
         Wait for specific text to appear on the page.
@@ -593,7 +619,7 @@ class PlaywrightUtils:
         min_delay_ms: int = 300,
         max_delay_ms: int = 600,
         timeout_ms: int = 120000,
-        log_callback=None
+        log_callback=None,
     ) -> None:
         """
         Check a checkbox with human-like delays.
@@ -613,12 +639,14 @@ class PlaywrightUtils:
             # Wait for element to be attached (not necessarily visible)
             if log_callback:
                 log_callback(f"Waiting for checkbox '{selector}' to be attached...")
-            await locator.wait_for(state='attached', timeout=timeout_ms)
+            await locator.wait_for(state="attached", timeout=timeout_ms)
 
             # Check if it's visible
             is_visible = await locator.is_visible()
             if not is_visible and log_callback:
-                log_callback(f"Checkbox '{selector}' is hidden, attempting to check anyway...")
+                log_callback(
+                    f"Checkbox '{selector}' is hidden, attempting to check anyway..."
+                )
 
             # If already checked, return early.
             try:
@@ -629,14 +657,18 @@ class PlaywrightUtils:
                     return
             except Exception as check_error:
                 if log_callback:
-                    log_callback(f"Could not determine checkbox state for '{selector}': {check_error}. Attempting to check anyway...")
+                    log_callback(
+                        f"Could not determine checkbox state for '{selector}': {check_error}. Attempting to check anyway..."
+                    )
 
             try:
                 await locator.check(timeout=timeout_ms)
             except Exception as check_error:
                 # Fallback to click for sites with non-standard checkbox controls.
                 if log_callback:
-                    log_callback(f"Check failed, trying click: {str(check_error)[:100]}")
+                    log_callback(
+                        f"Check failed, trying click: {str(check_error)[:100]}"
+                    )
                 await locator.click(timeout=timeout_ms)
 
             if log_callback:
@@ -653,7 +685,7 @@ class PlaywrightUtils:
         selector: str,
         min_delay_ms: int = 300,
         max_delay_ms: int = 600,
-        log_callback=None
+        log_callback=None,
     ) -> None:
         """
         Click an element and wait for any page navigation/reload.
@@ -669,7 +701,9 @@ class PlaywrightUtils:
             await PlaywrightUtils.random_delay(min_delay_ms, max_delay_ms)
             # Use Promise.all to handle potential navigation
             await PlaywrightUtils.template_manager.load_templates()
-            js_code = PlaywrightUtils.template_manager.get_template('wait_for_navigation')
+            js_code = PlaywrightUtils.template_manager.get_template(
+                "wait_for_navigation"
+            )
             await page.evaluate(js_code)
             await page.locator(selector).click()
             await PlaywrightUtils.random_delay(500, 1000)
@@ -679,18 +713,20 @@ class PlaywrightUtils:
             # Don't log/raise navigation errors, they're expected
             if "timeout" not in str(e).lower():
                 if log_callback:
-                    log_callback(f"Clicked element '{selector}' (navigation completed or in progress)")
+                    log_callback(
+                        f"Clicked element '{selector}' (navigation completed or in progress)"
+                    )
 
     @staticmethod
     async def block_media_loading(page: Page) -> None:
         """
         Block media (video/audio) resources from loading to speed up page navigation.
-        
+
         Args:
             page: Page instance
         """
         await PlaywrightUtils.template_manager.load_templates()
-        js_code = PlaywrightUtils.template_manager.get_template('block_media_loading')
+        js_code = PlaywrightUtils.template_manager.get_template("block_media_loading")
         await page.add_init_script(js_code)
 
     @staticmethod
@@ -699,18 +735,18 @@ class PlaywrightUtils:
         url: str,
         wait_until: str = "load",
         timeout: int = 30000,
-        log_callback=None
+        log_callback=None,
     ) -> bool:
         """
         Navigate to a URL with error handling.
-        
+
         Args:
             page: Page instance
             url: URL to navigate to
             wait_until: Wait condition ("load", "domcontentloaded", "networkidle")
             timeout: Timeout in milliseconds
             log_callback: Function to call for logging
-            
+
         Returns:
             True if navigation succeeded, False otherwise
         """
@@ -724,14 +760,11 @@ class PlaywrightUtils:
 
     @staticmethod
     async def wait_for_load_state(
-        page: Page,
-        state: str = "load",
-        timeout: int = 30000,
-        log_callback=None
+        page: Page, state: str = "load", timeout: int = 30000, log_callback=None
     ) -> None:
         """
         Wait for page to reach a specific load state.
-        
+
         Args:
             page: Page instance
             state: Load state ("load", "domcontentloaded", "networkidle")
@@ -753,11 +786,11 @@ class PlaywrightUtils:
         value: str,
         min_delay_ms: int = 300,
         max_delay_ms: int = 600,
-        log_callback=None
+        log_callback=None,
     ) -> None:
         """
         Fill a form input field by name attribute with human-like delays.
-        
+
         Args:
             page: Page instance
             name: Name attribute of the input
@@ -768,7 +801,9 @@ class PlaywrightUtils:
         """
         try:
             await PlaywrightUtils.random_delay(min_delay_ms, max_delay_ms)
-            locator = page.locator(f'input[name="{name}"], textarea[name="{name}"], select[name="{name}"]')
+            locator = page.locator(
+                f'input[name="{name}"], textarea[name="{name}"], select[name="{name}"]'
+            )
             await locator.fill(value)
             if log_callback:
                 log_callback(f"Filled form field '{name}'")
@@ -784,11 +819,11 @@ class PlaywrightUtils:
         value: str,
         min_delay_ms: int = 300,
         max_delay_ms: int = 600,
-        log_callback=None
+        log_callback=None,
     ) -> None:
         """
         Fill a form textarea field by name attribute with human-like delays.
-        
+
         Args:
             page: Page instance
             name: Name attribute of the textarea
@@ -815,11 +850,11 @@ class PlaywrightUtils:
         value: str,
         min_delay_ms: int = 300,
         max_delay_ms: int = 600,
-        log_callback=None
+        log_callback=None,
     ) -> None:
         """
         Fill a form input field by ID with human-like delays.
-        
+
         Args:
             page: Page instance
             element_id: ID of the input element
@@ -830,7 +865,7 @@ class PlaywrightUtils:
         """
         try:
             await PlaywrightUtils.random_delay(min_delay_ms, max_delay_ms)
-            locator = page.locator(f'#{element_id}')
+            locator = page.locator(f"#{element_id}")
             await locator.fill(value)
             if log_callback:
                 log_callback(f"Filled form field with ID '{element_id}'")
@@ -846,11 +881,11 @@ class PlaywrightUtils:
         value: str,
         min_delay_ms: int = 300,
         max_delay_ms: int = 600,
-        log_callback=None
+        log_callback=None,
     ) -> None:
         """
         Fill a form textarea field by ID with human-like delays.
-        
+
         Args:
             page: Page instance
             element_id: ID of the textarea element
@@ -861,13 +896,15 @@ class PlaywrightUtils:
         """
         try:
             await PlaywrightUtils.random_delay(min_delay_ms, max_delay_ms)
-            locator = page.locator(f'#{element_id}')
+            locator = page.locator(f"#{element_id}")
             await locator.fill(value)
             if log_callback:
                 log_callback(f"Filled textarea field with ID '{element_id}'")
         except Exception as e:
             if log_callback:
-                log_callback(f"Error filling textarea field with ID '{element_id}': {e}")
+                log_callback(
+                    f"Error filling textarea field with ID '{element_id}': {e}"
+                )
             raise
 
     @staticmethod
@@ -876,11 +913,11 @@ class PlaywrightUtils:
         name: str,
         min_delay_ms: int = 300,
         max_delay_ms: int = 600,
-        log_callback=None
+        log_callback=None,
     ) -> None:
         """
         Click an element by name attribute with human-like delays.
-        
+
         Args:
             page: Page instance
             name: Name attribute of the element
@@ -905,11 +942,11 @@ class PlaywrightUtils:
         element_id: str,
         min_delay_ms: int = 300,
         max_delay_ms: int = 600,
-        log_callback=None
+        log_callback=None,
     ) -> None:
         """
         Click an element by ID with human-like delays.
-        
+
         Args:
             page: Page instance
             element_id: ID of the element
@@ -919,7 +956,7 @@ class PlaywrightUtils:
         """
         try:
             await PlaywrightUtils.random_delay(min_delay_ms, max_delay_ms)
-            locator = page.locator(f'#{element_id}')
+            locator = page.locator(f"#{element_id}")
             await locator.click()
             if log_callback:
                 log_callback(f"Clicked element with ID '{element_id}'")
@@ -928,7 +965,6 @@ class PlaywrightUtils:
                 log_callback(f"Error clicking element with ID '{element_id}': {e}")
             raise
 
- 
     @staticmethod
     async def log_upload_percent_by_selector(
         page: Page,
@@ -936,11 +972,11 @@ class PlaywrightUtils:
         log_callback=None,
         interval_sec: int = 20,
         timeout_sec: int = 1800,
-        completion_strings: dict = None
+        completion_strings: dict = None,
     ) -> None:
         """
         Periodically log upload progress percentage from an element until completion is reached.
-        
+
         Args:
             page: Page instance
             selector: CSS selector for the element containing percentage
@@ -951,42 +987,45 @@ class PlaywrightUtils:
         """
         import re
         import time as time_module
-        
+
         if completion_strings is None:
             completion_strings = {"100": None, "Complete": None}
-        
+
         start_time = time_module.time()
         last_percent = 0
-        
+
         while time_module.time() - start_time < timeout_sec:
             try:
                 locator = page.locator(selector)
                 is_visible = await locator.is_visible()
-                
+
                 if is_visible:
                     # Get full inner text content (e.g., "100% (486.7KB/s - 0s)")
                     full_text = await locator.inner_text()
-                    
+
                     if full_text:
                         # Replace newlines with spaces to keep everything on one line
-                        full_text = full_text.replace('\n', ' ')
-                        
+                        full_text = full_text.replace("\n", " ")
+
                         # Check for completion strings (case insensitive)
-                        if any(key.lower() in full_text.lower() for key in completion_strings):
+                        if any(
+                            key.lower() in full_text.lower()
+                            for key in completion_strings
+                        ):
                             if log_callback:
                                 log_callback(f"Upload completed: {full_text}")
                             return
-                        
+
                         # Extract percentage value from text (e.g., "100%" -> 100)
-                        percent_match = re.search(r'(\d+(?:\.\d+)?)', full_text)
+                        percent_match = re.search(r"(\d+(?:\.\d+)?)", full_text)
                         percent = float(percent_match.group(1)) if percent_match else 0
-                        
+
                         # Log if percentage changed
                         if percent != last_percent:
                             if log_callback:
                                 log_callback(f"Upload progress: {full_text}")
                                 last_percent = percent
-                            
+
                             # Stop if reached 100%
                             if percent >= 100:
                                 if log_callback:
@@ -995,69 +1034,72 @@ class PlaywrightUtils:
             except Exception as e:
                 if log_callback:
                     log_callback(f"Error reading upload progress: {str(e)[:100]}")
-            
+
             await asyncio.sleep(interval_sec)
-        
+
         if log_callback:
-            log_callback(f"Timeout waiting for upload to complete (timeout: {timeout_sec}s)")
+            log_callback(
+                f"Timeout waiting for upload to complete (timeout: {timeout_sec}s)"
+            )
 
     @staticmethod
     async def execute_template_script(
-        page: Page,
-        template_filename: str,
-        return_value: bool = True,
-        log_callback=None
+        page: Page, template_filename: str, return_value: bool = True, log_callback=None
     ):
         """
         Execute JavaScript code from a template file.
-        
+
         Attempts to load template from TemplateManager first, then falls back to
         reading directly from the templates directory.
-        
+
         Args:
             page: Page instance
             template_filename: Name of the template file (e.g., 'rumble_upload_check_rights.js')
             return_value: If True, returns the result of the script execution. If False, executes as init script.
             log_callback: Function to call for logging
-            
+
         Returns:
             Result of the JavaScript execution if return_value is True, None otherwise
-            
+
         Raises:
             ValueError: If template file cannot be found or loaded
         """
         try:
             js_code = None
-            
+
             # First, try to load from registered templates in TemplateManager
             await PlaywrightUtils.template_manager.load_templates()
-            template_key = template_filename.replace('.js', '').replace('.', '_')
+            template_key = template_filename.replace(".js", "").replace(".", "_")
             js_code = PlaywrightUtils.template_manager.get_template(template_key)
-            
+
             # If not found in TemplateManager, try to load directly from file
             if not js_code:
                 template_path = os.path.join(
-                    PlaywrightUtils._parent_path,
-                    'templates',
-                    template_filename
+                    PlaywrightUtils._parent_path, "templates", template_filename
                 )
-                
+
                 if os.path.exists(template_path):
                     try:
-                        with open(template_path, 'r', encoding='utf-8') as f:
+                        with open(template_path, "r", encoding="utf-8") as f:
                             js_code = f.read()
                     except Exception as e:
                         if log_callback:
-                            log_callback(f"Error reading template file '{template_filename}': {e}")
-                        raise ValueError(f"Cannot read template file '{template_filename}': {e}")
+                            log_callback(
+                                f"Error reading template file '{template_filename}': {e}"
+                            )
+                        raise ValueError(
+                            f"Cannot read template file '{template_filename}': {e}"
+                        )
                 else:
                     if log_callback:
-                        log_callback(f"Template '{template_filename}' not found in templates directory")
+                        log_callback(
+                            f"Template '{template_filename}' not found in templates directory"
+                        )
                     raise ValueError(f"Template '{template_filename}' not found")
-            
+
             if not js_code:
                 raise ValueError(f"Template '{template_filename}' is empty")
-            
+
             # Execute the script
             if return_value:
                 result = await page.evaluate(js_code)
@@ -1067,12 +1109,16 @@ class PlaywrightUtils:
             else:
                 await page.add_init_script(js_code)
                 if log_callback:
-                    log_callback(f"Added init script from template '{template_filename}'")
+                    log_callback(
+                        f"Added init script from template '{template_filename}'"
+                    )
                 return None
-                
+
         except Exception as e:
             if log_callback:
-                log_callback(f"Error executing template script '{template_filename}': {e}")
+                log_callback(
+                    f"Error executing template script '{template_filename}': {e}"
+                )
             raise
 
     @staticmethod
@@ -1081,18 +1127,18 @@ class PlaywrightUtils:
         element_id: str,
         filepath: str,
         timeout_ms: int = 30000,
-        log_callback=None
+        log_callback=None,
     ) -> None:
         """
         Set a file input field by ID and submit the file.
-        
+
         Args:
             page: Page instance
             element_id: ID of the file input element
             filepath: Full path to the file to upload
             timeout_ms: Timeout in milliseconds
             log_callback: Function to call for logging
-            
+
         Raises:
             FileNotFoundError: If the file does not exist
             Exception: If setting the file input fails
@@ -1101,20 +1147,22 @@ class PlaywrightUtils:
             # Verify file exists
             if not os.path.exists(filepath):
                 raise FileNotFoundError(f"File not found: {filepath}")
-            
-            locator = page.locator(f'#{element_id}')
-            
+
+            locator = page.locator(f"#{element_id}")
+
             # Wait for element to be attached
             if log_callback:
-                log_callback(f"Waiting for file input element with ID '{element_id}'...")
-            await locator.wait_for(state='attached', timeout=timeout_ms)
-            
+                log_callback(
+                    f"Waiting for file input element with ID '{element_id}'..."
+                )
+            await locator.wait_for(state="attached", timeout=timeout_ms)
+
             # Set the input files
             await locator.set_input_files(filepath)
-            
+
             if log_callback:
                 log_callback(f"File input '{element_id}' set with file: {filepath}")
-                
+
         except FileNotFoundError as e:
             if log_callback:
                 log_callback(f"File not found for input '{element_id}': {e}")
@@ -1126,22 +1174,18 @@ class PlaywrightUtils:
 
     @staticmethod
     async def set_file_input_by_name(
-        page: Page,
-        name: str,
-        filepath: str,
-        timeout_ms: int = 30000,
-        log_callback=None
+        page: Page, name: str, filepath: str, timeout_ms: int = 30000, log_callback=None
     ) -> None:
         """
         Set a file input field by name attribute and submit the file.
-        
+
         Args:
             page: Page instance
             name: Name attribute of the file input element
             filepath: Full path to the file to upload
             timeout_ms: Timeout in milliseconds
             log_callback: Function to call for logging
-            
+
         Raises:
             FileNotFoundError: If the file does not exist
             Exception: If setting the file input fails
@@ -1150,20 +1194,20 @@ class PlaywrightUtils:
             # Verify file exists
             if not os.path.exists(filepath):
                 raise FileNotFoundError(f"File not found: {filepath}")
-            
+
             locator = page.locator(f'input[name="{name}"]')
-            
+
             # Wait for element to be attached
             if log_callback:
                 log_callback(f"Waiting for file input element with name '{name}'...")
-            await locator.wait_for(state='attached', timeout=timeout_ms)
-            
+            await locator.wait_for(state="attached", timeout=timeout_ms)
+
             # Set the input files
             await locator.set_input_files(filepath)
-            
+
             if log_callback:
                 log_callback(f"File input '{name}' set with file: {filepath}")
-                
+
         except FileNotFoundError as e:
             if log_callback:
                 log_callback(f"File not found for input '{name}': {e}")
@@ -1190,7 +1234,7 @@ class PlaywrightUtils:
             html_content = await page.content()
 
             # Write the HTML content to the file
-            with open(file_path, 'w', encoding='utf-8') as file:
+            with open(file_path, "w", encoding="utf-8") as file:
                 file.write(html_content)
         except Exception as e:
             LogManager.log_message(f"Failed to save page HTML to {file_path}: {e}")

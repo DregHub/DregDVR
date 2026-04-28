@@ -1,0 +1,21 @@
+[ui]
+hideTopBar = true
+
+[client]
+toolbarMode = "minimal"
+
+[logger]
+level = "warning"
+
+[server]
+headless = true
+
+[theme]
+base = "dark"
+primaryColor = "#7b68ee"
+backgroundColor = "#1e1e2e"
+secondaryBackgroundColor = "#2d2d3d"
+textColor = "#e0e0e0"
+
+[browser]
+gatherUsageStats = false

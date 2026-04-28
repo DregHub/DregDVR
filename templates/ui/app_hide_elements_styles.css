@@ -1,0 +1,37 @@
+/* Hide Streamlit top bar */
+header {visibility: hidden; height: 0 !important;}
+
+/* Hide sidebar completely */
+section[data-testid="stSidebar"] {
+    display: none !important;
+}
+
+/* Remove left margin that appears when sidebar is hidden */
+div[data-testid="stAppViewContainer"] {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Remove max-width constraint and ensure full width without horizontal scroll */
+.st-emotion-cache-1w723zb {
+    max-width: none !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: -70px 0 0 0 !important;
+    width: calc(100vw - 100px) !important;
+    border-left: 50px solid transparent !important;
+    border-right: 50px solid transparent !important;
+    box-sizing: border-box !important;
+}
+
+/* AgGrid iframe styling - standard background */
+.st-emotion-cache-8atqhb iframe.stCustomComponentV1[title="st_aggrid.AgGrid.agGrid"] {
+    background: white !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+/* AgGrid container background transparency */
+.st-emotion-cache-8atqhb {
+    background: transparent !important;
+}

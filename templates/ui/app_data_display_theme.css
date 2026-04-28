@@ -1,0 +1,129 @@
+/* Data Display Theme */
+/* Standard Streamlit styling for AgGrid and other data display components */
+
+/* AgGrid container - ensure consistency with existing JSON styles */
+.ag-root {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+/* AgGrid header */
+.ag-header {
+  background: var(--secondary-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ag-header-cell {
+  background: transparent;
+  color: var(--text-color);
+  font-weight: 600;
+  font-size: 1.1rem;
+  border-right: 1px solid var(--border-color);
+  padding: 0.75rem 1rem;
+}
+
+.ag-header-cell:last-child {
+  border-right: none;
+}
+
+/* AgGrid rows */
+.ag-row {
+  background: transparent;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-color);
+  transition: background var(--transition-fast);
+}
+
+.ag-row:hover {
+  background: var(--secondary-color);
+}
+
+.ag-row-selected {
+  background: #e3f2fd !important;
+  border-left: 3px solid var(--primary-color);
+  color: var(--text-color);
+}
+
+.ag-row-selected:hover {
+  background: #bbdefb !important;
+}
+
+/* AgGrid cells */
+.ag-cell {
+  color: var(--text-color);
+  font-size: 1.05rem;
+  padding: 0.5rem 1rem;
+  border-right: 1px solid var(--border-color);
+}
+
+.ag-cell:last-child {
+  border-right: none;
+}
+
+/* AgGrid pagination and controls */
+.ag-paging-panel {
+  background: white;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-color);
+  font-size: 1.05rem;
+}
+
+.ag-paging-button {
+  background: white;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-small);
+  padding: 0.25rem 0.5rem;
+  font-size: 1.05rem;
+  transition: all var(--transition-fast);
+}
+
+.ag-paging-button:hover {
+  background: var(--secondary-color);
+  border-color: #d0d2d6;
+  color: var(--text-color);
+}
+
+.ag-paging-button.ag-paging-button-selected {
+  background: #e3f2fd;
+  border-color: var(--primary-color);
+  color: var(--text-color);
+}
+
+/* AgGrid loading overlay */
+.ag-overlay-loading-center {
+  background: white;
+  color: var(--text-color);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  font-size: 1.1rem;
+}
+
+/* DataFrame display (if used) */
+.stDataFrame {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.stDataFrame th {
+  background: var(--secondary-color);
+  color: var(--text-color);
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.stDataFrame td {
+  color: var(--text-color);
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.stDataFrame tr:hover {
+  background: var(--secondary-color);
+}

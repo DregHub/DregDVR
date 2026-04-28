@@ -1,30 +1,30 @@
 import traceback
 import logging
 import time
-from utils.logging_utils import LogManager
-from config.config_settings import DVR_Config
-
-# Configure logger for this module
+from utils.logging_utils import LogManager, LogLevels
+# Backup logger
 logger = logging.getLogger(__name__)
 
 
 class DLPEvents:
     """
     Event handler class for yt-dlp progress hooks.
-    Instantiate with an optional `log_file_name` and two optional
+    Instantiate with an optional `log_table_name` and two optional
     callbacks: `download_started(filename)` and `download_complete(filename)`.
     """
 
     def __init__(
         self,
         stream_url=None,
-        log_file_name=None,
+        log_table_name=None,
         download_started=None,
         download_complete=None,
         download_processing=None,
+        thread_number=None,
     ):
         self.stream_url = stream_url
-        self.log_file_name = log_file_name
+        self.log_table_name = log_table_name
+        self.thread_number = thread_number
         self.download_started = (
             download_started if download_started is not None else (lambda: None)
         )
@@ -34,8 +34,8 @@ class DLPEvents:
         self.download_processing = (
             download_processing if download_processing is not None else (lambda: None)
         )
-        # Get stall timeout from config
-        self.stall_timeout = DVR_Config.get_dlp_stall_timeout()
+        # Get stall timeout from config (lazy-loaded, will be set by _ensure_initialized)
+        self.stall_timeout = 800  # Default, will be updated
         # Track active downloads and last-logged elapsed/bytes per stream and per-file
         self._active_downloads = set()  # filenames seen (legacy per-file tracking)
         # Map stream_key -> set(filenames)
@@ -112,13 +112,15 @@ class DLPEvents:
                             # self.log_message(f"Stream-level download_started callback invoked for {first_file}")
                         except Exception as cb_exc2:
                             self.log_message(
-                                f"Exception in stream-level download_started callback for {first_file}: {cb_exc2}\n{traceback.format_exc()}"
+                                f"Exception in stream-level download_started callback for {first_file}: {cb_exc2}\n{traceback.format_exc()}",
+                                LogLevels.Error
                             )
                             # Still mark one file as active to avoid repeated attempts if callback misbehaves
                             self._active_downloads.add(first_file)
                 except Exception:
                     self.log_message(
                         "Exception while attempting to call stream-level download_started",
+                        LogLevels.Error
                     )
                 self._streams_last_logged_elapsed[stream_key] = None
                 self._streams_last_logged_bytes[stream_key] = 0
@@ -207,34 +209,40 @@ class DLPEvents:
                 )
 
                 self.log_message(
-                    f"Download Duration: {elapsed_str} Total Download Size: {downloaded_str} At Rate: {speed_str}"
+                    f"Download Duration: {elapsed_str} Total Download Size: {downloaded_str} At Rate: {speed_str}",
+                    LogLevels.Info
                 )
 
             elif current_status == "processing":
                 try:
                     self.download_processing()
                     self.log_message(
-                        f"download_processing callback invoked for {filename}"
+                        f"download_processing callback invoked for {filename}",
+                        LogLevels.Info
                     )
                 except Exception as cb_proc_exc:
                     self.log_message(
-                        f"Exception in download_processing callback for {filename}: {cb_proc_exc}\n{traceback.format_exc()}"
+                        f"Exception in download_processing callback for {filename}: {cb_proc_exc}\n{traceback.format_exc()}",
+                        LogLevels.Error
                     )
-                self.log_message(f"Download processing: {filename}")
+                self.log_message(f"Download processing: {filename}", LogLevels.Info)
 
             elif current_status == "finished":
                 self.log_message(
-                    f"Status 'finished' observed for filename={filename}, invoking download_complete callback"
+                    f"Status 'finished' observed for filename={filename}, invoking download_complete callback",
+                    LogLevels.Info
                 )
                 # finished -> call complete callback for the file and cleanup per-file tracking
                 try:
                     self.download_complete()
                     self.log_message(
-                        f"download_complete callback invoked for {filename}"
+                        f"download_complete callback invoked for {filename}",
+                        LogLevels.Info
                     )
                 except Exception as cb_exc3:
                     self.log_message(
-                        f"Exception in download_complete callback for {filename}: {cb_exc3}\n{traceback.format_exc()}"
+                        f"Exception in download_complete callback for {filename}: {cb_exc3}\n{traceback.format_exc()}",
+                        LogLevels.Error
                     )
                 self._active_downloads.discard(filename)
                 # Cleanup per-file entries
@@ -255,11 +263,12 @@ class DLPEvents:
                     self._streams_last_logged_elapsed.pop(stream_to_clean, None)
                     self._streams_last_logged_bytes.pop(stream_to_clean, None)
 
-                self.log_message(f"Download finished: {filename}")
+                self.log_message(f"Download finished: {filename}", LogLevels.Info)
 
             elif current_status == "error":
                 self.log_message(
-                    f"Download error occurred for filename={filename}: {d.get('_exception', 'Unknown error')}"
+                    f"Download error occurred for filename={filename}: {d.get('_exception', 'Unknown error')}",
+                    LogLevels.Error
                 )
 
         except Exception as e:
@@ -273,7 +282,8 @@ class DLPEvents:
                 fname = "Unknown"
                 keys = []
             self.log_message(
-                f"Error in dlp_events handler for filename={fname} event_keys={keys}: {e}\n{traceback.format_exc()}"
+                f"Error in dlp_events handler for filename={fname} event_keys={keys}: {e}\n{traceback.format_exc()}",
+                LogLevels.Error
             )
 
     @classmethod
@@ -312,13 +322,17 @@ class DLPEvents:
             parts.append(f"{secs} s")
         return " ".join(parts) or "0s"
 
-    def log_message(self, message):
+    def log_message(self, message, level="INFO"):
         """
-        Forward a log message to LogManager. If `log_file_name` is provided,
-        pass it as the second positional argument, otherwise pass None.
+        Forward a log message to LogManager with optional level.
+        If `log_table_name` is provided, pass it as the second positional argument.
+        
+        Args:
+            message: The message to log
+            level: Log level (DEBUG, INFO, WARNING, ERROR). Defaults to INFO.
         """
         try:
-            LogManager.log_message(message, self.log_file_name)
+            LogManager.log_message(message, self.log_table_name, level, thread_number=self.thread_number)
         except Exception as e:
             logger.error(f"Failed to forward log message: {e}")
 

@@ -1,0 +1,98 @@
+/* Metric Theme - Standard Streamlit Design */
+/* Target Streamlit 1.28+ with metric display components */
+
+.stMetric {
+  width: 100%;
+}
+
+/* Metric container */
+.stMetric > div {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-md);
+  transition: all 0.2s ease-out;
+  cursor: default;
+}
+
+.stMetric > div:hover {
+  border-color: #d0d2d6;
+  background: var(--secondary-color);
+}
+
+/* Metric label */
+.stMetric label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-xs);
+  display: block;
+  opacity: 0.85;
+}
+
+/* Metric value */
+.stMetric [data-testid="metric-value"] {
+  color: var(--text-color);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: var(--spacing-sm) 0;
+  letter-spacing: -0.5px;
+}
+
+/* Metric delta (change indicator) */
+.stMetric [data-testid="metric-delta"] {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Positive delta */
+.stMetric [data-testid="metric-delta"].positive {
+  color: #00D084;
+}
+
+/* Negative delta */
+.stMetric [data-testid="metric-delta"].negative {
+  color: #FF3B30;
+}
+
+/* Neutral delta */
+.stMetric [data-testid="metric-delta"].neutral {
+  color: var(--text-secondary);
+}
+
+/* Delta arrow icons */
+.stMetric [data-testid="metric-delta"] svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.8;
+}
+
+/* Multi-column metric layout */
+[data-testid="stMetricContainer"] {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--spacing-md);
+}
+
+/* Metric in columns */
+[data-testid="stMetricContainer"] .stMetric {
+  min-width: 0;
+}
+
+/* Responsive metric cards */
+@media (max-width: 640px) {
+  [data-testid="stMetricContainer"] {
+    grid-auto-flow: row;
+  }
+
+  .stMetric [data-testid="metric-value"] {
+    font-size: 24px;
+  }
+}

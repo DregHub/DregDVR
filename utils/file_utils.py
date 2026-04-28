@@ -5,11 +5,25 @@ import mmap
 import asyncio
 import re
 import unicodedata
-from utils.logging_utils import LogManager
+from utils.logging_utils import LogManager,LogLevels
 
 
 class FileManager:
     """Utility class for file operations."""
+
+    @classmethod
+    def get_db_dir(cls) -> str:
+        """Get or create the database directory in /_DVR_Runtime."""
+        db_dir = "/_DVR_Runtime"
+        os.makedirs(db_dir, exist_ok=True)
+        return db_dir
+
+    @classmethod
+    def get_dvr_runtime_dir(cls) -> str:
+        """Get or create the logs directory in /_DVR_Runtime."""
+        log_dir = "/_DVR_Runtime"
+        os.makedirs(log_dir, exist_ok=True)
+        return log_dir
 
     @classmethod
     def move_file(cls, src, dst, logfile):
@@ -20,6 +34,7 @@ class FileManager:
             LogManager.log_message(
                 f"Failed to move file from {src} to {dst}:  {e}\n{traceback.format_exc()}",
                 logfile,
+                LogLevels.Error
             )
 
     @classmethod
@@ -32,6 +47,7 @@ class FileManager:
             LogManager.log_message(
                 f"Failed to delete file {filepath}:  {e}\n{traceback.format_exc()}",
                 logfile,
+                LogLevels.Error
             )
 
     @classmethod
@@ -44,6 +60,7 @@ class FileManager:
             LogManager.log_message(
                 f"Failed to create directory {directory}:  {e}\n{traceback.format_exc()}",
                 logfile,
+                LogLevels.Error
             )
 
     @classmethod

@@ -1,0 +1,185 @@
+/* HTML Content Theme */
+/* Standard Streamlit styling for rendered HTML from downloader/posts.py and downloader/comments.py */
+
+/* Posts styling */
+.post {
+  background: white !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  padding: 1rem !important;
+  margin-bottom: 1rem !important;
+  color: var(--text-color) !important;
+}
+
+.post .title {
+  margin-bottom: 0.5rem !important;
+}
+
+.post .title a {
+  color: var(--primary-color) !important;
+  text-decoration: none !important;
+  font-weight: 600 !important;
+  transition: color var(--transition-fast) !important;
+}
+
+.post .title a:hover {
+  color: #ff6b6b !important;
+  text-decoration: underline !important;
+}
+
+.post .author {
+  color: var(--text-secondary) !important;
+  font-size: 0.875rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.post .content {
+  color: var(--text-color) !important;
+  line-height: 1.6 !important;
+}
+
+.post .content img {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: var(--border-radius) !important;
+  margin: 0.5rem 0 !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.post .content a {
+  color: var(--primary-color) !important;
+  text-decoration: none !important;
+  transition: color var(--transition-fast) !important;
+}
+
+.post .content a:hover {
+  color: #ff6b6b !important;
+  text-decoration: underline !important;
+}
+
+/* Comments styling */
+.comment {
+  background: white !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  padding: 1rem !important;
+  margin-bottom: 1rem !important;
+}
+
+.comment .header {
+  margin-bottom: 0.75rem !important;
+}
+
+.comment .post_info {
+  color: var(--text-secondary) !important;
+  font-size: 0.875rem !important;
+}
+
+.comment .post_info a {
+  color: var(--primary-color) !important;
+  text-decoration: none !important;
+  font-weight: 600 !important;
+  transition: color var(--transition-fast) !important;
+}
+
+.comment .post_info a:hover {
+  color: #ff6b6b !important;
+  text-decoration: underline !important;
+}
+
+.comment .post_info strong {
+  color: var(--text-color) !important;
+}
+
+.comment .post_content {
+  color: var(--text-color) !important;
+  line-height: 1.6 !important;
+}
+
+.comment .post_content img {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: var(--border-radius) !important;
+  margin: 0.5rem 0 !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.comment .post_content a {
+  color: var(--primary-color) !important;
+  text-decoration: none !important;
+  transition: color var(--transition-fast) !important;
+}
+
+.comment .post_content a:hover {
+  color: #ff6b6b !important;
+  text-decoration: underline !important;
+}
+
+/* Banners and special content */
+.comment .user_banned_banner,
+.comment .removed_post_banner {
+  background: #ffebee !important;
+  border: 1px solid #f44336 !important;
+  border-radius: var(--border-radius-small) !important;
+  padding: 0.5rem !important;
+  margin: 0.5rem 0 !important;
+  color: #f44336 !important;
+  font-weight: 500 !important;
+}
+
+/* Media containers */
+.media_container,
+.media-container {
+  background: var(--secondary-color) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  padding: 0.5rem !important;
+  margin: 0.5rem 0 !important;
+}
+
+.media_container img,
+.media-container img {
+  border-radius: var(--border-radius-small) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* YouTube placeholders */
+.youtube_placeholder {
+  background: white !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  padding: 1rem !important;
+  text-align: center !important;
+  color: var(--text-secondary) !important;
+}
+
+.youtube_placeholder a {
+  color: var(--primary-color) !important;
+  text-decoration: none !important;
+  font-weight: 500 !important;
+  transition: color var(--transition-fast) !important;
+}
+
+.youtube_placeholder a:hover {
+  color: #ff6b6b !important;
+  text-decoration: underline !important;
+}
+
+/* Embedded content */
+.embed_container,
+.embed-container {
+  background: white !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  padding: 0.5rem !important;
+  margin: 0.5rem 0 !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.embed_container iframe,
+.embed-container iframe {
+  border-radius: var(--border-radius-small) !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 200px !important;
+}

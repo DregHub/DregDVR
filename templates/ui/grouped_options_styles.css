@@ -1,0 +1,222 @@
+/* Grouped Options Styles - Reusable styles for option grouping across controls */
+/* Used by grouped_selectbox(), searchable_multiselect(), and similar components */
+
+/* Base grouping styles */
+.grouped-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Option group */
+.option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: var(--spacing-md);
+}
+
+.option-group:last-of-type {
+  margin-bottom: 0;
+}
+
+/* Group header/label */
+.option-group-header {
+  padding: var(--spacing-xs) var(--spacing-md);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  background: var(--secondary-color);
+  border-bottom: 1px solid var(--border-color);
+  border-left: 3px solid var(--primary-color);
+  opacity: 0.8;
+  user-select: none;
+}
+
+/* Group items container */
+.option-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Individual grouped option */
+.option-group-item {
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-sm) calc(var(--spacing-md) + 12px);
+  color: var(--text-color);
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-color);
+  transition: all 0.15s ease-out;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.option-group-item:hover {
+  background: var(--secondary-color);
+  border-left-color: var(--primary-color);
+  padding-left: calc(var(--spacing-md) + 9px);
+}
+
+.option-group-item:active {
+  background: #e0e2e6;
+  border-left-color: var(--primary-color);
+}
+
+.option-group-item[aria-selected="true"] {
+  background: #e3f2fd;
+  border-left-color: var(--primary-color);
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.option-group-item[aria-selected="true"]::before {
+  content: '✓';
+  position: absolute;
+  left: calc(var(--spacing-md) + 8px);
+  color: var(--primary-color);
+  font-weight: 700;
+}
+
+.option-group-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Visual variant: Collapsible groups */
+.option-group.collapsible {
+  border: 1px solid var(--border-color);
+  border-radius: calc(var(--border-radius) / 2);
+  overflow: hidden;
+}
+
+.option-group.collapsible .option-group-header {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  border-radius: calc(var(--border-radius) / 2) calc(var(--border-radius) / 2) 0 0;
+}
+
+.option-group.collapsible .option-group-header::after {
+  content: '▼';
+  font-size: 10px;
+  transition: transform 0.2s ease-out;
+  margin-left: 8px;
+}
+
+.option-group.collapsible.collapsed .option-group-header::after {
+  transform: rotate(-90deg);
+}
+
+.option-group.collapsible.collapsed .option-group-items {
+  display: none;
+}
+
+/* Badge for group count */
+.option-group-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: #e3f2fd;
+  border: 1px solid var(--primary-color);
+  border-radius: 50%;
+  color: var(--primary-color);
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Empty group message */
+.option-group-empty {
+  padding: var(--spacing-md) var(--spacing-md);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* Separator between groups */
+.option-group-separator {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-color), transparent);
+  margin: var(--spacing-sm) 0;
+}
+
+/* Enhanced selectbox search integration */
+.enhanced-selectbox-wrapper .selectbox-search-input {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: calc(var(--border-radius) - 1px) calc(var(--border-radius) - 1px) 0 0;
+  color: var(--text-color);
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-sm) var(--spacing-lg);
+  font-size: 13px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease-out;
+  outline: none;
+  position: relative;
+  z-index: 10;
+}
+
+.enhanced-selectbox-wrapper .selectbox-search-input:hover {
+  border-color: #d0d2d6;
+}
+
+.enhanced-selectbox-wrapper .selectbox-search-input:focus {
+  border-color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+}
+
+.enhanced-selectbox-wrapper .selectbox-search-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* Search icon styling */
+.selectbox-search-icon {
+  position: absolute;
+  left: var(--spacing-sm);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 11;
+}
+
+.selectbox-search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
+/* No results message */
+.selectbox-search-state {
+  padding: var(--spacing-md);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+  font-style: italic;
+  background: var(--secondary-color);
+  border-top: 1px solid var(--border-color);
+}
+
+.selectbox-no-results {
+  color: #FF3B30;
+  opacity: 0.8;
+}

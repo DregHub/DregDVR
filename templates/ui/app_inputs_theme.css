@@ -1,0 +1,220 @@
+/* Input Components Theme */
+/* Standard Streamlit styling for st.text_input, st.selectbox, st.text_area */
+
+.stTextInput input {
+  background: white;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  transition: border-color var(--transition-fast);
+}
+
+.stTextInput input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+}
+
+.stTextInput input:hover {
+  border-color: #d0d2d6;
+}
+
+.stTextInput input::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+/* Text Area */
+.stTextArea textarea {
+  background: white;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color var(--transition-fast);
+}
+
+.stTextArea textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+}
+
+.stTextArea textarea:hover {
+  border-color: #d0d2d6;
+}
+
+.stTextArea textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+.stTextArea textarea:disabled {
+  background: var(--secondary-color);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Input labels */
+.stTextInput label,
+.stSelectbox label,
+.stTextArea label {
+  color: var(--text-color);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* Error states */
+.stTextInput [data-testid*="error"],
+.stSelectbox [data-testid*="error"],
+.stTextArea [data-testid*="error"] {
+  border-color: #ff4b4b;
+  box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+}
+
+/* ========================================
+   Combined Dropdown-Input Component
+   Standard styling for side-by-side controls
+   ======================================== */
+
+/* Main container with shared border */
+.combined-input-dropdown {
+  display: flex;
+  gap: 0;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 0;
+  transition: border-color var(--transition-fast);
+  overflow: hidden;
+}
+
+/* Container hover state */
+.combined-input-dropdown:has(*:hover) {
+  border-color: #d0d2d6;
+}
+
+/* Container focus state - when any child is focused */
+.combined-input-dropdown:has(*:focus) {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+}
+
+/* Remove borders from nested input */
+.combined-input-dropdown .stTextInput input,
+.combined-input-dropdown .stTextInput > div > input {
+  border: none;
+  border-right: 1px solid var(--border-color);
+  border-radius: 0;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  box-shadow: none;
+  transition: background var(--transition-fast);
+}
+
+.combined-input-dropdown .stTextInput input:focus,
+.combined-input-dropdown .stTextInput > div > input:focus {
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  border-right-color: var(--border-color);
+}
+
+.combined-input-dropdown .stTextInput input:hover,
+.combined-input-dropdown .stTextInput > div > input:hover {
+  background: transparent;
+  border-right-color: #d0d2d6;
+}
+
+/* Remove borders from nested selectbox */
+.combined-input-dropdown .stSelectbox [data-baseweb="select"],
+.combined-input-dropdown .stSelectbox > div > div > div {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+  transition: background var(--transition-fast);
+  padding: 0 !important;
+}
+
+.combined-input-dropdown .stSelectbox [data-baseweb="select"] input {
+  padding: 0.5rem 0.75rem !important;
+}
+
+.combined-input-dropdown .stSelectbox [data-baseweb="select"]:hover {
+  background: transparent;
+  border: none;
+  box-shadow: none !important;
+}
+
+.combined-input-dropdown .stSelectbox [data-baseweb="select"]:focus {
+  outline: none;
+  box-shadow: none !important;
+  background: transparent;
+  border: none;
+}
+
+/* Selectbox container alignment */
+.combined-input-dropdown .stSelectbox {
+  width: 100%;
+  flex: 1;
+}
+
+/* Input container alignment */
+.combined-input-dropdown .stTextInput {
+  width: 100%;
+  flex: 1;
+  margin-bottom: 0;
+}
+
+/* Column spacing within combined control */
+.combined-input-dropdown > [data-testid="column"] {
+  padding: 0;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+}
+
+.combined-input-dropdown > [data-testid="column"]:first-child {
+  border-right: 1px solid var(--border-color);
+}
+
+/* Equal height for child elements */
+.combined-input-dropdown .stSelectbox,
+.combined-input-dropdown .stTextInput {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+/* Prevent label color override */
+.combined-input-dropdown label {
+  margin-bottom: 0 !important;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  color: var(--text-color);
+}
+
+/* Combined input label (for labeled variant) */
+.combined-input-label {
+  color: var(--text-color);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  display: block;
+  line-height: 1.4;
+}

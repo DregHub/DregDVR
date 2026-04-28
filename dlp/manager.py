@@ -1,7 +1,7 @@
 import asyncio
 import sys
 import traceback
-from utils.logging_utils import LogManager
+from utils.logging_utils import LogManager,LogLevels
 
 
 class YTDLPVersionManager:
@@ -18,7 +18,7 @@ class YTDLPVersionManager:
         Install or upgrade to the stable version of yt-dlp.
         """
         try:
-            LogManager.log_core("Switching to stable yt-dlp...")
+            LogManager.log_core("Switching to stable yt-dlp...", LogLevels.Info)
             process = await asyncio.create_subprocess_exec(
                 sys.executable,
                 "-m",
@@ -32,19 +32,19 @@ class YTDLPVersionManager:
             )
             output, _ = await process.communicate()
             output = output.decode()
-            LogManager.log_core(output)
+            LogManager.log_core(output, LogLevels.Info)
             if process.returncode == 0:
                 cls._current_version = "stable"
-                LogManager.log_core("Successfully switched to stable yt-dlp.")
+                LogManager.log_core("Successfully switched to stable yt-dlp.", LogLevels.Info)
                 return True
             else:
                 LogManager.log_core(
-                    f"Failed to switch to stable yt-dlp. Return code: {process.returncode}"
+                    f"Failed to switch to stable yt-dlp. Return code: {process.returncode}", LogLevels.Error
                 )
                 return False
         except Exception as e:
             LogManager.log_core(
-                f"Failed to switch to stable yt-dlp: {e}\n{traceback.format_exc()}"
+                f"Failed to switch to stable yt-dlp: {e}\n{traceback.format_exc()}", LogLevels.Error
             )
             return False
 
@@ -54,7 +54,7 @@ class YTDLPVersionManager:
         Install or upgrade to the nightly version of yt-dlp.
         """
         try:
-            LogManager.log_core("Switching to nightly yt-dlp...")
+            LogManager.log_core("Switching to nightly yt-dlp...", LogLevels.Info)
             process = await asyncio.create_subprocess_exec(
                 sys.executable,
                 "-m",
@@ -69,19 +69,19 @@ class YTDLPVersionManager:
             )
             output, _ = await process.communicate()
             output = output.decode()
-            LogManager.log_core(output)
+            LogManager.log_core(output, LogLevels.Info)
             if process.returncode == 0:
                 cls._current_version = "nightly"
-                LogManager.log_core("Successfully switched to nightly yt-dlp.")
+                LogManager.log_core("Successfully switched to nightly yt-dlp.", LogLevels.Info)
                 return True
             else:
                 LogManager.log_core(
-                    f"Failed to switch to nightly yt-dlp. Return code: {process.returncode}"
+                    f"Failed to switch to nightly yt-dlp. Return code: {process.returncode}", LogLevels.Error
                 )
                 return False
         except Exception as e:
             LogManager.log_core(
-                f"Failed to switch to nightly yt-dlp: {e}\n{traceback.format_exc()}"
+                f"Failed to switch to nightly yt-dlp: {e}\n{traceback.format_exc()}", LogLevels.Error
             )
             return False
 

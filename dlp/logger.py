@@ -1,7 +1,5 @@
-import os
 import contextlib
-from utils.logging_utils import LogManager
-from config.config_settings import DVR_Config
+from utils.logging_utils import LogManager, LogLevels
 from dlp.events import DLPEvents
 
 
@@ -20,7 +18,7 @@ class DLP_Logger:
         message: str = "",
         result=None,
         patterns: list = None,
-        log_file_name: str = None,
+        log_table_name: str = None,
         log_warnings_and_above_only: bool = False,
     ):
         # Normalize patterns into a list of dicts: {message_source, message, result}
@@ -54,14 +52,13 @@ class DLP_Logger:
                     "result": result,
                 }
             )
-        self.dlp_verbose = DVR_Config.get_verbose_dlp_mode()
-        self.dlp_keep_fragments = DVR_Config.get_keep_fragments_dlp_downloads()
-        self.dlp_no_progress = DVR_Config.no_progress_dlp_downloads()
+        self.dlp_verbose = False  # Will be set by caller or in _ensure_initialized
+        self.dlp_keep_fragments = False  # Will be set by caller or in _ensure_initialized
         self.detected = False
         self.last_match_result = None
         self.log_warnings_and_above_only = log_warnings_and_above_only
-        # optional file name to forward logs to LogManager
-        self.log_file_name = log_file_name
+        # optional table name to forward logs to LogManager
+        self.log_table_name = log_table_name
 
     def inputs(self):
         """Return the configured detection patterns as a list of dicts."""
@@ -86,7 +83,11 @@ class DLP_Logger:
         """Called when a configured match is detected. Stores last result and logs."""
         with contextlib.suppress(Exception):
             self.last_match_result = result
-            LogManager.log_message(f"YTDLP detect logger match found: {result}")
+            LogManager.log_message(
+                f"YTDLP detect logger match found: {result}",
+                self.log_table_name,
+                LogLevels.Info
+            )
 
     def debug(self, msg):
         # forward debug messages to centralized LogManager when available
@@ -94,7 +95,11 @@ class DLP_Logger:
             return None
         with contextlib.suppress(Exception):
             if self.dlp_verbose == True:
-                LogManager.log_message(str(f"DLP Debug: {msg}"), self.log_file_name)
+                LogManager.log_message(
+                    str(f"DLP Debug: {msg}"),
+                    self.log_table_name,
+                    LogLevels.Debug
+                )
             else:
                 return None
         return None
@@ -105,7 +110,11 @@ class DLP_Logger:
             return None
         with contextlib.suppress(Exception):
             if self.dlp_verbose == True:
-                LogManager.log_message(str(f"DLP Info: {msg}"), self.log_file_name)
+                LogManager.log_message(
+                    str(f"DLP Info: {msg}"),
+                    self.log_table_name,
+                    LogLevels.Info
+                )
             else:
                 return None
         return None
@@ -115,7 +124,11 @@ class DLP_Logger:
         with contextlib.suppress(Exception):
             # We should forward all messages at this level except those containing substrings on the ignore list
             if all(s not in str(msg).lower() for s in DLPEvents.NO_LOG_EVENT_STRINGS):
-                LogManager.log_message(str(f"DLP Warning: {msg}"), self.log_file_name)
+                LogManager.log_message(
+                    str(f"DLP Warning: {msg}"),
+                    self.log_table_name,
+                    LogLevels.Warning
+                )
         return None
 
     def error(self, msg):
@@ -123,7 +136,11 @@ class DLP_Logger:
         with contextlib.suppress(Exception):
             # We should forward all messages at this level except those containing substrings on the ignore list
             if all(s not in str(msg).lower() for s in DLPEvents.NO_LOG_EVENT_STRINGS):
-                LogManager.log_message(str(f"DLP Error: {msg}"), self.log_file_name)
+                LogManager.log_message(
+                    str(f"DLP Error: {msg}"),
+                    self.log_table_name,
+                    LogLevels.Error
+                )
 
 
 DLP_Logger_Patterns = [

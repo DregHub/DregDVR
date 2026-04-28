@@ -11,7 +11,11 @@ ia
 /_Posted_CompletedUploads
 /_channel_playlists
 /_Posted_Community_Messages
-/_Logs
 /_Temp
 .vscode/settings.json
 /.vscode
+
+
+# DVR Runtime - contains all databases and runtime state
+_DVR_Runtime/
+# Note: Redundant folders _Auth, _Config, _Logs, _Meta, _Playlists are now consolidated into databases

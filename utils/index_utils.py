@@ -1,141 +1,177 @@
-import os
-import re
 import traceback
-from utils.logging_utils import LogManager
-from config.config_settings import DVR_Config
-from config.config_accounts import Account_Config
+from utils.logging_utils import LogManager, LogLevels
 
 
 class IndexManager:
-    Live_DownloadQueue_Dir = DVR_Config.get_live_downloadqueue_dir()
-    Live_UploadQueue_Dir = DVR_Config.get_live_uploadqueue_dir()
-    Live_CompletedUploads_Dir = DVR_Config.get_live_completeduploads_dir()
+    """Manages live and posted video indices using a database-backed approach."""
 
-    Posted_DownloadQueue_Dir = DVR_Config.get_posted_downloadqueue_dir()
-    Posted_UploadQueue_Dir = DVR_Config.get_posted_uploadqueue_dir()
-    Posted_CompletedUploads_Dir = DVR_Config.get_posted_completeduploads_dir()
-
-    @staticmethod
-    def find_current_live_index(log_file):
-        """
-        Calculate the index by searching for video files in the specified directories.
-        The filename format is 'INDEXNUM FILENAME', and the index is set as the highest INDEXNUM found.
-        Returns "1" if no video files are found.
-        """
+    @classmethod
+    async def _ensure_instance_exists(cls, instance_name, db):
+        """Ensure the instance exists in the index table, creating it if necessary."""
         try:
-            dirs = [
-                IndexManager.Live_DownloadQueue_Dir,
-                IndexManager.Live_UploadQueue_Dir,
-                IndexManager.Live_CompletedUploads_Dir,
-            ]
-            max_index = 0
-            pattern = re.compile(r"^(\d+)\s")
-            previous_videos = False
-
-            for dir_path in dirs:
-                if not os.path.isdir(dir_path):
-                    continue
-                for fname in os.listdir(dir_path):
-                    if fname.lower().endswith(DVR_Config.get_video_file_extensions()):
-                        previous_videos = True
-                        if match := pattern.match(fname):
-                            idx = int(match[1])
-                            if idx > max_index:
-                                max_index = idx
-
-            if not previous_videos:
-                LogManager.log_message(
-                    "No previous videos found, First index will be returned", log_file
-                )
-                return "0"
-
-            return str(max_index)
-        except Exception as e:
-            LogManager.log_message(
-                f"Failed to get index: {e}\n{traceback.format_exc()}", log_file
+            # Check if instance exists
+            conn = await db._get_connection()
+            cursor = await conn.execute(
+                'SELECT instance_name FROM "index" WHERE instance_name = ?',
+                (instance_name,),
             )
-            return None
+            existing = await cursor.fetchone()
+            await cursor.close()
 
-    @staticmethod
-    def find_new_live_index(log_file):
-        """Calculate the next available free index"""
-        try:
-            current_index = IndexManager.find_current_live_index(log_file)
-            if current_index is None:
-                LogManager.log_message(
-                    "Current index is None, cannot increment.", log_file
+            if not existing:
+                # Create new entry with default indices
+                await conn.execute(
+                    'INSERT INTO "index" (instance_name, live_index, posted_index) VALUES (?, 0, 0)',
+                    (instance_name,),
                 )
-                return None
-            current_index_num = int(current_index) + 1
-            return str(current_index_num)
+                await conn.commit()
+                LogManager.log_core(
+                    f"Created new index entry for instance: {instance_name}",
+                    LogLevels.Info,
+                )
         except Exception as e:
-            LogManager.log_message(
-                f"Failed to get next free index: {e}\n{traceback.format_exc()}",
-                log_file,
+            LogManager.log_core(
+                f"Failed to ensure instance exists: {e}\n{traceback.format_exc()}",
+                LogLevels.Error,
             )
-            return None
+            raise
 
-    @staticmethod
-    def find_current_posted_index(log_file):
+    @classmethod
+    async def get_current_live_index(cls, instance_name):
         """
-        Calculate the index by searching for video files in the specified directories.
-        The filename format is 'INDEXNUM FILENAME', and the index is set as the highest INDEXNUM found.
-        Returns "1" if no video files are found.
+        Get the current live index for the specified instance.
+
+        Args:
+            instance_name: The name of the instance
+
+        Returns:
+            int: The current live index value
         """
         try:
-            dirs = [
-                IndexManager.Posted_DownloadQueue_Dir,
-                IndexManager.Posted_UploadQueue_Dir,
-                IndexManager.Posted_CompletedUploads_Dir,
-            ]
-            max_index = 0
-            pattern = re.compile(r"^(\d+)\s")
-            previous_videos = False
+            from db.dvr_db import DVRDB
 
-            for dir_path in dirs:
-                if not os.path.isdir(dir_path):
-                    continue
-                for fname in os.listdir(dir_path):
-                    if fname.lower().endswith(DVR_Config.get_video_file_extensions()):
-                        previous_videos = True
-                        cleaned_name = fname.replace(
-                            Account_Config.get_posted_downloadprefix(), ""
-                        )
-                        if match := pattern.match(cleaned_name):
-                            idx = int(match[1])
-                            if idx > max_index:
-                                max_index = idx
+            db = await DVRDB.get_global()
+            await cls._ensure_instance_exists(instance_name, db)
 
-            if not previous_videos:
-                LogManager.log_message(
-                    "No previous videos found, First index will be returned", log_file
-                )
-                return "0"
-
-            return str(max_index)
-        except Exception as e:
-            LogManager.log_message(
-                f"Failed to get index: {e}\n{traceback.format_exc()}", log_file
+            conn = await db._get_connection()
+            cursor = await conn.execute(
+                'SELECT live_index FROM "index" WHERE instance_name = ?',
+                (instance_name,),
             )
-            return None
+            result = await cursor.fetchone()
+            await cursor.close()
 
-    @staticmethod
-    def find_new_posted_index(log_file):
-        """Calculate the next available free index"""
+            if result:
+                return result[0]
+            return 0
+        except Exception as e:
+            LogManager.log_core(
+                f"Failed to get current live index: {e}\n{traceback.format_exc()}",
+                LogLevels.Error,
+            )
+            raise
+
+    @classmethod
+    async def get_current_posted_index(cls, instance_name):
+        """
+        Get the current posted index for the specified instance.
+
+        Args:
+            instance_name: The name of the instance
+
+        Returns:
+            int: The current posted index value
+        """
         try:
-            current_index = IndexManager.find_current_posted_index(log_file)
-            if current_index is None:
-                LogManager.log_message(
-                    "Current index is None, cannot increment.", log_file
-                )
-                return None
-            current_index_num = int(current_index) + 1
+            from db.dvr_db import DVRDB
 
-            # LogManager.log_message(f"Next Free Index: {current_index_num}", log_file)
-            return str(current_index_num)
-        except Exception as e:
-            LogManager.log_message(
-                f"Failed to get next free index: {e}\n{traceback.format_exc()}",
-                log_file,
+            db = await DVRDB.get_global()
+            await cls._ensure_instance_exists(instance_name, db)
+
+            conn = await db._get_connection()
+            cursor = await conn.execute(
+                'SELECT posted_index FROM "index" WHERE instance_name = ?',
+                (instance_name,),
             )
-            return None
+            result = await cursor.fetchone()
+            await cursor.close()
+
+            if result:
+                return result[0]
+            return 0
+        except Exception as e:
+            LogManager.log_core(
+                f"Failed to get current posted index: {e}\n{traceback.format_exc()}",
+                LogLevels.Error,
+            )
+            raise
+
+    @classmethod
+    async def increment_current_live_index(cls, instance_name):
+        """
+        Increment the live index for the specified instance.
+
+        Args:
+            instance_name: The name of the instance
+
+        Returns:
+            int: The new live index value after incrementing
+        """
+        try:
+            from db.dvr_db import DVRDB
+
+            db = await DVRDB.get_global()
+            await cls._ensure_instance_exists(instance_name, db)
+
+            # Increment and update in a single operation
+            conn = await db._get_connection()
+            await conn.execute(
+                'UPDATE "index" SET live_index = live_index + 1, updated_at = CURRENT_TIMESTAMP WHERE instance_name = ?',
+                (instance_name,),
+            )
+            await conn.commit()
+
+            # Return the new value
+            new_index = await cls.get_current_live_index(instance_name)
+            return new_index
+        except Exception as e:
+            LogManager.log_core(
+                f"Failed to increment live index: {e}\n{traceback.format_exc()}",
+                LogLevels.Error,
+            )
+            raise
+
+    @classmethod
+    async def increment_current_posted_index(cls, instance_name):
+        """
+        Increment the posted index for the specified instance.
+
+        Args:
+            instance_name: The name of the instance
+
+        Returns:
+            int: The new posted index value after incrementing
+        """
+        try:
+            from db.dvr_db import DVRDB
+
+            db = await DVRDB.get_global()
+            await cls._ensure_instance_exists(instance_name, db)
+
+            # Increment and update in a single operation
+            conn = await db._get_connection()
+            await conn.execute(
+                'UPDATE "index" SET posted_index = posted_index + 1, updated_at = CURRENT_TIMESTAMP WHERE instance_name = ?',
+                (instance_name,),
+            )
+            await conn.commit()
+
+            # Return the new value
+            new_index = await cls.get_current_posted_index(instance_name)
+            return new_index
+        except Exception as e:
+            LogManager.log_core(
+                f"Failed to increment posted index: {e}\n{traceback.format_exc()}",
+                LogLevels.Error,
+            )
+            raise

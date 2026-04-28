@@ -4,11 +4,9 @@ import os
 import re
 import json
 import dateparser
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-from utils.logging_utils import LogManager
+from utils.logging_utils import LogManager, LogLevels
 from config.config_settings import DVR_Config
-from config.config_accounts import Account_Config
+from config.config_settings import DVR_Config
 from utils.file_utils import FileManager
 from utils.template_manager import TemplateManager
 from yp_dl.yp_dl import YoutubePosts, get_SOCS_cookie
@@ -16,27 +14,19 @@ from yp_dl.yp_dl import YoutubePosts, get_SOCS_cookie
 
 class CommunityDownloader:
     _download_lock = asyncio.Lock()
-    _youtube_source = Account_Config.get_youtube_source()
-    _youtube_handle = Account_Config.extract_channel_handle(_youtube_source)
-    json_dir = os.path.join(
-        DVR_Config.get_posted_notices_dir(),
-        _youtube_handle,
-    )
-    community_archive = os.path.join(
-        DVR_Config.get_posted_notices_dir(), "Community_Post_Archive.html"
-    )
-    json_path = os.path.join(
-        json_dir, "posts_posts.json"
-    )
-    posts_url = f"{Account_Config.build_youtube_url(_youtube_source)}/posts"
-    ythandle = _youtube_handle
-    templates_dir = DVR_Config.get_templates_dir()
-    posts_template = os.path.join(templates_dir, "posts_page.html")
-    posts_youtube_placeholder_template = os.path.join(
-        templates_dir, "posts_youtube_placeholder.html"
-    )
-    posts_embed_script_template = os.path.join(templates_dir, "posts_embed_script.html")
-    posts_item_template = os.path.join(templates_dir, "posts_item.html")
+    # Lazy-loaded on first use in _ensure_initialized()
+    _youtube_handle = None
+    json_dir = None
+    community_archive = None
+    json_path = None
+    posts_url = None
+    ythandle = None
+    templates_dir = None
+    posts_templates_dir = None
+    posts_template = None
+    posts_youtube_placeholder_template = None
+    posts_embed_script_template = None
+    posts_item_template = None
 
     # Class variables to cache loaded templates
     _posts_youtube_placeholder_content = ""
@@ -45,6 +35,45 @@ class CommunityDownloader:
 
     # Template Manager instance for loading and caching templates
     _template_manager = None
+
+    @classmethod
+    async def _ensure_initialized(cls):
+        """Lazy-load configuration values from database."""
+        if cls._youtube_handle is not None:
+            return  # Already initialized
+
+        # Get instance context
+        from utils.playlist_manager import PlaylistManager
+
+        instance_name = await PlaylistManager._get_instance_name()
+        channel_source = await PlaylistManager._get_channel_source()
+
+        if not instance_name or not channel_source:
+            raise ValueError("Cannot initialize: instance_name or channel_source is not set")
+
+        cls._youtube_handle = channel_source
+        cls.json_dir = os.path.join(
+            DVR_Config.get_posted_notices_dir(),
+            cls._youtube_handle,
+        )
+        cls.community_archive = os.path.join(
+            DVR_Config.get_posted_notices_dir(), "Community_Post_Archive.html"
+        )
+        cls.json_path = os.path.join(cls.json_dir, "posts_posts.json")
+        cls.posts_url = f"{DVR_Config.build_youtube_url(channel_source)}/posts"
+        cls.ythandle = cls._youtube_handle
+        cls.templates_dir = DVR_Config.get_templates_dir()
+        cls.posts_templates_dir = os.path.join(cls.templates_dir, "posts")
+        cls.posts_template = os.path.join(cls.posts_templates_dir, "posts_page.html")
+        cls.posts_youtube_placeholder_template = os.path.join(
+            cls.posts_templates_dir, "posts_youtube_placeholder.html"
+        )
+        cls.posts_embed_script_template = os.path.join(
+            cls.posts_templates_dir, "posts_embed_script.html"
+        )
+        cls.posts_item_template = os.path.join(
+            cls.posts_templates_dir, "posts_item.html"
+        )
 
     @classmethod
     def _get_template_manager(cls):
@@ -77,6 +106,7 @@ class CommunityDownloader:
 
     @classmethod
     async def monitor_channel(cls):
+        await cls._ensure_initialized()
         await cls._load_templates()
         LogManager.log_download_posted_notices(
             f"Monitoring {cls.posts_url} for new Community Posts"
@@ -208,9 +238,7 @@ class CommunityDownloader:
             LogManager.log_download_posted_notices(
                 f"Unhandled exception in export_json_to_html: {e}\n{traceback.format_exc()}"
             )
-        pagetitle = (
-            f"Community Posts Archive for {cls.ythandle}"
-        )
+        pagetitle = f"Community Posts Archive for {cls.ythandle}"
         # Ensure HTML file exists with base structure (must come from template)
         if not os.path.exists(output_html_path):
             try:
@@ -307,7 +335,7 @@ class CommunityDownloader:
             try:
                 # Ensure parent directory exists before any save operations
                 os.makedirs(DVR_Config.get_posted_notices_dir(), exist_ok=True)
-                
+
                 if not os.path.exists(cls.json_path):
                     LogManager.log_download_posted_notices(
                         f"Creating new Community Posts Archive for {cls.ythandle}"

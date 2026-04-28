@@ -1,0 +1,163 @@
+/* File Uploader Theme - Standard Streamlit Design */
+/* Target Streamlit 1.28+ with file uploader components */
+
+.stFileUploader {
+  width: 100%;
+}
+
+/* Main upload container */
+.stFileUploader > div {
+  width: 100%;
+}
+
+/* Upload zone */
+.stFileUploader [data-testid="stFileUploaderDropzone"] {
+  background: white;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-lg);
+  text-align: center;
+  transition: all 0.2s ease-out;
+  cursor: pointer;
+}
+
+.stFileUploader [data-testid="stFileUploaderDropzone"]:hover {
+  border-color: var(--primary-color);
+  background: var(--secondary-color);
+}
+
+.stFileUploader [data-testid="stFileUploaderDropzone"].dragover {
+  border-color: var(--primary-color);
+  background: #e3f2fd;
+  transform: scale(1.01);
+}
+
+/* Upload icon */
+.stFileUploader [data-testid="stFileUploaderDropzone"] svg {
+  color: var(--primary-color);
+  opacity: 0.8;
+  margin-bottom: var(--spacing-sm);
+  transition: all 0.2s ease-out;
+}
+
+.stFileUploader [data-testid="stFileUploaderDropzone"]:hover svg {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+/* Upload text */
+.stFileUploader [data-testid="stFileUploaderDropzone"] p {
+  color: var(--text-color);
+  font-weight: 500;
+  margin: var(--spacing-sm) 0;
+  font-size: 14px;
+}
+
+.stFileUploader [data-testid="stFileUploaderDropzone"] small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* File list section */
+.stFileUploader [data-testid="stFileUploaderList"] {
+  margin-top: var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+  padding-top: var(--spacing-md);
+}
+
+/* Individual file item */
+.stFileUploader [data-testid="stFileUploaderItem"] {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: calc(var(--border-radius) / 2);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin: var(--spacing-xs) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  transition: all 0.2s ease-out;
+}
+
+.stFileUploader [data-testid="stFileUploaderItem"]:hover {
+  background: var(--secondary-color);
+  border-color: #d0d2d6;
+}
+
+/* File icon */
+.stFileUploader [data-testid="stFileUploaderItem"] svg {
+  color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+/* File name */
+.stFileUploader [data-testid="stFileUploaderItem"] span {
+  color: var(--text-color);
+  font-weight: 500;
+  flex: 1;
+  word-break: break-word;
+}
+
+/* File size */
+.stFileUploader [data-testid="stFileUploaderItem"] small {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-left: auto;
+}
+
+/* Delete button */
+.stFileUploader [data-testid="stFileUploaderItem"] button {
+  background: #ffebee;
+  border: 1px solid #f44336;
+  color: #f44336;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.stFileUploader [data-testid="stFileUploaderItem"] button:hover {
+  background: #ffcdd2;
+  border-color: #d32f2f;
+}
+
+.stFileUploader [data-testid="stFileUploaderItem"] button:active {
+  background: #ef9a9a;
+  color: #b71c1c;
+}
+
+/* Progress bar */
+.stFileUploader progress {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.stFileUploader progress::-webkit-progress-bar {
+  background: var(--secondary-color);
+  border-radius: 2px;
+}
+
+.stFileUploader progress::-webkit-progress-value {
+  background: var(--primary-color);
+  border-radius: 2px;
+}
+
+.stFileUploader progress::-moz-progress-bar {
+  background: var(--primary-color);
+  border-radius: 2px;
+}
+
+/* Label styling */
+.stFileUploader > label {
+  color: var(--text-color);
+  font-weight: 500;
+  font-size: 14px;
+  margin-bottom: var(--spacing-xs);
+  display: block;
+}

@@ -1,0 +1,171 @@
+/* Third Party Components Theme */
+/* Standard Streamlit styling for tree_select (streamlit_tree_select) and st_navbar */
+
+/* Tree Select Component - react-simple-tree-menu */
+.react-simple-tree-menu {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 0.5rem;
+}
+
+.react-simple-tree-menu__item {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--border-radius-small);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.react-simple-tree-menu__item:hover {
+  background: var(--secondary-color);
+  color: var(--text-color);
+}
+
+.react-simple-tree-menu__item--selected {
+  background: #e3f2fd;
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+.react-simple-tree-menu__item--selected:hover {
+  background: #bbdefb;
+}
+
+.react-simple-tree-menu__item__checkbox {
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  background: white;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.react-simple-tree-menu__item__checkbox:hover {
+  border-color: var(--primary-color);
+  background: var(--secondary-color);
+}
+
+.react-simple-tree-menu__item--selected .react-simple-tree-menu__item__checkbox {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.react-simple-tree-menu__item__checkbox::after {
+  content: '✓';
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.react-simple-tree-menu__item--selected .react-simple-tree-menu__item__checkbox::after {
+  opacity: 1;
+}
+
+.react-simple-tree-menu__label {
+  color: inherit;
+  font-size: 0.875rem;
+  flex: 1;
+}
+
+.react-simple-tree-menu__item__toggle {
+  width: 1rem;
+  height: 1rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast);
+}
+
+.react-simple-tree-menu__item__toggle:hover {
+  color: var(--primary-color);
+}
+
+.react-simple-tree-menu__item__toggle::before {
+  content: '▶';
+  font-size: 0.75rem;
+  transition: transform var(--transition-normal);
+}
+
+.react-simple-tree-menu__item--expanded .react-simple-tree-menu__item__toggle::before {
+  transform: rotate(90deg);
+}
+
+/* Streamlit Navigation Bar - verify compatibility */
+.stNavbar,
+.st-navbar,
+[data-testid*="navbar"] {
+  background: white;
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.stNavbar a,
+.st-navbar a,
+[data-testid*="navbar"] a {
+  color: var(--text-color);
+  transition: color var(--transition-fast);
+}
+
+.stNavbar a:hover,
+.st-navbar a:hover,
+[data-testid*="navbar"] a:hover {
+  color: var(--primary-color);
+}
+
+.stNavbar span,
+.st-navbar span,
+[data-testid*="navbar"] span {
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  transition: all var(--transition-normal);
+}
+
+.stNavbar span:hover,
+.st-navbar span:hover,
+[data-testid*="navbar"] span:hover {
+  background: #e0e2e6;
+}
+
+/* Option Menu (if used) */
+.stOptionMenu {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+
+.stOptionMenu button {
+  background: transparent;
+  color: var(--text-color);
+  border: none;
+  padding: 0.5rem 1rem;
+  transition: background var(--transition-fast);
+}
+
+.stOptionMenu button:hover {
+  background: var(--secondary-color);
+}
+
+/* Dynamic Filters (if used) */
+.stDynamicFilters {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+}

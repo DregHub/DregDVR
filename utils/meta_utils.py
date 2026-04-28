@@ -1,7 +1,7 @@
 import os
 import xml.etree.ElementTree as ET
 import traceback
-from utils.logging_utils import LogManager
+from utils.logging_utils import LogManager, LogLevels
 from config.config_settings import DVR_Config
 
 
@@ -25,10 +25,10 @@ class MetaDataManager:
     def get_thumbnail_path(cls, platform):
         """
         Get the full path to the thumbnail file in the metadata directory.
-        
+
         Args:
             platform: The platform name (e.g., 'bitchute', 'rumble')
-        
+
         Returns:
             str: Full path to the thumbnail file, or None if metadata directory is not found
         """
@@ -46,12 +46,14 @@ class MetaDataManager:
             return None
 
     @classmethod
-    def read_value(cls, xpath, platform, logfile):
+    def read_value(cls, xpath, platform, log_table):
         try:
             meta_path = cls.init_reader(platform)
             if not meta_path or not os.path.exists(meta_path):
                 LogManager.log_message(
-                    f"Meta file not found at path: {meta_path}", logfile
+                    f"Meta file not found at path: {meta_path}",
+                    log_table,
+                    LogLevels.Warning,
                 )
                 return None
             tree = ET.parse(meta_path)
@@ -61,17 +63,20 @@ class MetaDataManager:
         except Exception as e:
             LogManager.log_message(
                 f"Failed to read value from meta:  {e}\n{traceback.format_exc()}",
-                logfile,
+                log_table,
+                LogLevels.Error,
             )
             return None
 
     @classmethod
-    def write_value(cls, xpath, value, platform, logfile):
+    def write_value(cls, xpath, value, platform, log_table):
         try:
             meta_path = cls.init_reader(platform)
             if not meta_path or not os.path.exists(meta_path):
                 LogManager.log_message(
-                    f"Meta file not found at path: {meta_path}", logfile
+                    f"Meta file not found at path: {meta_path}",
+                    log_table,
+                    LogLevels.Warning,
                 )
                 return
             tree = ET.parse(meta_path)
@@ -82,10 +87,13 @@ class MetaDataManager:
                 tree.write(meta_path)
             else:
                 LogManager.log_message(
-                    f"XPath '{xpath}' not found in the metadata.", logfile
+                    f"XPath '{xpath}' not found in the metadata.",
+                    log_table,
+                    LogLevels.Warning,
                 )
         except Exception as e:
             LogManager.log_message(
                 f"Failed to write value to meta:  {e}\n{traceback.format_exc()}",
-                logfile,
+                log_table,
+                LogLevels.Error,
             )

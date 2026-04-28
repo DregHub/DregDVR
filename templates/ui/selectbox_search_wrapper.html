@@ -1,0 +1,20 @@
+<!-- Searchable Selectbox Wrapper - Provides container for search/filter functionality -->
+<!-- Used by enhanced_selectbox() and searchable_selectbox() components -->
+
+<div class="enhanced-selectbox-wrapper">
+  <div class="selectbox-search-container">
+    <input 
+      type="text" 
+      class="selectbox-search-input" 
+      placeholder="Search options..." 
+      aria-label="Search selectbox options"
+      data-testid="selectbox-search-input"
+    />
+    <svg class="selectbox-search-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+    </svg>
+  </div>
+  <div class="selectbox-dropdown-container" data-testid="selectbox-options">
+    <!-- Selectbox will be rendered here -->
+  </div>
+</div>

@@ -1,0 +1,84 @@
+/* Date Input Theme - Standard Streamlit Design */
+/* Target Streamlit 1.28+ with date input components */
+
+.stDateInput {
+  width: 100%;
+}
+
+/* Date input container */
+.stDateInput > div {
+  position: relative;
+}
+
+/* Date input field */
+.stDateInput input[type="date"] {
+  width: 100%;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-color);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease-out;
+  outline: none;
+  cursor: pointer;
+}
+
+.stDateInput input[type="date"]::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.stDateInput input[type="date"]:hover {
+  border-color: #d0d2d6;
+}
+
+.stDateInput input[type="date"]:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+}
+
+.stDateInput input[type="date"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--secondary-color);
+  border-color: var(--border-color);
+}
+
+/* Calendar popup styling */
+.stDateInput input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.3);
+  padding: 4px;
+  margin-right: 4px;
+  transition: filter 0.15s ease-out;
+}
+
+.stDateInput input[type="date"]:hover::-webkit-calendar-picker-indicator {
+  filter: invert(0.5);
+}
+
+/* Color adjustment for dark theme compatibility */
+.stDateInput input[type="date"]::before {
+  content: attr(placeholder);
+  position: absolute;
+  color: var(--text-secondary);
+}
+
+/* Label styling */
+.stDateInput > label {
+  color: var(--text-color);
+  font-weight: 500;
+  font-size: 14px;
+  margin-bottom: var(--spacing-xs);
+  display: block;
+}
+
+/* Help text */
+.stDateInput small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}

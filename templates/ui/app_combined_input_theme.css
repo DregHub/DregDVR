@@ -1,0 +1,113 @@
+/* Combined Dropdown-Input Component Styling */
+
+/* Container with flexbox layout */
+.combined-input-flexbox {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: white;
+    overflow: hidden;
+    transition: border-color var(--transition-fast);
+    pointer-events: auto;
+}
+
+.combined-input-flexbox:hover {
+    border-color: #d0d2d6;
+    transition-property: border-color;
+}
+
+.combined-input-flexbox:has(input:focus),
+.combined-input-flexbox:has([data-baseweb="select"]:focus-within) {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+}
+
+/* Dropdown side */
+.combined-input-flexbox > .col-combined-select {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    border-right: 1px solid var(--border-color);
+    transition: border-color var(--transition-fast);
+    pointer-events: none;
+}
+
+.combined-input-flexbox:hover > .col-combined-select {
+    border-right-color: #d0d2d6;
+    transition-property: border-color;
+}
+
+/* Input side */
+.combined-input-flexbox > .col-combined-input {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    pointer-events: none;
+}
+
+/* Remove margins from inner controls */
+.combined-input-flexbox .stSelectbox,
+.combined-input-flexbox .stTextInput {
+    width: 100%;
+    margin: 0 !important;
+    flex: 1;
+    height: 100%;
+}
+
+.combined-input-flexbox .stSelectbox > div,
+.combined-input-flexbox .stTextInput > div {
+    margin: 0 !important;
+    height: 100%;
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* Element containers */
+.combined-input-flexbox .stElementContainer {
+    height: 100%;
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* Normalize selectbox within combined input */
+.combined-input-flexbox div[data-baseweb="select"] {
+    background: white !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+/* Normalize text input wrapper */
+.combined-input-flexbox [data-baseweb="input"] {
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 !important;
+}
+
+.combined-input-flexbox [data-baseweb="base-input"] {
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.combined-input-flexbox input {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.95rem !important;
+    height: 100% !important;
+    line-height: 1.5 !important;
+    min-height: 44px !important;
+}
+
+/* Hide labels for both dropdown and input controls */
+label[data-testid="stWidgetLabel"] {
+    display: none !important;
+}
+
+.combined-input-flexbox label[data-testid="stWidgetLabel"],
+.stSelectbox label[data-testid="stWidgetLabel"],
+.stTextInput label[data-testid="stWidgetLabel"] {
+    display: none !important;
+}

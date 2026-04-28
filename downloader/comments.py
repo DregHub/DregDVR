@@ -14,31 +14,53 @@ except ImportError:
     _emoji_lib_available = False
 
 from config.config_settings import DVR_Config
-from utils.logging_utils import LogManager
+from utils.logging_utils import LogManager, LogLevels
 from utils.template_manager import TemplateManager
 
 
 class LiveCommentsDownloader:
-    Live_Comments_Dir = DVR_Config.get_live_comments_dir()
-    TXT_Comments_Dir = os.path.join(Live_Comments_Dir, "_TXT")
-    JSON_Comments_Dir = os.path.join(Live_Comments_Dir, "_JSON")
+    Live_Comments_Dir = None
+    TXT_Comments_Dir = None
+    JSON_Comments_Dir = None
     _download_lock = asyncio.Lock()
     _publish_lock = asyncio.Lock()
-    templates_dir = DVR_Config.get_templates_dir()
-    HTML_Template_File = os.path.join(templates_dir, "comments_page.html")
-    comments_youtube_placeholder_template = os.path.join(
-        templates_dir, "comments_youtube_placeholder.html"
-    )
-    comments_embed_script_template = os.path.join(
-        templates_dir, "comments_embed_script.html"
-    )
-    comments_item_template = os.path.join(templates_dir, "comments_item.html")
-    comments_user_banned_banner_template = os.path.join(
-        templates_dir, "comments_user_banned_banner.html"
-    )
-    comments_removed_post_banner_template = os.path.join(
-        templates_dir, "comments_removed_post_banner.html"
-    )
+    templates_dir = None
+    comments_templates_dir = None
+    HTML_Template_File = None
+    comments_youtube_placeholder_template = None
+    comments_embed_script_template = None
+    comments_item_template = None
+    comments_user_banned_banner_template = None
+    comments_removed_post_banner_template = None
+
+    @classmethod
+    async def _ensure_initialized(cls):
+        """Initialize class variables from config on first use."""
+        if cls.Live_Comments_Dir is not None:
+            return  # Already initialized
+        cls.Live_Comments_Dir = DVR_Config.get_live_comments_dir()
+        cls.TXT_Comments_Dir = os.path.join(cls.Live_Comments_Dir, "_TXT")
+        cls.JSON_Comments_Dir = os.path.join(cls.Live_Comments_Dir, "_JSON")
+        cls.templates_dir = DVR_Config.get_templates_dir()
+        cls.comments_templates_dir = os.path.join(cls.templates_dir, "comments")
+        cls.HTML_Template_File = os.path.join(
+            cls.comments_templates_dir, "comments_page.html"
+        )
+        cls.comments_youtube_placeholder_template = os.path.join(
+            cls.comments_templates_dir, "comments_youtube_placeholder.html"
+        )
+        cls.comments_embed_script_template = os.path.join(
+            cls.comments_templates_dir, "comments_embed_script.html"
+        )
+        cls.comments_item_template = os.path.join(
+            cls.comments_templates_dir, "comments_item.html"
+        )
+        cls.comments_user_banned_banner_template = os.path.join(
+            cls.comments_templates_dir, "comments_user_banned_banner.html"
+        )
+        cls.comments_removed_post_banner_template = os.path.join(
+            cls.comments_templates_dir, "comments_removed_post_banner.html"
+        )
 
     # Class variables to cache loaded templates
     _comments_youtube_placeholder_content = None
@@ -89,6 +111,7 @@ class LiveCommentsDownloader:
 
     @classmethod
     async def download_comments(cls, yturl, name_template, name_prefix):
+        await cls._ensure_initialized()
         await cls._load_templates()
         async with cls._download_lock:
             try:
@@ -97,18 +120,55 @@ class LiveCommentsDownloader:
                 )
                 cls._ensure_chat_directories_exist()
 
+                # Get instance context
+                from utils.playlist_manager import PlaylistManager
+                from config.config_settings import DVR_Config
+
+                instance_name = await PlaylistManager._get_instance_name()
+                channel_source = await PlaylistManager._get_channel_source()
+
+                if not instance_name or not channel_source:
+                    LogManager.log_download_comments(
+                        "Cannot get instance context: instance_name or channel_source is not set",
+                        LogLevels.Warning,
+                    )
+                else:
+                    # Get download table name for current instance
+                    db = await PlaylistManager._get_db()
+                    download_table_name = db.get_playlist_download_table_name(
+                        channel_source
+                    )
+
+                    # Get current download playlist
+                    current_download_playlist = await db.get_current_download_playlist(
+                        instance_name
+                    )
+
+                    if not current_download_playlist:
+                        LogManager.log_download_comments(
+                            "Cannot get current download playlist: current_download_playlist is not set",
+                            LogLevels.Warning,
+                        )
+                    else:
+                        LogManager.log_download_comments(
+                            f"Scanning download table: {download_table_name} for playlist: {current_download_playlist} for instance: {instance_name}",
+                            LogLevels.Info,
+                        )
+
                 options = cls._get_download_options(name_template)
                 try:
                     await DLPHelpers.download_with_retry(
                         ydl_opts=options,
                         url_or_list=yturl,
                         timeout_enabled=True,
-                        log_file_name=LogManager.DOWNLOAD_COMMENTS_LOG_FILE,
+                        log_table_name=LogManager.table_download_comments,
                         log_warnings_and_above_only=False,
+                        thread_number=1,
                     )
                 except Exception as e:
                     LogManager.log_download_comments(
-                        f"Error downloading live comments: {e}\n{traceback.format_exc()}"
+                        f"Error downloading live comments: {e}\n{traceback.format_exc()}",
+                        LogLevels.Error,
                     )
                 json_path = None
                 # Search for files in JSON_Comments_Dir starting with name_prefix
@@ -124,7 +184,7 @@ class LiveCommentsDownloader:
                             json_path = new_file_path
                         else:
                             LogManager.log_download_comments(
-                                f"Found existing JSON file: {file_path}"
+                                f"Found existing JSON file: {file_path}", LogLevels.Info
                             )
                             json_path = file_path
 
@@ -132,15 +192,18 @@ class LiveCommentsDownloader:
                     await cls.publish_comments(json_path)
                 else:
                     LogManager.log_download_comments(
-                        f"No valid JSON file found for {name_template} in {cls.JSON_Comments_Dir}"
+                        f"No valid JSON file found for {name_template} in {cls.JSON_Comments_Dir}",
+                        LogLevels.Warning,
                     )
                     LogManager.log_download_comments(
-                        "Leaving as unpublished, This will be fixed on the next republish"
+                        "Leaving as unpublished, This will be fixed on the next republish",
+                        LogLevels.Warning,
                     )
 
             except Exception as e:
                 LogManager.log_download_comments(
-                    f"Exception in download_comments:  {e}\n{traceback.format_exc()}"
+                    f"Exception in download_comments:  {e}\n{traceback.format_exc()}",
+                    LogLevels.Error,
                 )
 
     @classmethod
@@ -171,7 +234,9 @@ class LiveCommentsDownloader:
             with open(file_path, "r", encoding="utf-8") as jf:
                 text = jf.read()
         except Exception as e:
-            LogManager.log_download_comments(f"Failed reading JSON {file_path}: {e}")
+            LogManager.log_download_comments(
+                f"Failed reading JSON {file_path}: {e}", LogLevels.Error
+            )
             return []
 
         try:
@@ -194,7 +259,7 @@ class LiveCommentsDownloader:
                     idx = end
             except Exception as e:
                 LogManager.log_download_comments(
-                    f"Failed parsing JSON {file_path}: {e}"
+                    f"Failed parsing JSON {file_path}: {e}", LogLevels.Error
                 )
                 return []
             data = objs
@@ -256,7 +321,9 @@ class LiveCommentsDownloader:
             matches = []
 
         if not matches:
-            LogManager.log_download_comments(f"Source JSON not found: {sourcejson}")
+            LogManager.log_download_comments(
+                f"Source JSON not found: {sourcejson}", LogLevels.Error
+            )
             return None
         if len(matches) == 1:
             return matches[0]
@@ -271,19 +338,22 @@ class LiveCommentsDownloader:
             with open(combined_path, "w", encoding="utf-8") as cf:
                 json.dump(combined_items, cf, ensure_ascii=False)
             LogManager.log_download_comments(
-                f"Combined {len(matches)} JSON files into {combined_path}"
+                f"Combined {len(matches)} JSON files into {combined_path}",
+                LogLevels.Info,
             )
             return combined_path
         except Exception as e:
             LogManager.log_download_comments(
-                f"Failed creating combined JSON {combined_path}: {e}"
+                f"Failed creating combined JSON {combined_path}: {e}", LogLevels.Error
             )
             return None
 
     @classmethod
     def check_user_banned(cls, author_id, mod_items):
         if not author_id:
-            LogManager.log_download_comments("Empty author_id, skipping ban check")
+            LogManager.log_download_comments(
+                "Empty author_id, skipping ban check"
+            ), LogLevels.Warning
             return False
         return author_id in mod_items
 
@@ -291,7 +361,7 @@ class LiveCommentsDownloader:
     def check_post_removed(cls, offset_time, mod_items):
         if not offset_time:
             LogManager.log_download_comments(
-                "Empty offset_time, skipping removal check"
+                "Empty offset_time, skipping removal check", LogLevels.Info
             )
             return False
         return offset_time in mod_items

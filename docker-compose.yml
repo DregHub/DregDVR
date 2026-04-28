@@ -1,8 +1,12 @@
 services:
   DreggDVR-Beta:
-    image: mcr.microsoft.com/playwright/python:v1.58.0-noble
+    image: dreggdvr-beta:latest
+    build:
+      context: .
     container_name: DreggDVR-Beta
-    command: python /_Dregg_DVR/main.py
+    command: python /_Dregg_DVR/main.py --ui
+    ports:
+      - "8501:8501"
     volumes:
       - D:\GitHub\DregDVR:/_Dregg_DVR:ro
       - D:\Containers\Mounts\Dreggs\Beta\_DVR_Runtime:/_DVR_Runtime

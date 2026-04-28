@@ -1,0 +1,109 @@
+/* Expanders Theme */
+/* Standard Streamlit styling for st.expander component */
+
+.streamlit-expanderHeader {
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.streamlit-expanderHeader:hover {
+  background: #e0e2e6;
+  border-color: #d0d2d6;
+}
+
+.streamlit-expanderHeader:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
+}
+
+.streamlit-expanderHeader p {
+  color: var(--text-color);
+  font-weight: 500;
+  margin: 0;
+  flex: 1;
+}
+
+/* Expander chevron icon */
+.streamlit-expanderHeader svg {
+  color: var(--text-secondary);
+  transition: transform var(--transition-normal), color var(--transition-fast);
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.streamlit-expanderHeader:hover svg {
+  color: var(--primary-color);
+}
+
+/* Expanded state */
+.streamlit-expanderHeader[aria-expanded="true"] {
+  background: white;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 0;
+}
+
+.streamlit-expanderHeader[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+  color: var(--primary-color);
+}
+
+/* Expander content */
+.streamlit-expanderContent {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  padding: 1rem;
+  animation: expandContent var(--transition-normal) ease-out;
+  overflow: hidden;
+}
+
+.streamlit-expanderContent p {
+  color: var(--text-color);
+  line-height: 1.6;
+  margin: 0 0 1rem 0;
+}
+
+.streamlit-expanderContent p:last-child {
+  margin-bottom: 0;
+}
+
+/* Content reveal animation */
+@keyframes expandContent {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 1000px;
+  }
+}
+
+/* Expander in different contexts */
+.stExpander {
+  margin-bottom: 1rem;
+}
+
+/* Nested expanders */
+.streamlit-expanderContent .streamlit-expanderHeader {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.streamlit-expanderContent .streamlit-expanderContent {
+  margin-bottom: 1rem;
+}

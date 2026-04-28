@@ -1,0 +1,5 @@
+iframe[title="streamlit_navigation_bar.st_navbar"] {
+    box-shadow:
+        0 12px 36px rgba(0,0,0,0.75),
+        0 4px 14px rgba(0,0,0,0.55);
+}

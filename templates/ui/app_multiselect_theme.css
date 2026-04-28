@@ -1,0 +1,124 @@
+/* Multi-Select Theme - Standard Streamlit Design */
+/* Target Streamlit 1.28+ with BaseWeb multi-select components */
+
+.stMultiSelect {
+  width: 100%;
+}
+
+/* Main multi-select container */
+.stMultiSelect > div {
+  position: relative;
+}
+
+/* Multi-select input field */
+.stMultiSelect input[type="text"] {
+  width: 100%;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-color);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease-out;
+  outline: none;
+}
+
+.stMultiSelect input[type="text"]::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.stMultiSelect input[type="text"]:hover {
+  border-color: #d0d2d6;
+}
+
+.stMultiSelect input[type="text"]:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+}
+
+.stMultiSelect input[type="text"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--secondary-color);
+  border-color: var(--border-color);
+}
+
+/* Selected items/chips */
+.stMultiSelect [data-baseweb="tag"] {
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: calc(var(--border-radius) / 2);
+  color: var(--text-color);
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stMultiSelect [data-baseweb="tag"]:hover {
+  background: #e0e2e6;
+  border-color: #d0d2d6;
+}
+
+/* Remove button for selected items */
+.stMultiSelect [data-baseweb="tag"] button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.stMultiSelect [data-baseweb="tag"] button:hover {
+  color: var(--primary-color);
+}
+
+/* Dropdown menu */
+.stMultiSelect [data-baseweb="popover"] {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.stMultiSelect [data-baseweb="popover"] [role="option"] {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease-out;
+  color: var(--text-color);
+}
+
+.stMultiSelect [data-baseweb="popover"] [role="option"]:hover {
+  background: var(--secondary-color);
+}
+
+.stMultiSelect [data-baseweb="popover"] [role="option"][aria-selected="true"] {
+  background: #e3f2fd;
+  color: var(--text-color);
+}
+
+/* Label styling */
+.stMultiSelect > label {
+  color: var(--text-color);
+  font-weight: 500;
+  font-size: 14px;
+  margin-bottom: var(--spacing-xs);
+  display: block;
+}
+
+/* Help text */
+.stMultiSelect small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}

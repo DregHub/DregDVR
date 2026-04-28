@@ -1,4 +1,3 @@
-import shutil
 import traceback
 import httplib2
 import os
@@ -12,7 +11,6 @@ from googleapiclient.discovery import build
 from utils.logging_utils import LogManager
 from utils.meta_utils import MetaDataManager
 from config.config_settings import DVR_Config
-from config.config_accounts import Account_Config
 
 # Thread-specific upload locks to allow concurrent uploads across different threads
 _yt_upload_locks = {}  # {thread_number: asyncio.Lock()}
@@ -22,14 +20,16 @@ def _get_yt_lock(thread_number=None):
     """Get or create a lock for a specific thread."""
     if thread_number is None:
         thread_number = 1
-    
+
     if thread_number not in _yt_upload_locks:
         _yt_upload_locks[thread_number] = asyncio.Lock()
-    
+
     return _yt_upload_locks[thread_number]
 
 
-async def upload_to_youtube(filepath, filename, title, log_file=None, thread_number=None, uniqueid=None):
+async def upload_to_youtube(
+    filepath, filename, title, log_table=None, thread_number=None, unique_id=None
+):
     """Upload a video file to YouTube."""
     media_upload = None
     if thread_number is None:
@@ -37,11 +37,13 @@ async def upload_to_youtube(filepath, filename, title, log_file=None, thread_num
     try:
         thread_lock = _get_yt_lock(thread_number)
         async with thread_lock:
-            LogManager.log_message(f"Attempting upload of file: {filepath} to YouTube", log_file)
+            LogManager.log_upload_yt(
+                f"Attempting upload of file: {filepath} to YouTube"
+            )
             YT_ClientSecretFile = DVR_Config.get_yt_client_secret_file()
             YT_CredentialsFile = DVR_Config.get_yt_credentials_file()
-            YT_PrivacyMode = DVR_Config.get_yt_upload_visibility()
-            YT_Catagory = DVR_Config.get_yt_upload_catagory()
+            YT_PrivacyMode = DVR_Config.get_upload_visibility()
+            YT_Catagory = DVR_Config.get_upload_category()
             storage = Storage(YT_CredentialsFile)
             credentials = storage.get()
 
@@ -60,16 +62,20 @@ async def upload_to_youtube(filepath, filename, title, log_file=None, thread_num
             Title = title if title else os.path.splitext(os.path.basename(filename))[0]
 
             # Build the API client using authorized HTTP
-            youtube = build("youtube", "v3", http=credentials.authorize(httplib2.Http()))
-            LogManager.log_message("YoutubeAPI Initialized Successfully", log_file)
+            youtube = build(
+                "youtube", "v3", http=credentials.authorize(httplib2.Http())
+            )
+            LogManager.log_upload_yt("YoutubeAPI Initialized Successfully")
 
             description = MetaDataManager.read_value(
-                "Description", "_Youtube", log_file or LogManager.UPLOAD_YT_LOG_FILE
+                "Description",
+                "_Youtube",
+                log_table or LogManager.table_upload_platform_yt,
             )
             CSV_Keywords = MetaDataManager.read_value(
-                "Tags", "_Youtube", log_file or LogManager.UPLOAD_YT_LOG_FILE
+                "Tags", "_Youtube", log_table or LogManager.table_upload_platform_yt
             )
-            LogManager.log_message(f"Uploading {Title} to YouTube...", log_file)
+            LogManager.log_upload_yt(f"Uploading {Title} to YouTube...")
 
             # Prepare tags, trimming whitespace and ignoring empty strings
             tags = []
@@ -94,18 +100,16 @@ async def upload_to_youtube(filepath, filename, title, log_file=None, thread_num
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(None, request.execute)
             if response:
-                LogManager.log_message(
-                    f"Successfully uploaded {Title} to YouTube: {response.get('id')}",
-                    log_file
+                LogManager.log_upload_yt(
+                    f"Successfully uploaded {Title} to YouTube: {response.get('id')}"
                 )
                 return True, None
             else:
-                LogManager.log_message(f"Upload failed for {Title}", log_file)
+                LogManager.log_upload_yt(f"Upload failed for {Title}")
                 return False, "Upload failed"
     except Exception as e:
-        LogManager.log_message(
-            f"Exception in upload_to_youtube: {e}\n{traceback.format_exc()}",
-            log_file
+        LogManager.log_upload_yt(
+            f"Exception in upload_to_youtube: {e}\n{traceback.format_exc()}"
         )
         return False, str(e)
     finally:

@@ -1,0 +1,96 @@
+/* Container Components Theme */
+/* Standard Streamlit styling for st.container, st.columns, st.divider */
+
+.stContainer {
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.stContainer[border="false"],
+.stContainer[data-testid*="border-false"] {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+/* Columns layout */
+.stColumn {
+  padding: 0 0.5rem;
+}
+
+.stColumn:first-child {
+  padding-left: 0;
+}
+
+.stColumn:last-child {
+  padding-right: 0;
+}
+
+/* Column gaps */
+[data-testid*="columns"] [data-testid*="column"] {
+  margin-right: 0.5rem;
+}
+
+[data-testid*="columns"] [data-testid*="column"]:last-child {
+  margin-right: 0;
+}
+
+[data-testid*="columns"][data-testid*="gap-medium"] [data-testid*="column"] {
+  margin-right: 1rem;
+}
+
+[data-testid*="columns"][data-testid*="gap-small"] [data-testid*="column"] {
+  margin-right: 0.25rem;
+}
+
+[data-testid*="columns"][data-testid*="gap-large"] [data-testid*="column"] {
+  margin-right: 1.5rem;
+}
+
+/* Divider */
+.stDivider {
+  border-top: 1px solid var(--border-color);
+  margin: 1.5rem 0;
+}
+
+/* Vertical blocks and main content areas */
+[data-testid="stVerticalBlock"] {
+  background: transparent;
+  padding: 0.5rem 0;
+}
+
+.main {
+  background: transparent;
+  color: var(--text-color);
+}
+
+/* Sidebar and content areas */
+[data-testid*="sidebar"] {
+  background: var(--secondary-color);
+  border-right: 1px solid var(--border-color);
+}
+
+[data-testid*="content"] {
+  background: transparent;
+  padding: 1rem;
+}
+
+/* Form containers and grouped elements */
+.stForm {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+}
+
+/* Expander content containers */
+.streamlit-expanderContent {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  padding: 1rem;
+  margin-top: 0.5rem;
+}

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import sys; sys.path.insert\\(0, '.'\\); from ui.pages.instances_page.instances import show_instances\")",
+      "Bash(python -m streamlit run ui/app.py --server.headless true --server.port 8501)"
+    ]
+  }
+}

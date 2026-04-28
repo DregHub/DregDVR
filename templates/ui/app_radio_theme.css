@@ -1,0 +1,80 @@
+/* Radio Button Theme - Standard Streamlit Design */
+/* Target Streamlit 1.28+ with BaseWeb radio components */
+
+/* Base radio container */
+.stRadio {
+  padding: var(--spacing-sm) 0;
+}
+
+.stRadio > div > label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius);
+  transition: all 0.2s ease-out;
+  cursor: pointer;
+}
+
+.stRadio > div > label:hover {
+  background: var(--secondary-color);
+}
+
+/* Radio button element (the actual circle) */
+.stRadio [type="radio"] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  flex-shrink: 0;
+}
+
+.stRadio [type="radio"]:hover {
+  border-color: var(--primary-color);
+}
+
+.stRadio [type="radio"]:checked {
+  border-color: var(--primary-color);
+  background: white;
+}
+
+.stRadio [type="radio"]:checked::after {
+  content: '';
+  display: block;
+  width: 10px;
+  height: 10px;
+  background: var(--primary-color);
+  border-radius: 50%;
+  margin: auto;
+}
+
+.stRadio [type="radio"]:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.stRadio [type="radio"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--secondary-color);
+  border-color: var(--border-color);
+}
+
+.stRadio [type="radio"]:disabled:checked {
+  background: var(--secondary-color);
+}
+
+/* Label text styling */
+.stRadio label > span {
+  color: var(--text-color);
+  font-weight: 500;
+  user-select: none;
+}
+
+.stRadio [type="radio"]:disabled ~ span {
+  opacity: 0.6;
+}

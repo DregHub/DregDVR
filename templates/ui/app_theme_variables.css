@@ -1,0 +1,32 @@
+/* Standard Streamlit Theme Variables */
+/* Simplified from glass-morphism to standard Streamlit styling */
+
+:root {
+  /* Standard Colors */
+  --primary-color: #ff4b4b;
+  --secondary-color: #f0f2f6;
+  --text-color: #31333f;
+  --text-secondary: #6b6c7e;
+  --background-color: #ffffff;
+  --border-color: #f0f2f6;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+
+  /* Border Radius */
+  --border-radius: 0.5rem;
+  --border-radius-small: 0.25rem;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.1);
+}

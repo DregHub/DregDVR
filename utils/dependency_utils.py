@@ -1,145 +1,84 @@
-import asyncio
 import sys
-import traceback
-from utils.logging_utils import LogManager
+import subprocess
+from pathlib import Path
+from utils.logging_utils import LogManager,LogLevels
 
 
 class DependencyManager:
-
+    """Manage Python dependencies and package updates."""
+    
     @classmethod
-    async def install_apt_dependency(cls, package_name):
+    def update_py_dependencies(cls, requirements_file: str = None, verbose: bool = False) -> bool:
+        """
+        Update Python dependencies from requirements.txt using pip.
+        
+        Args:
+            requirements_file: Path to requirements.txt file. If None, looks for it in parent directory.
+            verbose: If True, print pip output to console.
+            
+        Returns:
+            bool: True if update succeeded, False otherwise.
+        """
         try:
-            process_apt = await asyncio.create_subprocess_exec(
-                "apt-get",
-                "install",
-                "-y",
-                package_name,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            output_apt, _ = await process_apt.communicate()
-            output_apt = output_apt.decode()
-            LogManager.log_core("apt-get install output:\n" + output_apt)
-            if process_apt.returncode != 0:
+            # Determine requirements file path
+            if requirements_file is None:
+                # Look for requirements.txt in workspace root
+                workspace_root = Path(__file__).parent.parent
+                requirements_file = workspace_root / "requirements.txt"
+            else:
+                requirements_file = Path(requirements_file)
+            
+            if not requirements_file.exists():
                 LogManager.log_core(
-                    f"Failed to install {package_name}. Return code: {process_apt.returncode}"
+                    f"DependencyManager: Requirements file not found: {requirements_file}"
                 )
                 return False
-            else:
-                LogManager.log_core(
-                    f"{package_name} installed successfully. Return code: {process_apt.returncode}"
-                )
-                return True
-        except Exception as e:
+            
             LogManager.log_core(
-                f"Failed to install {package_name}:  {e}\n{traceback.format_exc()}"
+                f"DependencyManager: Updating Python dependencies from: {requirements_file}"
+            )
+            
+            # Run pip install with requirements file
+            pip_command = [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--upgrade",
+                "-r",
+                str(requirements_file)
+            ]
+            
+            result = subprocess.run(
+                pip_command,
+                capture_output=not verbose,
+                text=True,
+                timeout=300  # 5 minute timeout
+            )
+            
+            if result.returncode == 0:
+                LogManager.log_core(
+                    "DependencyManager: Python dependencies updated successfully"
+                )
+                if verbose and result.stdout:
+                    LogManager.log_core(result.stdout)
+                return True
+            else:
+                error_msg = result.stderr or "Unknown pip error"
+                LogManager.log_core(
+                    f"DependencyManager: Pip update failed with code {result.returncode}: {error_msg}"
+                )
+                if verbose:
+                    LogManager.log_core(f"Error: {error_msg}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            LogManager.log_core(
+                "DependencyManager: Pip update timed out after 300 seconds"
             )
             return False
-
-    @classmethod
-    async def install_pip_dependency(cls, package_name):
-        try:
-            # Ensure pip itself is up-to-date before installing the requested package
-            process_upgrade = await asyncio.create_subprocess_exec(
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "--upgrade",
-                "--root-user-action=ignore",
-                "pip",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            output_upgrade, _ = await process_upgrade.communicate()
-            output_upgrade = output_upgrade.decode()
-            LogManager.log_core("pip upgrade output:\n" + output_upgrade)
-            if process_upgrade.returncode != 0:
-                LogManager.log_core(
-                    f"Failed to upgrade pip. Return code: {process_upgrade.returncode}"
-                )
-
-            process = await asyncio.create_subprocess_exec(
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "--upgrade",
-                "--root-user-action=ignore",
-                package_name,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            output, _ = await process.communicate()
-            output = output.decode()
-            LogManager.log_core(output)
-            if process.returncode == 0:
-                LogManager.log_core(f"{package_name} installed/updated successfully.")
-            else:
-                LogManager.log_core(
-                    f"Failed to install {package_name}. Return code: {process.returncode}"
-                )
         except Exception as e:
             LogManager.log_core(
-                f"Failed to install {package_name}:  {e}\n{traceback.format_exc()}"
+                f"DependencyManager: Failed to update dependencies: {str(e)}"
             )
-
-    @classmethod
-    async def install_apt_packages(cls):
-        """
-        Ensure build dependencies, python3 and py3-pip are installed via apt, and wheel is installed via pip.
-        """
-        try:
-            # Install wheel using pip
-            process_pip = await asyncio.create_subprocess_exec(
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "--root-user-action=ignore",
-                "--upgrade",
-                "wheel",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            output_pip, _ = await process_pip.communicate()
-            output_pip = output_pip.decode()
-            LogManager.log_core("pip install wheel output:\n" + output_pip)
-            if process_pip.returncode != 0:
-                LogManager.log_core(
-                    f"Failed to install wheel. Return code: {process_pip.returncode}"
-                )
-        except Exception as e:
-            LogManager.log_core(
-                f"Failed to ensure python3, pip, and wheel: {e}\n{traceback.format_exc()}"
-            )
-
-    @classmethod
-    async def update_ytdlp(cls):
-        """Install or update yt-dlp using pip."""
-        try:
-            process = await asyncio.create_subprocess_exec(
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "--root-user-action=ignore",
-                "-U",
-                "--pre",
-                "yt-dlp[default]",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            output, _ = await process.communicate()
-            output = output.decode()
-            LogManager.log_core(output)
-            if process.returncode == 0:
-                LogManager.log_core("yt-dlp installed/updated successfully.")
-            else:
-                LogManager.log_core(
-                    f"Failed to install yt-dlp. Return code: {process.returncode}"
-                )
-        except Exception as e:
-            LogManager.log_core(
-                f"Failed to install yt-dlp:  {e}\n{traceback.format_exc()}"
-            )
+            return False

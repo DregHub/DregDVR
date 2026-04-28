@@ -1,0 +1,141 @@
+/* Color Picker Theme - Standard Streamlit Design */
+/* Target Streamlit 1.28+ with color picker components */
+
+.stColorPickerWidget {
+  width: 100%;
+}
+
+/* Color picker container */
+.stColorPickerWidget > div {
+  position: relative;
+}
+
+/* Color input field */
+.stColorPickerWidget input[type="color"] {
+  width: 100%;
+  height: 42px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  padding: 4px;
+  outline: none;
+}
+
+.stColorPickerWidget input[type="color"]:hover {
+  border-color: #d0d2d6;
+}
+
+.stColorPickerWidget input[type="color"]:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+}
+
+.stColorPickerWidget input[type="color"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--secondary-color);
+  border-color: var(--border-color);
+}
+
+/* Color picker popup/dropdown */
+.stColorPickerWidget input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border-radius: calc(var(--border-radius) - 2px);
+  overflow: hidden;
+}
+
+.stColorPickerWidget input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: calc(var(--border-radius) - 3px);
+}
+
+/* Color value display (if shown) */
+.stColorPickerWidget [data-testid*="color"] {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+/* Color preview circle */
+.stColorPickerWidget [data-testid*="preview"] {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  background-clip: padding-box;
+  transition: all 0.2s ease-out;
+}
+
+.stColorPickerWidget [data-testid*="preview"]:hover {
+  border-color: var(--primary-color);
+}
+
+/* Color value text (HEX/RGB display) */
+.stColorPickerWidget input[type="text"] {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-color);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  transition: all 0.2s ease-out;
+  outline: none;
+  min-width: 100px;
+}
+
+.stColorPickerWidget input[type="text"]:hover {
+  border-color: #d0d2d6;
+}
+
+.stColorPickerWidget input[type="text"]:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+}
+
+/* Label styling */
+.stColorPickerWidget > label {
+  color: var(--text-color);
+  font-weight: 500;
+  font-size: 14px;
+  margin-bottom: var(--spacing-xs);
+  display: block;
+}
+
+/* Help text */
+.stColorPickerWidget small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Color palette suggestions (if applicable) */
+.stColorPickerWidget [data-testid*="palette"] {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+}
+
+.stColorPickerWidget [data-testid*="palette"] button {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+}
+
+.stColorPickerWidget [data-testid*="palette"] button:hover {
+  border-color: var(--primary-color);
+  transform: scale(1.1);
+}
+
+.stColorPickerWidget [data-testid*="palette"] button:active {
+  transform: scale(0.95);
+}
